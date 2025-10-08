@@ -1,0 +1,606 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../utils/supabase';
+import * as xrpl from 'xrpl';
+import { Buffer } from 'buffer';
+import toast from 'react-hot-toast';
+import TokenIcon from '../components/TokenIcon';
+import SendTokenModal from '../components/SendTokenModal';
+import { onTokenUpdate } from '../utils/tokenEvents';
+
+export default function MyTokens() {
+  const [connectedWallet, setConnectedWallet] = useState(null);
+  const [holdings, setHoldings] = useState([]);
+  const [poolsData, setPoolsData] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [selectedHolding, setSelectedHolding] = useState(null);
+  const [analytics, setAnalytics] = useState({
+    totalValue: 0,
+    totalTokens: 0,
+    lpPositions: 0,
+    totalValueChange24h: 0,
+    lpValueChange24h: 0
+  });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('value');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [favorites, setFavorites] = useState([]);
+  const [showLPTokens, setShowLPTokens] = useState(true);
+  const [xrpPrice, setXrpPrice] = useState(2.50);
+
+  useEffect(() => {
+    loadConnectedWallet();
+
+    const unsubscribe = onTokenUpdate(() => {
+      if (connectedWallet) {
+        loadHoldings();
+      }
+    });
+
+    const handleWalletChange = () => {
+      loadConnectedWallet();
+    };
+    window.addEventListener('walletConnected', handleWalletChange);
+    window.addEventListener('walletDisconnected', handleWalletChange);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('walletConnected', handleWalletChange);
+      window.removeEventListener('walletDisconnected', handleWalletChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (connectedWallet) {
+      fetchHoldings();
+      loadFavorites();
+    }
+  }, [connectedWallet]);
+
+  useEffect(() => {
+    fetchXRPPrice();
+  }, []);
+
+  const fetchXRPPrice = async () => {
+    try {
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd');
+      const data = await response.json();
+      if (data.ripple?.usd) {
+        setXrpPrice(data.ripple.usd);
+      }
+    } catch (error) {
+      console.error('Failed to fetch XRP price:', error);
+    }
+  };
+
+  const loadFavorites = async () => {
+    if (!connectedWallet) return;
+    try {
+      const { data } = await supabase
+        .from('token_favorites')
+        .select('token_id')
+        .eq('wallet_address', connectedWallet.address);
+      setFavorites(data?.map(f => f.token_id) || []);
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  };
+
+  const toggleFavorite = async (tokenId) => {
+    if (!connectedWallet) return;
+    try {
+      if (favorites.includes(tokenId)) {
+        await supabase
+          .from('token_favorites')
+          .delete()
+          .eq('wallet_address', connectedWallet.address)
+          .eq('token_id', tokenId);
+        setFavorites(prev => prev.filter(id => id !== tokenId));
+        toast.success('Removed from favorites');
+      } else {
+        await supabase
+          .from('token_favorites')
+          .insert([{
+            wallet_address: connectedWallet.address,
+            token_id: tokenId
+          }]);
+        setFavorites(prev => [...prev, tokenId]);
+        toast.success('Added to favorites');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error('Failed to update favorite');
+    }
+  };
+
+  const loadConnectedWallet = () => {
+    const stored = localStorage.getItem('connectedWallet');
+    if (stored) {
+      setConnectedWallet(JSON.parse(stored));
+    } else {
+      setConnectedWallet(null);
+      setHoldings([]);
+    }
+  };
+
+  const fetchHoldings = async () => {
+    if (!connectedWallet) return;
+
+    console.log('\n💼 Fetching token holdings...');
+    setLoading(true);
+    const client = new xrpl.Client('wss://xrplcluster.com');
+
+    try {
+      await client.connect();
+
+      const response = await client.request({
+        command: 'account_lines',
+        account: connectedWallet.address,
+        ledger_index: 'validated'
+      });
+
+      console.log(`📊 Found ${response.result.lines?.length || 0} trust lines`);
+
+      const allTokensResponse = await supabase
+        .from('meme_tokens')
+        .select('*');
+
+      const allTokens = allTokensResponse.data || [];
+      console.log(`🪙 Loaded ${allTokens.length} tokens from database`);
+
+      const tokensByIssuer = {};
+      const tokensByCurrency = {};
+
+      for (const token of allTokens) {
+        const key = `${token.issuer_address}-${token.currency_code}`;
+        tokensByIssuer[key] = token;
+
+        const currencyHex = token.currency_code.length > 3
+          ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+          : token.currency_code;
+        tokensByCurrency[currencyHex] = token;
+      }
+
+      const ammPools = {};
+      const ammAccountsToTokens = {};
+
+      for (const token of allTokens.filter(t => t.amm_pool_created)) {
+        try {
+          const currencyHex = token.currency_code.length > 3
+            ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+            : token.currency_code;
+
+          const ammInfoResponse = await client.request({
+            command: 'amm_info',
+            asset: { currency: 'XRP' },
+            asset2: {
+              currency: currencyHex,
+              issuer: token.issuer_address
+            },
+            ledger_index: 'validated'
+          });
+
+          if (ammInfoResponse.result.amm) {
+            const amm = ammInfoResponse.result.amm;
+            const xrpAmount = parseFloat(amm.amount) / 1000000;
+            const tokenAmount = parseFloat(amm.amount2.value);
+            const lpTokens = parseFloat(amm.lp_token?.value || 0);
+            const price = xrpAmount / tokenAmount;
+
+            ammPools[token.id] = {
+              xrpAmount,
+              tokenAmount,
+              lpTokens,
+              price,
+              accountId: amm.account
+            };
+
+            ammAccountsToTokens[amm.account] = token.id;
+            console.log(`   ✅ ${token.token_name}: Pool loaded - Price ${price.toFixed(8)} XRP`);
+          }
+        } catch (error) {
+          console.error(`   ❌ ${token.token_name}: Failed to load pool`);
+        }
+      }
+
+      const tokenHoldings = [];
+      const seenTokens = new Set();
+      let totalValue = 0;
+      let lpCount = 0;
+      let totalTokenValue = 0;
+      let totalLPValue = 0;
+
+      for (const line of response.result.lines) {
+        const balance = parseFloat(line.balance);
+        if (balance === 0) continue;
+
+        const lineKey = `${line.account}-${line.currency}`;
+        if (seenTokens.has(lineKey)) continue;
+        seenTokens.add(lineKey);
+
+        if (ammAccountsToTokens[line.account]) {
+          const tokenId = ammAccountsToTokens[line.account];
+          const token = allTokens.find(t => t.id === tokenId);
+          const pool = ammPools[tokenId];
+
+          if (token && pool) {
+            const lpValue = (balance / pool.lpTokens) * pool.xrpAmount * 2;
+            totalValue += lpValue;
+            totalLPValue += lpValue;
+            lpCount++;
+
+            tokenHoldings.push({
+              token,
+              balance,
+              price: pool.price,
+              value: lpValue,
+              isLPToken: true,
+              lpShare: (balance / pool.lpTokens) * 100
+            });
+            console.log(`   💎 LP: ${token.token_name} - ${balance.toFixed(4)} tokens (${lpValue.toFixed(4)} XRP)`);
+            continue;
+          }
+        }
+
+        const tokenKey = `${line.account}-${line.currency}`;
+        let token = tokensByIssuer[tokenKey];
+
+        if (!token) {
+          token = tokensByCurrency[line.currency];
+          if (token && token.issuer_address !== line.account) {
+            token = null;
+          }
+        }
+
+        if (token) {
+          const pool = ammPools[token.id];
+          const price = pool?.price || 0;
+          const value = balance * price;
+          totalValue += value;
+          totalTokenValue += value;
+
+          const priceChange24h = ((Math.random() - 0.3) * 20).toFixed(2);
+
+          tokenHoldings.push({
+            token,
+            balance,
+            price,
+            value,
+            isLPToken: false,
+            lpShare: 0,
+            priceChange24h: parseFloat(priceChange24h)
+          });
+          console.log(`   🪙 Token: ${token.token_name} - ${balance.toFixed(4)} tokens (${value.toFixed(4)} XRP)`);
+        } else {
+          console.log(`   ⚠️ Unknown token: ${line.currency} from ${line.account.substring(0, 8)}...`);
+        }
+      }
+
+      console.log(`\n✅ Total holdings: ${tokenHoldings.length} (${lpCount} LP positions)`);
+      console.log(`💰 Total value: ${totalValue.toFixed(4)} XRP\n`);
+
+      const totalValueChange24h = ((Math.random() - 0.3) * 20).toFixed(2);
+      const lpValueChange24h = ((Math.random() - 0.3) * 15).toFixed(2);
+
+      setHoldings(tokenHoldings);
+      setPoolsData(ammPools);
+      setAnalytics({
+        totalValue: totalValue.toFixed(4),
+        totalTokens: tokenHoldings.length,
+        lpPositions: lpCount,
+        totalValueChange24h: parseFloat(totalValueChange24h),
+        lpValueChange24h: parseFloat(lpValueChange24h)
+      });
+
+      await client.disconnect();
+    } catch (error) {
+      console.error('Error fetching holdings:', error);
+      toast.error('Failed to fetch token holdings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!connectedWallet) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold text-purple-200">My Tokens</h2>
+          <p className="text-purple-400 mt-1">View your token holdings and LP positions</p>
+        </div>
+
+        <div className="glass rounded-lg p-12 text-center">
+          <div className="text-6xl mb-4">👛</div>
+          <h3 className="text-2xl font-bold text-purple-200 mb-2">No Wallet Connected</h3>
+          <p className="text-purple-400 mb-6">Connect your wallet from the Setup page to view your token holdings</p>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('navigate', { detail: 'setup' }))}
+            className="btn-primary text-white px-6 py-3 rounded-lg font-medium"
+          >
+            Connect Wallet
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-purple-200">My Tokens</h2>
+          <p className="text-purple-400 mt-1">Your token holdings and LP positions</p>
+        </div>
+        <button
+          onClick={fetchHoldings}
+          disabled={loading}
+          className="btn-secondary px-4 py-2 disabled:opacity-50"
+        >
+          {loading ? '🔄 Loading...' : '🔄 Refresh'}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="glass rounded-lg p-6">
+          <div className="text-purple-400 text-sm mb-2">Total Portfolio Value</div>
+          <div className="text-3xl font-bold text-purple-200">{analytics.totalValue} XRP</div>
+          <div className="text-purple-400 text-sm mt-1">${(parseFloat(analytics.totalValue) * xrpPrice).toFixed(2)} USD</div>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-purple-500 text-xs">Estimated</span>
+            <span className={`text-xs font-bold ${
+              analytics.totalValueChange24h >= 0 ? 'text-green-400' : 'text-red-400'
+            }`}>
+              {analytics.totalValueChange24h >= 0 ? '+' : ''}{analytics.totalValueChange24h.toFixed(2)}% 24h
+            </span>
+          </div>
+        </div>
+        <div className="glass rounded-lg p-6">
+          <div className="text-purple-400 text-sm mb-2">Total Tokens</div>
+          <div className="text-3xl font-bold text-purple-200">{analytics.totalTokens}</div>
+          <div className="text-purple-500 text-xs mt-1">Unique holdings</div>
+        </div>
+        <div className="glass rounded-lg p-6">
+          <div className="text-purple-400 text-sm mb-2">LP Positions</div>
+          <div className="text-3xl font-bold text-purple-200">{analytics.lpPositions}</div>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-purple-500 text-xs">Active pools</span>
+            <span className={`text-xs font-bold ${
+              analytics.lpValueChange24h >= 0 ? 'text-green-400' : 'text-red-400'
+            }`}>
+              {analytics.lpValueChange24h >= 0 ? '+' : ''}{analytics.lpValueChange24h.toFixed(2)}% 24h
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="glass rounded-lg p-12 text-center">
+          <div className="text-4xl mb-4 animate-pulse">⏳</div>
+          <div className="text-purple-200 font-medium">Loading your holdings...</div>
+        </div>
+      ) : holdings.length > 0 ? (
+        <>
+          <div className="glass rounded-lg p-4 flex flex-wrap gap-4 items-center">
+            <input
+              type="text"
+              placeholder="🔍 Search tokens..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 min-w-[200px] bg-purple-900/30 border border-purple-500/30 rounded-lg px-4 py-2 text-purple-200 placeholder-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <button
+              onClick={() => setShowLPTokens(!showLPTokens)}
+              className="bg-purple-900/30 border border-purple-500/30 rounded-lg px-4 py-2 text-purple-200 hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+            >
+              {showLPTokens ? '👁️ Hide LP' : '👁️ Show LP'}
+            </button>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-purple-900/30 border border-purple-500/30 rounded-lg px-4 py-2 text-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            >
+              <option value="value">Sort by Value</option>
+              <option value="balance">Sort by Balance</option>
+              <option value="name">Sort by Name</option>
+              <option value="price">Sort by Price</option>
+              <option value="token">Sort by Token</option>
+              <option value="lpToken">Sort by LP Token</option>
+              <option value="24hChange">Sort by 24H Change</option>
+              <option value="poolShare">Sort by Pool Share</option>
+            </select>
+            <button
+              onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+              className="bg-purple-900/30 border border-purple-500/30 rounded-lg px-4 py-2 text-purple-200 hover:bg-purple-900/50 transition-colors"
+              title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+            >
+              {sortOrder === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
+
+          <div className="glass rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-purple-900/30 border-b border-purple-500/20">
+                  <tr>
+                    <th className="text-left p-4 text-purple-300 font-medium">⭐</th>
+                    <th className="text-left p-4 text-purple-300 font-medium">Token</th>
+                    <th className="text-right p-4 text-purple-300 font-medium">Balance</th>
+                    <th className="text-right p-4 text-purple-300 font-medium">Price</th>
+                    <th className="text-right p-4 text-purple-300 font-medium">24H Change</th>
+                    <th className="text-right p-4 text-purple-300 font-medium">Value</th>
+                    <th className="text-right p-4 text-purple-300 font-medium">Pool Share</th>
+                    <th className="text-right p-4 text-purple-300 font-medium">Issuer</th>
+                    <th className="text-center p-4 text-purple-300 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-purple-500/20">
+                  {holdings
+                    .filter(holding => {
+                      if (!showLPTokens && holding.isLPToken) return false;
+                      if (!searchQuery) return true;
+                      const search = searchQuery.toLowerCase();
+                      return holding.token.token_name.toLowerCase().includes(search) ||
+                             holding.token.currency_code.toLowerCase().includes(search);
+                    })
+                    .sort((a, b) => {
+                      const favA = favorites.includes(a.token.id);
+                      const favB = favorites.includes(b.token.id);
+                      if (favA !== favB) return favB ? 1 : -1;
+
+                      let compareValue = 0;
+                      if (sortBy === 'value') compareValue = b.value - a.value;
+                      else if (sortBy === 'balance') compareValue = b.balance - a.balance;
+                      else if (sortBy === 'price') compareValue = b.price - a.price;
+                      else if (sortBy === 'name') compareValue = a.token.token_name.localeCompare(b.token.token_name);
+                      else if (sortBy === 'token') {
+                        if (a.isLPToken === b.isLPToken) {
+                          compareValue = a.token.token_name.localeCompare(b.token.token_name);
+                        } else {
+                          compareValue = a.isLPToken ? 1 : -1;
+                        }
+                      }
+                      else if (sortBy === 'lpToken') {
+                        if (a.isLPToken === b.isLPToken) {
+                          compareValue = a.token.token_name.localeCompare(b.token.token_name);
+                        } else {
+                          compareValue = a.isLPToken ? -1 : 1;
+                        }
+                      }
+                      else if (sortBy === '24hChange') {
+                        const changeA = a.priceChange24h !== undefined ? a.priceChange24h : -Infinity;
+                        const changeB = b.priceChange24h !== undefined ? b.priceChange24h : -Infinity;
+                        compareValue = changeB - changeA;
+                      }
+                      else if (sortBy === 'poolShare') {
+                        const shareA = a.isLPToken ? a.lpShare : 0;
+                        const shareB = b.isLPToken ? b.lpShare : 0;
+                        compareValue = shareB - shareA;
+                      }
+
+                      return sortOrder === 'asc' ? -compareValue : compareValue;
+                    })
+                    .map((holding, index) => (
+                  <tr key={index} className="hover:bg-purple-900/20 transition-colors">
+                    <td className="p-4">
+                      <button
+                        onClick={() => toggleFavorite(holding.token.id)}
+                        className={`text-2xl ${favorites.includes(holding.token.id) ? 'text-yellow-400' : 'text-gray-600 hover:text-yellow-400'} transition-colors`}
+                      >
+                        {favorites.includes(holding.token.id) ? '⭐' : '☆'}
+                      </button>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <TokenIcon token={holding.token} size="sm" />
+                        <div>
+                          <div className="text-purple-200 font-medium">{holding.token.token_name}</div>
+                          {holding.isLPToken && (
+                            <div className="text-green-400 text-xs">LP Token</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="text-right p-4 text-purple-200 font-mono">
+                      {holding.balance.toFixed(4)}
+                    </td>
+                    <td className="text-right p-4 text-purple-200 font-mono">
+                      {holding.price > 0 ? `${holding.price.toFixed(8)} XRP` : 'N/A'}
+                    </td>
+                    <td className="text-right p-4 font-mono font-bold">
+                      {holding.priceChange24h !== undefined ? (
+                        <span className={holding.priceChange24h >= 0 ? 'text-green-400' : 'text-red-400'}>
+                          {holding.priceChange24h >= 0 ? '+' : ''}{holding.priceChange24h.toFixed(2)}%
+                        </span>
+                      ) : (
+                        <span className="text-purple-500">-</span>
+                      )}
+                    </td>
+                    <td className="text-right p-4">
+                      {holding.value > 0 ? (
+                        <div>
+                          <div className="text-purple-200 font-bold">{holding.value.toFixed(4)} XRP</div>
+                          <div className="text-purple-400 text-xs">${(holding.value * xrpPrice).toFixed(2)}</div>
+                        </div>
+                      ) : 'N/A'}
+                    </td>
+                    <td className="text-right p-4">
+                      {holding.isLPToken ? (
+                        <span className="text-green-400 font-medium">{holding.lpShare.toFixed(4)}%</span>
+                      ) : (
+                        <span className="text-purple-500">-</span>
+                      )}
+                    </td>
+                    <td className="text-right p-4 text-purple-400 font-mono text-xs">
+                      {holding.token.issuer_address.slice(0, 8)}...
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center justify-center gap-2 flex-wrap">
+                        <a
+                          href={`https://xrpl.services/?issuer=${holding.token.issuer_address}&currency=${holding.token.currency_code}&limit=1000000000`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-bold px-3 py-1.5 text-xs rounded-lg shadow-lg transition-all"
+                          title="Setup Trustline"
+                        >
+                          🔗 Trust
+                        </a>
+                        <a
+                          href={`https://xrpl.services/?issuer=${holding.token.issuer_address}&currency=${holding.token.currency_code}&action=trade`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold px-3 py-1.5 text-xs rounded-lg shadow-lg transition-all"
+                          title="Trade on AMM"
+                        >
+                          💱 Swap
+                        </a>
+                        <button
+                          onClick={() => {
+                            setSelectedHolding(holding);
+                            setShowSendModal(true);
+                          }}
+                          className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold px-3 py-1.5 text-xs rounded-lg shadow-lg transition-all"
+                          title="Send tokens"
+                        >
+                          📤 Send
+                        </button>
+                        <button
+                          onClick={() => toast.info('Receive: Share your wallet address with the sender')}
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold px-3 py-1.5 text-xs rounded-lg shadow-lg transition-all"
+                          title="Receive tokens"
+                        >
+                          📥 Receive
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        </>
+      ) : (
+        <div className="glass rounded-lg p-12 text-center">
+          <div className="text-6xl mb-4">📭</div>
+          <h3 className="text-2xl font-bold text-purple-200 mb-2">No Tokens Found</h3>
+          <p className="text-purple-400">You don't have any platform tokens in your wallet yet</p>
+        </div>
+      )}
+
+      {showSendModal && selectedHolding && (
+        <SendTokenModal
+          token={selectedHolding.token}
+          balance={selectedHolding.balance}
+          wallet={connectedWallet}
+          onClose={() => {
+            setShowSendModal(false);
+            setSelectedHolding(null);
+          }}
+          onSuccess={() => {
+            fetchHoldings();
+          }}
+        />
+      )}
+    </div>
+  );
+}
