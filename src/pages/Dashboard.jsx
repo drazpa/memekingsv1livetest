@@ -831,6 +831,7 @@ export default function Dashboard() {
         imageUrl = await uploadImageToPinata(editImageFile);
         toast.dismiss();
         toast.success('Image uploaded successfully!');
+        console.log('New image URL:', imageUrl);
       }
 
       const updateData = {
@@ -838,9 +839,10 @@ export default function Dashboard() {
         supply: parseFloat(editingToken.supply),
         amm_xrp_amount: parseFloat(editingToken.amm_xrp_amount),
         amm_asset_amount: parseFloat(editingToken.amm_asset_amount),
-        image_url: imageUrl,
-        updated_at: new Date().toISOString()
+        image_url: imageUrl
       };
+
+      console.log('Updating token with data:', updateData);
 
       const { data, error } = await supabase
         .from('meme_tokens')
@@ -851,23 +853,20 @@ export default function Dashboard() {
       if (error) throw error;
 
       const updatedToken = data[0];
+      console.log('Updated token from database:', updatedToken);
 
-      setTokens(prevTokens =>
-        prevTokens.map(t => t.id === editingToken.id ? { ...updatedToken } : t)
-      );
-
-      emitTokenUpdate(editingToken.id);
+      const tokenId = editingToken.id;
 
       setEditingToken(null);
       setAdminPassword('');
       setEditImageFile(null);
       setEditImagePreview(null);
 
-      toast.success(`Token updated successfully!`);
+      toast.success(`Token updated successfully! Refreshing...`);
 
-      setTimeout(() => {
-        loadTokens();
-      }, 1000);
+      await loadTokens();
+
+      emitTokenUpdate(tokenId);
     } catch (error) {
       console.error('Update error:', error);
       toast.error('Failed to update token: ' + error.message);
