@@ -72,7 +72,7 @@ export default function BotTrader() {
     if (tokens.length > 0) {
       fetchAllPoolsData();
     }
-  }, [tokens]);
+  }, [tokens.length]);
 
   useEffect(() => {
     if (connectedWallet) {
@@ -84,7 +84,7 @@ export default function BotTrader() {
 
       return () => clearInterval(interval);
     }
-  }, [connectedWallet]);
+  }, [connectedWallet?.address]);
 
   useEffect(() => {
     const handleWalletChange = () => {

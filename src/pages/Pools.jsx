@@ -43,19 +43,19 @@ export default function Pools() {
     if (tokens.length > 0) {
       fetchAllPoolsData();
     }
-  }, [tokens]);
+  }, [tokens.length]);
 
   useEffect(() => {
     if (connectedWallet && Object.keys(poolsData).length > 0) {
       fetchLPBalances();
     }
-  }, [connectedWallet, poolsData]);
+  }, [connectedWallet?.address, Object.keys(poolsData).length]);
 
   useEffect(() => {
     if (connectedWallet) {
       loadFavorites();
     }
-  }, [connectedWallet]);
+  }, [connectedWallet?.address]);
 
   const loadConnectedWallet = () => {
     const stored = localStorage.getItem('connectedWallet');

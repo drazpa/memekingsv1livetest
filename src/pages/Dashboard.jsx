@@ -109,27 +109,22 @@ export default function Dashboard() {
   useEffect(() => {
     if (tokens.length > 0) {
       fetchAllPoolsData();
+      fetchTrustlineStats();
+      calculate24hTokens();
     }
-  }, [tokens]);
+  }, [tokens.length]);
 
   useEffect(() => {
     if (Object.keys(poolsData).length > 0) {
       calculateLivePoolStats();
     }
-  }, [poolsData]);
-
-  useEffect(() => {
-    if (tokens.length > 0) {
-      fetchTrustlineStats();
-      calculate24hTokens();
-    }
-  }, [tokens]);
+  }, [Object.keys(poolsData).length]);
 
   useEffect(() => {
     if (connectedWallet && Object.keys(poolsData).length > 0) {
       fetchLPBalances();
     }
-  }, [connectedWallet, poolsData]);
+  }, [connectedWallet?.address, Object.keys(poolsData).length]);
 
   const loadConnectedWallet = () => {
     const stored = localStorage.getItem('connectedWallet');
