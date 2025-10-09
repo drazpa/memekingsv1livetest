@@ -37,13 +37,24 @@ export default function KingsList() {
     setLoadingTokens(true);
     try {
       const { data, error } = await supabase
-        .from('tokens')
-        .select('*')
-        .order('name', { ascending: true });
+        .from('meme_tokens')
+        .select('id, token_name, currency_code, issuer_address, image_url, supply')
+        .eq('status', 'completed')
+        .order('token_name', { ascending: true });
 
       if (error) throw error;
-      setTokens(data || []);
-      console.log('Loaded tokens:', data?.length || 0, data);
+
+      const formattedTokens = (data || []).map(token => ({
+        id: token.id,
+        name: token.token_name,
+        currency_code: token.currency_code,
+        issuer_address: token.issuer_address,
+        image_url: token.image_url,
+        supply: token.supply
+      }));
+
+      setTokens(formattedTokens);
+      console.log('Loaded tokens:', formattedTokens.length, formattedTokens);
     } catch (error) {
       console.error('Error loading tokens:', error);
     } finally {
