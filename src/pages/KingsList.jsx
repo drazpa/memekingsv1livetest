@@ -90,18 +90,9 @@ export default function KingsList() {
         .filter(holder => holder.balance > 0)
         .sort((a, b) => b.balance - a.balance);
 
-      let developerBalance = 0;
-      try {
-        const accountInfo = await client.request({
-          command: 'account_info',
-          account: selectedToken.issuer_address,
-          ledger_index: 'validated'
-        });
-        const xrpBalance = parseFloat(accountInfo.result.account_data.Balance) / 1000000;
-        developerBalance = xrpBalance;
-      } catch (error) {
-        console.error('Error fetching developer balance:', error);
-      }
+      const totalSupplyIssued = selectedToken.initial_supply || 0;
+      const totalHeld = holders.reduce((sum, h) => sum + h.balance, 0);
+      const developerBalance = totalSupplyIssued - totalHeld;
 
       setRichList(holders);
       calculateStats(holders, totalTrustlines, developerBalance);
@@ -378,9 +369,14 @@ export default function KingsList() {
                   {formatNumber(stats.developerBalance)}
                 </div>
                 <div className="text-xs text-purple-300/80 mb-2">
-                  XRP Balance
+                  {selectedToken.currency_code}
                 </div>
-                <div className="text-xs font-mono text-purple-300/70 break-all">
+                <div className="text-sm font-semibold text-purple-300 mb-2">
+                  {(selectedToken.initial_supply || 0) > 0
+                    ? ((stats.developerBalance / selectedToken.initial_supply) * 100).toFixed(2)
+                    : '0.00'}% of supply
+                </div>
+                <div className="text-xs font-mono text-purple-400/60 break-all">
                   {selectedToken.issuer_address}
                 </div>
               </div>
