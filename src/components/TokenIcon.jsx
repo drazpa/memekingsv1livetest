@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 
 const IPFS_GATEWAYS = [
   'https://gateway.pinata.cloud/ipfs/',
@@ -9,7 +9,7 @@ const IPFS_GATEWAYS = [
 
 const imageCache = new Map();
 
-export default function TokenIcon({ token, size = 'md', className = '' }) {
+function TokenIcon({ token, size = 'md', className = '' }) {
   const cacheKey = `${token.id}-${token.image_url}`;
   const isCached = imageCache.has(cacheKey);
 
@@ -119,3 +119,12 @@ export default function TokenIcon({ token, size = 'md', className = '' }) {
     </div>
   );
 }
+
+export default memo(TokenIcon, (prevProps, nextProps) => {
+  return (
+    prevProps.token.id === nextProps.token.id &&
+    prevProps.token.image_url === nextProps.token.image_url &&
+    prevProps.size === nextProps.size &&
+    prevProps.className === nextProps.className
+  );
+});
