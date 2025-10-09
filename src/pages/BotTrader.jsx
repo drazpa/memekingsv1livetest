@@ -61,6 +61,7 @@ export default function BotTrader() {
   });
   const [ticker, setTicker] = useState(0);
   const botIntervals = useRef({});
+  const fetchingPools = useRef(new Set());
 
   useEffect(() => {
     loadTokens();
@@ -201,18 +202,36 @@ export default function BotTrader() {
   };
 
   const fetchAllPoolsData = async () => {
-    const newPoolsData = {};
-    for (const token of tokens) {
+    const tokensToFetch = tokens.filter(token =>
+      !poolsData[token.id] && !fetchingPools.current.has(token.id)
+    );
+
+    if (tokensToFetch.length === 0) return;
+
+    tokensToFetch.forEach(token => fetchingPools.current.add(token.id));
+
+    const poolPromises = tokensToFetch.map(async (token) => {
       try {
         const poolData = await fetchPoolData(token);
-        if (poolData) {
-          newPoolsData[token.id] = poolData;
-        }
+        return { tokenId: token.id, poolData };
       } catch (error) {
         console.error(`Error fetching pool data for ${token.token_name}:`, error);
+        return { tokenId: token.id, poolData: null };
+      } finally {
+        fetchingPools.current.delete(token.id);
       }
-    }
-    setPoolsData(newPoolsData);
+    });
+
+    const results = await Promise.all(poolPromises);
+    setPoolsData(prev => {
+      const updated = { ...prev };
+      results.forEach(({ tokenId, poolData }) => {
+        if (poolData) {
+          updated[tokenId] = poolData;
+        }
+      });
+      return updated;
+    });
   };
 
   const fetchPoolData = async (token) => {
@@ -306,6 +325,23 @@ export default function BotTrader() {
       if (error) throw error;
 
       setBots(data || []);
+
+      if (data && data.length > 0 && tokens.length > 0) {
+        const botTokenIds = [...new Set(data.map(bot => bot.token_id))];
+        const botTokens = tokens.filter(token => botTokenIds.includes(token.id));
+        for (const token of botTokens) {
+          if (!poolsData[token.id] && !fetchingPools.current.has(token.id)) {
+            fetchingPools.current.add(token.id);
+            fetchPoolData(token).then(poolData => {
+              if (poolData) {
+                setPoolsData(prev => ({ ...prev, [token.id]: poolData }));
+              }
+            }).finally(() => {
+              fetchingPools.current.delete(token.id);
+            });
+          }
+        }
+      }
 
       const runningBotIds = JSON.parse(localStorage.getItem('runningBots') || '[]');
       data?.forEach(bot => {
@@ -438,6 +474,19 @@ export default function BotTrader() {
 
       toast.success('Trading bot created successfully!');
       setBots([data, ...bots]);
+
+      const createdToken = tokens.find(t => t.id === newBot.tokenId);
+      if (createdToken && !poolsData[createdToken.id] && !fetchingPools.current.has(createdToken.id)) {
+        fetchingPools.current.add(createdToken.id);
+        try {
+          const poolData = await fetchPoolData(createdToken);
+          if (poolData) {
+            setPoolsData(prev => ({ ...prev, [createdToken.id]: poolData }));
+          }
+        } finally {
+          fetchingPools.current.delete(createdToken.id);
+        }
+      }
 
       setPaymentProgress({ show: false, message: '' });
       setShowCreateBot(false);
@@ -1558,6 +1607,11 @@ export default function BotTrader() {
                       {favoriteTokens.includes(token.id) ? '⭐' : '☆'}
                     </button>
                   </div>
+                  {poolsData[token.id] && (
+                    <div className="text-xs text-blue-300 text-center">
+                      {poolsData[token.id].price.toFixed(8)} XRP
+                    </div>
+                  )}
                   <button
                     onClick={() => {
                       setNewBot({ ...newBot, tokenId: token.id });
