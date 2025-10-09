@@ -181,15 +181,28 @@ class AIAssistant {
         };
       }
 
+      const totalSupply = tokens.reduce((sum, t) => sum + (parseFloat(t.total_supply) || 0), 0);
+      const avgVolume = tokens.reduce((sum, t) => sum + (t.volume_24h || 0), 0) / tokens.length;
+
       return {
-        content: `I found ${tokens.length} recent tokens. Here are the latest:`,
+        content: `I found ${tokens.length} recent tokens from the platform database:`,
         data: {
+          card: {
+            icon: '💎',
+            title: 'Token Overview',
+            badge: `${tokens.length} Tokens`,
+            items: [
+              { label: 'Total Tokens', value: `${tokens.length}` },
+              { label: 'Avg 24h Volume', value: avgVolume.toFixed(2) },
+              { label: 'Total Supply', value: totalSupply.toFixed(0) }
+            ]
+          },
           table: {
-            headers: ['Token', 'Symbol', 'Creator', 'Created'],
+            headers: ['Token', 'Symbol', 'Volume', 'Created'],
             rows: tokens.slice(0, 5).map(token => [
               token.name || 'Unknown',
               token.currency_code || 'N/A',
-              `${token.issuer_address?.slice(0, 8)}...`,
+              token.volume_24h ? token.volume_24h.toFixed(2) : 'N/A',
               new Date(token.created_at).toLocaleDateString()
             ])
           },
@@ -199,6 +212,12 @@ class AIAssistant {
               icon: '📋',
               style: 'primary',
               onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'mytokens' }))
+            },
+            {
+              label: 'Trade Tokens',
+              icon: '💱',
+              style: 'secondary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'trade' }))
             }
           ]
         }
@@ -237,14 +256,29 @@ class AIAssistant {
         };
       }
 
+      const successfulTrades = trades.filter(t => t.status === 'success').length;
+      const totalVolume = trades.reduce((sum, t) => sum + (t.amount_bought || 0), 0);
+      const successRate = trades.length > 0 ? (successfulTrades / trades.length * 100).toFixed(1) : 0;
+
       return {
-        content: `Here are your ${trades.length} most recent trades:`,
+        content: `Here is your trading activity from the platform:`,
         data: {
+          card: {
+            icon: '📊',
+            title: 'Trading Summary',
+            badge: `${trades.length} Trades`,
+            items: [
+              { label: 'Total Trades', value: `${trades.length}` },
+              { label: 'Successful', value: `${successfulTrades}` },
+              { label: 'Success Rate', value: `${successRate}%` },
+              { label: 'Total Volume', value: `${totalVolume.toFixed(2)} tokens` }
+            ]
+          },
           table: {
             headers: ['Type', 'Amount', 'Status', 'Date'],
             rows: trades.map(trade => [
               trade.trade_type || 'Unknown',
-              `${trade.amount_bought || 0} tokens`,
+              `${(trade.amount_bought || 0).toFixed(2)}`,
               trade.status || 'N/A',
               new Date(trade.created_at).toLocaleString()
             ])
@@ -255,6 +289,12 @@ class AIAssistant {
               icon: '📊',
               style: 'primary',
               onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'bottrader' }))
+            },
+            {
+              label: 'Start Trading',
+              icon: '💱',
+              style: 'secondary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'trade' }))
             }
           ]
         }
@@ -268,25 +308,58 @@ class AIAssistant {
   }
 
   async handlePriceQuery(message) {
-    return {
-      content: 'I can help you check token prices! To get the most accurate price information, please visit the Trade page where you can see real-time prices for all tokens.',
-      data: {
-        actions: [
-          {
-            label: 'View Prices',
-            icon: '💰',
-            style: 'primary',
-            onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'trade' }))
+    try {
+      const { data: tokens, error } = await supabase
+        .from('tokens')
+        .select('*')
+        .order('volume_24h', { ascending: false, nullsFirst: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      return {
+        content: 'Here are the top tokens by trading volume:',
+        data: {
+          table: {
+            headers: ['Token', 'Symbol', '24h Volume', '24h Change'],
+            rows: tokens?.map(token => [
+              token.name || 'Unknown',
+              token.currency_code || 'N/A',
+              token.volume_24h ? `${token.volume_24h.toFixed(2)}` : 'N/A',
+              token.price_change_24h ? `${token.price_change_24h > 0 ? '+' : ''}${token.price_change_24h.toFixed(2)}%` : 'N/A'
+            ]) || []
           },
-          {
-            label: 'Top 10 Tokens',
-            icon: '👑',
-            style: 'secondary',
-            onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'top10' }))
-          }
-        ]
-      }
-    };
+          actions: [
+            {
+              label: 'View All Prices',
+              icon: '💰',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'trade' }))
+            },
+            {
+              label: 'Top 10 Tokens',
+              icon: '👑',
+              style: 'secondary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'top10' }))
+            }
+          ]
+        }
+      };
+    } catch (error) {
+      return {
+        content: 'I can help you check token prices! Visit the Trade page for real-time prices.',
+        data: {
+          actions: [
+            {
+              label: 'View Prices',
+              icon: '💰',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'trade' }))
+            }
+          ]
+        }
+      };
+    }
   }
 
   async handleMarketQuery() {
@@ -294,7 +367,7 @@ class AIAssistant {
       const { data: tokens, error } = await supabase
         .from('tokens')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('price_change_24h', { ascending: false, nullsFirst: false })
         .limit(10);
 
       if (error) throw error;
@@ -307,8 +380,20 @@ class AIAssistant {
         .from('liquidity_pools')
         .select('*', { count: 'exact', head: true });
 
+      const { count: activeBots } = await supabase
+        .from('trading_bots')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
+
+      const topGainer = tokens && tokens.length > 0 ? tokens[0] : null;
+      const recentTokens = tokens?.filter(t => {
+        const created = new Date(t.created_at);
+        const now = new Date();
+        return (now - created) < 24 * 60 * 60 * 1000;
+      }).length || 0;
+
       return {
-        content: 'Here is the current market overview:',
+        content: 'Here is the current market overview with real-time data from the platform:',
         data: {
           card: {
             icon: '📊',
@@ -317,8 +402,19 @@ class AIAssistant {
             items: [
               { label: 'Total Tokens', value: `${totalTokens || 0}` },
               { label: 'Active Pools', value: `${totalPools || 0}` },
-              { label: 'Recent Tokens', value: `${tokens?.length || 0} new today` }
+              { label: 'Active Bots', value: `${activeBots || 0}` },
+              { label: '24h New Tokens', value: `${recentTokens}` },
+              { label: 'Top Gainer', value: topGainer ? `${topGainer.name}` : 'N/A' }
             ]
+          },
+          table: {
+            headers: ['Token', 'Symbol', '24h Change', 'Created'],
+            rows: tokens?.slice(0, 5).map(token => [
+              token.name || 'Unknown',
+              token.currency_code || 'N/A',
+              token.price_change_24h ? `${token.price_change_24h > 0 ? '+' : ''}${token.price_change_24h.toFixed(2)}%` : 'N/A',
+              new Date(token.created_at).toLocaleDateString()
+            ]) || []
           },
           actions: [
             {
