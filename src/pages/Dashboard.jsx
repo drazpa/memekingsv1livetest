@@ -2009,21 +2009,33 @@ export default function Dashboard() {
                     />
                     <p className="text-purple-400 text-xs mt-1">Upload new image or leave blank to keep current</p>
                   </div>
-                  {(editImagePreview || editingToken.image_url) && (
-                    <div className="w-20 h-20 rounded-lg border-2 border-purple-500/30 overflow-hidden bg-gradient-to-br from-purple-900 to-purple-800 flex items-center justify-center">
+                  <div className="w-20 h-20 rounded-lg border-2 border-purple-500/30 overflow-hidden bg-gradient-to-br from-purple-900 to-purple-800 flex items-center justify-center">
+                    {editImagePreview ? (
                       <img
-                        src={editImagePreview || editingToken.image_url}
+                        src={editImagePreview}
                         alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : editingToken.image_url ? (
+                      <img
+                        src={
+                          editingToken.image_url.startsWith('ipfs://')
+                            ? editingToken.image_url.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')
+                            : editingToken.image_url.startsWith('http')
+                            ? editingToken.image_url
+                            : `https://gateway.pinata.cloud/ipfs/${editingToken.image_url}`
+                        }
+                        alt="Current"
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           e.target.style.display = 'none';
+                          e.target.parentElement.innerHTML = `<span class="text-2xl text-purple-300">${editingToken.token_name[0]}</span>`;
                         }}
                       />
-                      {!editImagePreview && !editingToken.image_url && (
-                        <span className="text-3xl">{editingToken.token_name[0]}</span>
-                      )}
-                    </div>
-                  )}
+                    ) : (
+                      <span className="text-2xl text-purple-300">{editingToken.token_name[0]}</span>
+                    )}
+                  </div>
                 </div>
               </div>
 
