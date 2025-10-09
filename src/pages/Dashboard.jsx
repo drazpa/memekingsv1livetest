@@ -787,6 +787,7 @@ export default function Dashboard() {
         if (error) throw error;
         toast.success(`Token ${adminAction.token.token_name} deleted!`);
       } else if (adminAction.type === 'edit') {
+        console.log('Opening edit modal for token:', adminAction.token.token_name, 'Image URL:', adminAction.token.image_url);
         setEditingToken(adminAction.token);
         setEditImageFile(null);
         setEditImagePreview(null);
@@ -807,12 +808,22 @@ export default function Dashboard() {
   const handleEditImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      console.log('Edit image file selected:', file.name, file.type, file.size);
       setEditImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
+        console.log('Edit image preview generated, length:', reader.result.length);
         setEditImagePreview(reader.result);
       };
+      reader.onerror = (error) => {
+        console.error('FileReader error:', error);
+        toast.error('Failed to read image file');
+      };
       reader.readAsDataURL(file);
+    } else {
+      console.log('No file selected');
+      setEditImageFile(null);
+      setEditImagePreview(null);
     }
   };
 
@@ -839,7 +850,9 @@ export default function Dashboard() {
         supply: parseFloat(editingToken.supply),
         amm_xrp_amount: parseFloat(editingToken.amm_xrp_amount),
         amm_asset_amount: parseFloat(editingToken.amm_asset_amount),
-        image_url: imageUrl
+        image_url: imageUrl,
+        is_featured: editingToken.is_featured || false,
+        featured_order: editingToken.is_featured ? (editingToken.featured_order || null) : null
       };
 
       console.log('Updating token with data:', updateData);
@@ -912,9 +925,17 @@ export default function Dashboard() {
   const userTokens = tokens.filter(t => t.issuer_address !== ISSUER_ADDRESS);
 
   const topTokens = [...tokens]
-    .filter(t => t.amm_pool_created)
-    .sort((a, b) => parseFloat(calculateMarketCap(b)) - parseFloat(calculateMarketCap(a)))
+    .filter(t => t.is_featured && t.amm_pool_created)
+    .sort((a, b) => (a.featured_order || 999) - (b.featured_order || 999))
     .slice(0, 3);
+
+  if (topTokens.length < 3) {
+    const nonFeaturedTokens = [...tokens]
+      .filter(t => !t.is_featured && t.amm_pool_created)
+      .sort((a, b) => parseFloat(calculateMarketCap(b)) - parseFloat(calculateMarketCap(a)))
+      .slice(0, 3 - topTokens.length);
+    topTokens.push(...nonFeaturedTokens);
+  }
 
   const TokenCard = ({ token, featured = false }) => (
     <div
@@ -1997,6 +2018,32 @@ export default function Dashboard() {
               </div>
 
               <div>
+                <label className="block text-purple-300 mb-2">Featured Token</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={editingToken.is_featured || false}
+                    onChange={(e) => setEditingToken({ ...editingToken, is_featured: e.target.checked })}
+                    className="w-5 h-5 rounded border-purple-500 bg-purple-900/50 text-purple-600 focus:ring-purple-500"
+                  />
+                  <span className="text-purple-300">Mark as featured token (top 3)</span>
+                </div>
+                {editingToken.is_featured && (
+                  <div className="mt-2">
+                    <label className="block text-purple-300 text-sm mb-1">Featured Order (1-3)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="3"
+                      value={editingToken.featured_order || 1}
+                      onChange={(e) => setEditingToken({ ...editingToken, featured_order: parseInt(e.target.value) })}
+                      className="input w-32 text-purple-200"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
                 <label className="block text-purple-300 mb-2">Token Icon</label>
                 <div className="flex gap-4">
                   <div className="flex-1">
@@ -2015,21 +2062,25 @@ export default function Dashboard() {
                         src={editImagePreview}
                         alt="Preview"
                         className="w-full h-full object-cover"
+                        onLoad={() => console.log('Preview image loaded')}
+                        onError={() => console.error('Preview image failed to load')}
                       />
                     ) : editingToken.image_url ? (
                       <img
-                        src={
-                          editingToken.image_url.startsWith('ipfs://')
-                            ? editingToken.image_url.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')
-                            : editingToken.image_url.startsWith('http')
-                            ? editingToken.image_url
-                            : `https://gateway.pinata.cloud/ipfs/${editingToken.image_url}`
-                        }
+                        src={editingToken.image_url}
                         alt="Current"
                         className="w-full h-full object-cover"
+                        onLoad={() => console.log('Current token image loaded:', editingToken.image_url)}
                         onError={(e) => {
+                          console.error('Current token image failed to load:', editingToken.image_url);
                           e.target.style.display = 'none';
-                          e.target.parentElement.innerHTML = `<span class="text-2xl text-purple-300">${editingToken.token_name[0]}</span>`;
+                          const parent = e.target.parentElement;
+                          if (parent && !parent.querySelector('span')) {
+                            const span = document.createElement('span');
+                            span.className = 'text-2xl text-purple-300';
+                            span.textContent = editingToken.token_name[0];
+                            parent.appendChild(span);
+                          }
                         }}
                       />
                     ) : (
