@@ -37,6 +37,13 @@ export default function BotTrader() {
   const [nextTradeTimes, setNextTradeTimes] = useState({});
   const [nextTradeActions, setNextTradeActions] = useState({});
   const [botAnnouncements, setBotAnnouncements] = useState({});
+  const [viewMode, setViewMode] = useState('grid');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [favoriteTokens, setFavoriteTokens] = useState([]);
+  const [botViewMode, setBotViewMode] = useState('grid');
+  const [botSearchQuery, setBotSearchQuery] = useState('');
+  const [favoriteBots, setFavoriteBots] = useState([]);
+  const [botSortBy, setBotSortBy] = useState('name');
   const [newBot, setNewBot] = useState({
     name: '',
     tokenId: '',
@@ -58,6 +65,7 @@ export default function BotTrader() {
   useEffect(() => {
     loadTokens();
     loadConnectedWallet();
+    loadFavorites();
   }, []);
 
   useEffect(() => {
@@ -77,6 +85,8 @@ export default function BotTrader() {
   useEffect(() => {
     if (connectedWallet) {
       loadBots();
+      loadFavorites();
+      loadBotFavorites();
 
       const interval = setInterval(() => {
         refreshBotsFromDatabase();
@@ -102,6 +112,77 @@ export default function BotTrader() {
     const stored = localStorage.getItem('connectedWallet');
     if (stored) {
       setConnectedWallet(JSON.parse(stored));
+    }
+  };
+
+  const loadFavorites = async () => {
+    if (!connectedWallet) return;
+    try {
+      const { data, error } = await supabase
+        .from('token_favorites')
+        .select('token_id')
+        .eq('wallet_address', connectedWallet.address);
+      if (error) throw error;
+      setFavoriteTokens(data?.map(f => f.token_id) || []);
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  };
+
+  const loadBotFavorites = () => {
+    if (!connectedWallet) return;
+    try {
+      const stored = localStorage.getItem(`bot_favorites_${connectedWallet.address}`);
+      if (stored) {
+        setFavoriteBots(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Error loading bot favorites:', error);
+    }
+  };
+
+  const toggleBotFavorite = (botId) => {
+    if (!connectedWallet) return;
+
+    const isFavorite = favoriteBots.includes(botId);
+    const newFavorites = isFavorite
+      ? favoriteBots.filter(id => id !== botId)
+      : [...favoriteBots, botId];
+
+    setFavoriteBots(newFavorites);
+    localStorage.setItem(`bot_favorites_${connectedWallet.address}`, JSON.stringify(newFavorites));
+    toast.success(isFavorite ? 'Removed from favorites' : 'Added to favorites');
+  };
+
+  const toggleFavorite = async (tokenId) => {
+    if (!connectedWallet) return;
+
+    const isFavorite = favoriteTokens.includes(tokenId);
+
+    try {
+      if (isFavorite) {
+        const { error } = await supabase
+          .from('token_favorites')
+          .delete()
+          .eq('wallet_address', connectedWallet.address)
+          .eq('token_id', tokenId);
+        if (error) throw error;
+        setFavoriteTokens(prev => prev.filter(id => id !== tokenId));
+        toast.success('Removed from favorites');
+      } else {
+        const { error } = await supabase
+          .from('token_favorites')
+          .insert({
+            wallet_address: connectedWallet.address,
+            token_id: tokenId
+          });
+        if (error) throw error;
+        setFavoriteTokens(prev => [...prev, tokenId]);
+        toast.success('Added to favorites');
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      toast.error('Failed to update favorites');
     }
   };
 
@@ -1126,6 +1207,49 @@ export default function BotTrader() {
     );
   };
 
+  const filteredBots = bots.filter(bot => {
+    const token = tokens.find(t => t.id === bot.token_id);
+    const matchesSearch = bot.name.toLowerCase().includes(botSearchQuery.toLowerCase()) ||
+                          token?.token_name.toLowerCase().includes(botSearchQuery.toLowerCase()) ||
+                          token?.currency_code.toLowerCase().includes(botSearchQuery.toLowerCase());
+    return matchesSearch;
+  });
+
+  const sortedBots = [...filteredBots].sort((a, b) => {
+    const aFav = favoriteBots.includes(a.id);
+    const bFav = favoriteBots.includes(b.id);
+    if (aFav && !bFav) return -1;
+    if (!aFav && bFav) return 1;
+
+    const tokenA = tokens.find(t => t.id === a.token_id);
+    const tokenB = tokens.find(t => t.id === b.token_id);
+
+    if (botSortBy === 'name') {
+      return a.name.localeCompare(b.name);
+    } else if (botSortBy === 'token') {
+      return (tokenA?.token_name || '').localeCompare(tokenB?.token_name || '');
+    } else if (botSortBy === 'status') {
+      if (a.is_active && !b.is_active) return -1;
+      if (!a.is_active && b.is_active) return 1;
+      return 0;
+    }
+    return 0;
+  });
+
+  const filteredTokens = tokens.filter(token => {
+    const matchesSearch = token.token_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          token.currency_code.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSearch;
+  });
+
+  const sortedTokens = [...filteredTokens].sort((a, b) => {
+    const aFav = favoriteTokens.includes(a.id);
+    const bFav = favoriteTokens.includes(b.id);
+    if (aFav && !bFav) return -1;
+    if (!aFav && bFav) return 1;
+    return 0;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -1160,11 +1284,180 @@ export default function BotTrader() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {bots.map(bot => (
-          <BotCard key={bot.id} bot={bot} />
-        ))}
-      </div>
+      {connectedWallet && bots.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-2xl font-bold text-blue-200">My Bots ({sortedBots.length})</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBotViewMode('list')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  botViewMode === 'list' ? 'bg-blue-600 text-white' : 'glass text-blue-300'
+                }`}
+              >
+                List
+              </button>
+              <button
+                onClick={() => setBotViewMode('grid')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  botViewMode === 'grid' ? 'bg-blue-600 text-white' : 'glass text-blue-300'
+                }`}
+              >
+                Grid
+              </button>
+            </div>
+          </div>
+
+          <div className="glass rounded-lg p-4 space-y-3">
+            <input
+              type="text"
+              placeholder="Search bots by name or token..."
+              value={botSearchQuery}
+              onChange={(e) => setBotSearchQuery(e.target.value)}
+              className="input w-full"
+            />
+            <div className="flex gap-2">
+              <select
+                value={botSortBy}
+                onChange={(e) => setBotSortBy(e.target.value)}
+                className="input flex-1"
+              >
+                <option value="name">Sort by Name</option>
+                <option value="token">Sort by Token</option>
+                <option value="status">Sort by Status</option>
+              </select>
+            </div>
+          </div>
+
+          {botViewMode === 'grid' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+              {sortedBots.map(bot => (
+                <div key={bot.id} className="relative">
+                  <button
+                    onClick={() => toggleBotFavorite(bot.id)}
+                    className="absolute top-2 right-2 z-10 text-2xl hover:scale-110 transition-transform bg-black/50 rounded-full w-8 h-8 flex items-center justify-center"
+                  >
+                    {favoriteBots.includes(bot.id) ? '⭐' : '☆'}
+                  </button>
+                  <BotCard bot={bot} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="glass rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-blue-500/20 border-b border-blue-500/30">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Fav</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Bot Name</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Token</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Status</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Strategy</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Interval</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Amount Range</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Total Trades</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Next Trade</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold text-blue-200">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-blue-500/20">
+                    {sortedBots.map(bot => {
+                      const token = tokens.find(t => t.id === bot.token_id);
+                      const nextTime = nextTradeTimes[bot.id];
+                      const timeUntil = nextTime ? Math.max(0, Math.floor((nextTime - Date.now()) / 1000)) : 0;
+                      const minutes = Math.floor(timeUntil / 60);
+                      const seconds = timeUntil % 60;
+
+                      return (
+                        <tr key={bot.id} className="hover:bg-blue-500/10 transition-colors">
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={() => toggleBotFavorite(bot.id)}
+                              className="text-2xl hover:scale-110 transition-transform"
+                            >
+                              {favoriteBots.includes(bot.id) ? '⭐' : '☆'}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-blue-200">{bot.name}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {token && (
+                              <div className="flex items-center gap-2">
+                                <TokenIcon token={token} size="sm" />
+                                <div>
+                                  <div className="text-sm font-medium text-blue-200">{token.token_name}</div>
+                                  <div className="text-xs text-blue-400">{token.currency_code}</div>
+                                </div>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              bot.is_active
+                                ? 'bg-green-500/20 text-green-300'
+                                : 'bg-gray-500/20 text-gray-400'
+                            }`}>
+                              {bot.is_active ? '🟢 Active' : '⚫ Paused'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-blue-300">
+                              {bot.strategy === BOT_STRATEGIES.BALANCED && '⚖️ Balanced'}
+                              {bot.strategy === BOT_STRATEGIES.ACCUMULATE && '📈 Accumulate'}
+                              {bot.strategy === BOT_STRATEGIES.DISTRIBUTE && '📉 Distribute'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-blue-300">{bot.trade_interval}m</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-blue-300">
+                              {bot.min_amount} - {bot.max_amount} XRP
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-blue-300">{bot.total_trades || 0}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            {bot.is_active ? (
+                              <span className="text-sm text-blue-300">
+                                {minutes}m {seconds}s
+                              </span>
+                            ) : (
+                              <span className="text-sm text-gray-500">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => setSelectedBot(bot)}
+                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                              >
+                                View
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditingBot(bot);
+                                  setShowEditBot(true);
+                                }}
+                                className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {!loading && bots.length === 0 && connectedWallet && (
         <div className="glass rounded-lg p-12 text-center">
@@ -1173,6 +1466,114 @@ export default function BotTrader() {
           <p className="text-blue-400 mb-6">
             Create your first automated trading bot to start trading
           </p>
+        </div>
+      )}
+
+      {connectedWallet && tokens.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-2xl font-bold text-blue-200">Available Tokens</h3>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === 'list' ? 'bg-blue-600 text-white' : 'glass text-blue-300'
+                }`}
+              >
+                List
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === 'grid' ? 'bg-blue-600 text-white' : 'glass text-blue-300'
+                }`}
+              >
+                Grid
+              </button>
+            </div>
+          </div>
+
+          <div className="glass rounded-lg p-4">
+            <input
+              type="text"
+              placeholder="Search tokens by name or code..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input w-full"
+            />
+          </div>
+
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {sortedTokens.map(token => (
+                <div key={token.id} className="glass rounded-lg p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <TokenIcon token={token} size="md" />
+                      <div>
+                        <div className="font-semibold text-blue-200">{token.token_name}</div>
+                        <div className="text-xs text-blue-400">{token.currency_code}</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => toggleFavorite(token.id)}
+                      className="text-2xl hover:scale-110 transition-transform"
+                    >
+                      {favoriteTokens.includes(token.id) ? '⭐' : '☆'}
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setNewBot({ ...newBot, tokenId: token.id });
+                      setShowCreateBot(true);
+                    }}
+                    className="w-full btn-primary text-white px-4 py-2 rounded-lg text-sm"
+                  >
+                    Create Bot
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {sortedTokens.map(token => (
+                <div key={token.id} className="glass rounded-lg p-4 flex items-center justify-between hover:bg-blue-500/10 transition-colors">
+                  <div className="flex items-center gap-4 flex-1">
+                    <button
+                      onClick={() => toggleFavorite(token.id)}
+                      className="text-2xl hover:scale-110 transition-transform"
+                    >
+                      {favoriteTokens.includes(token.id) ? '⭐' : '☆'}
+                    </button>
+                    <TokenIcon token={token} size="md" />
+                    <div className="flex-1">
+                      <div className="font-semibold text-blue-200">{token.token_name}</div>
+                      <div className="text-sm text-blue-400">{token.currency_code}</div>
+                    </div>
+                    {poolsData[token.id] && (
+                      <div className="text-right">
+                        <div className="text-sm text-blue-300">
+                          Price: {poolsData[token.id].price?.toFixed(6) || 'N/A'} XRP
+                        </div>
+                        <div className="text-xs text-blue-400">
+                          {bots.filter(b => b.token_id === token.id).length} bot(s)
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setNewBot({ ...newBot, tokenId: token.id });
+                      setShowCreateBot(true);
+                    }}
+                    className="btn-primary text-white px-6 py-2 rounded-lg ml-4"
+                  >
+                    Create Bot
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
