@@ -719,13 +719,38 @@ export default function BotTrader() {
   const updateBot = async () => {
     if (!editingBot) return;
 
-    if (editingBot.interval < 1) {
+    if (!editingBot.name || editingBot.name.trim() === '') {
+      toast.error('Bot name is required');
+      return;
+    }
+
+    const interval = parseInt(editingBot.interval);
+    if (isNaN(interval) || interval < 1) {
       toast.error('Minimum interval is 1 minute');
       return;
     }
 
-    if (editingBot.minAmount >= editingBot.maxAmount) {
+    const minAmount = parseFloat(editingBot.minAmount);
+    const maxAmount = parseFloat(editingBot.maxAmount);
+
+    if (isNaN(minAmount) || minAmount < MIN_XRP_AMOUNT) {
+      toast.error(`Minimum amount must be at least ${MIN_XRP_AMOUNT} XRP`);
+      return;
+    }
+
+    if (isNaN(maxAmount) || maxAmount < MIN_XRP_AMOUNT) {
+      toast.error(`Maximum amount must be at least ${MIN_XRP_AMOUNT} XRP`);
+      return;
+    }
+
+    if (minAmount >= maxAmount) {
       toast.error('Min amount must be less than max amount');
+      return;
+    }
+
+    const slippage = parseFloat(editingBot.slippage);
+    if (isNaN(slippage) || slippage < 1 || slippage > 30) {
+      toast.error('Slippage must be between 1% and 30%');
       return;
     }
 
@@ -735,25 +760,28 @@ export default function BotTrader() {
       const { error } = await supabase
         .from('trading_bots')
         .update({
-          name: editingBot.name,
-          interval: editingBot.interval,
-          min_amount: parseFloat(editingBot.minAmount),
-          max_amount: parseFloat(editingBot.maxAmount),
-          slippage: parseFloat(editingBot.slippage),
+          name: editingBot.name.trim(),
+          interval: interval,
+          min_amount: minAmount,
+          max_amount: maxAmount,
+          slippage: slippage,
           strategy: editingBot.strategy,
           trade_mode: editingBot.buyProbability
         })
         .eq('id', editingBot.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       setBots(prev => prev.map(b => b.id === editingBot.id ? {
         ...b,
-        name: editingBot.name,
-        interval: editingBot.interval,
-        min_amount: parseFloat(editingBot.minAmount),
-        max_amount: parseFloat(editingBot.maxAmount),
-        slippage: parseFloat(editingBot.slippage),
+        name: editingBot.name.trim(),
+        interval: interval,
+        min_amount: minAmount,
+        max_amount: maxAmount,
+        slippage: slippage,
         strategy: editingBot.strategy,
         trade_mode: editingBot.buyProbability
       } : b));
@@ -763,7 +791,7 @@ export default function BotTrader() {
       setEditingBot(null);
     } catch (error) {
       console.error('Error updating bot:', error);
-      toast.error('Failed to update bot');
+      toast.error(error.message || 'Failed to update bot');
     } finally {
       setLoading(false);
     }
@@ -1933,8 +1961,8 @@ export default function BotTrader() {
                   <label className="block text-blue-300 mb-2">Interval (minutes)</label>
                   <input
                     type="number"
-                    value={editingBot.interval}
-                    onChange={(e) => setEditingBot({ ...editingBot, interval: Math.max(1, parseInt(e.target.value) || 1) })}
+                    value={editingBot.interval || ''}
+                    onChange={(e) => setEditingBot({ ...editingBot, interval: e.target.value })}
                     className="input w-full"
                     min="1"
                   />
@@ -1944,11 +1972,11 @@ export default function BotTrader() {
                   <label className="block text-blue-300 mb-2">Slippage (%)</label>
                   <input
                     type="number"
-                    value={editingBot.slippage}
-                    onChange={(e) => setEditingBot({ ...editingBot, slippage: parseFloat(e.target.value) || 10 })}
+                    value={editingBot.slippage || ''}
+                    onChange={(e) => setEditingBot({ ...editingBot, slippage: e.target.value })}
                     className="input w-full"
                     min="1"
-                    max="20"
+                    max="30"
                     step="0.5"
                   />
                 </div>
@@ -1957,8 +1985,8 @@ export default function BotTrader() {
                   <label className="block text-blue-300 mb-2">Min Amount (XRP)</label>
                   <input
                     type="number"
-                    value={editingBot.minAmount}
-                    onChange={(e) => setEditingBot({ ...editingBot, minAmount: parseFloat(e.target.value) || 0.1 })}
+                    value={editingBot.minAmount || ''}
+                    onChange={(e) => setEditingBot({ ...editingBot, minAmount: e.target.value })}
                     className="input w-full"
                     min={MIN_XRP_AMOUNT}
                     step="0.1"
@@ -1969,8 +1997,8 @@ export default function BotTrader() {
                   <label className="block text-blue-300 mb-2">Max Amount (XRP)</label>
                   <input
                     type="number"
-                    value={editingBot.maxAmount}
-                    onChange={(e) => setEditingBot({ ...editingBot, maxAmount: parseFloat(e.target.value) || 1 })}
+                    value={editingBot.maxAmount || ''}
+                    onChange={(e) => setEditingBot({ ...editingBot, maxAmount: e.target.value })}
                     className="input w-full"
                     min={MIN_XRP_AMOUNT}
                     step="0.1"
