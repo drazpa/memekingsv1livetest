@@ -11,6 +11,7 @@ export default function KingsList() {
   const [selectedToken, setSelectedToken] = useState(null);
   const [richList, setRichList] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingTokens, setLoadingTokens] = useState(true);
   const [stats, setStats] = useState({
     totalHolders: 0,
     totalSupplyHeld: 0,
@@ -33,6 +34,7 @@ export default function KingsList() {
   }, [selectedToken]);
 
   const loadTokens = async () => {
+    setLoadingTokens(true);
     try {
       const { data, error } = await supabase
         .from('tokens')
@@ -41,8 +43,11 @@ export default function KingsList() {
 
       if (error) throw error;
       setTokens(data || []);
+      console.log('Loaded tokens:', data?.length || 0, data);
     } catch (error) {
       console.error('Error loading tokens:', error);
+    } finally {
+      setLoadingTokens(false);
     }
   };
 
@@ -188,24 +193,41 @@ export default function KingsList() {
           }}
         >
           <div className="p-6">
-            <label className="block text-sm font-medium text-purple-200 mb-2">
-              Select Token
-            </label>
-            <select
-              value={selectedToken?.id || ''}
-              onChange={(e) => {
-                const token = tokens.find(t => t.id === e.target.value);
-                setSelectedToken(token);
-              }}
-              className="w-full bg-purple-950/60 border border-purple-500/40 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-400/60 focus:ring-2 focus:ring-purple-500/30 cursor-pointer"
-            >
-              {!selectedToken && <option value="">Choose a token...</option>}
-              {tokens.map(token => (
-                <option key={token.id} value={token.id} className="bg-purple-950 text-white">
-                  {token.name} ({token.currency_code})
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-purple-200">
+                Select Token
+              </label>
+              {tokens.length > 0 && (
+                <span className="text-xs text-purple-400">
+                  {tokens.length} tokens available
+                </span>
+              )}
+            </div>
+            {loadingTokens ? (
+              <div className="w-full bg-purple-950/60 border border-purple-500/40 rounded-lg px-4 py-3 text-purple-400">
+                Loading tokens...
+              </div>
+            ) : (
+              <select
+                value={selectedToken?.id || ''}
+                onChange={(e) => {
+                  const token = tokens.find(t => t.id === e.target.value);
+                  console.log('Selected token:', token);
+                  setSelectedToken(token);
+                }}
+                className="w-full bg-purple-950/60 border border-purple-500/40 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-400/60 focus:ring-2 focus:ring-purple-500/30 cursor-pointer"
+                disabled={tokens.length === 0}
+              >
+                <option value="" className="bg-purple-950 text-purple-400">
+                  {tokens.length === 0 ? 'No tokens available' : 'Choose a token...'}
                 </option>
-              ))}
-            </select>
+                {tokens.map(token => (
+                  <option key={token.id} value={token.id} className="bg-purple-950 text-white">
+                    {token.name} ({token.currency_code})
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
