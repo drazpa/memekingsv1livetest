@@ -250,6 +250,8 @@ export default function Dashboard() {
   };
 
   const loadTokens = async () => {
+    const client = new xrpl.Client('wss://xrplcluster.com');
+
     try {
       const { data, error } = await supabase
         .from('meme_tokens')
@@ -259,6 +261,37 @@ export default function Dashboard() {
       if (error) throw error;
 
       const tokensData = data || [];
+
+      await client.connect();
+
+      for (const token of tokensData.filter(t => t.amm_pool_created)) {
+        try {
+          const currencyHex = token.currency_code.length > 3
+            ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+            : token.currency_code;
+
+          const ammInfoResponse = await client.request({
+            command: 'amm_info',
+            asset: { currency: 'XRP' },
+            asset2: {
+              currency: currencyHex,
+              issuer: token.issuer_address
+            },
+            ledger_index: 'validated'
+          });
+
+          if (ammInfoResponse.result.amm) {
+            const amm = ammInfoResponse.result.amm;
+            token.amm_xrp_amount = parseFloat(amm.amount) / 1000000;
+            token.amm_asset_amount = parseFloat(amm.amount2.value);
+          }
+        } catch (error) {
+          console.error(`Failed to fetch live data for ${token.token_name}:`, error.message);
+        }
+      }
+
+      await client.disconnect();
+
       setTokens(tokensData);
 
       const stats = {
@@ -938,12 +971,12 @@ export default function Dashboard() {
           </span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-purple-400 text-xs">Starting Market Cap</span>
-          <span className="text-purple-200 text-sm font-bold">{calculateMarketCap(token)} XRP</span>
+          <span className="text-purple-400 text-xs">Market Cap (Live)</span>
+          <span className="text-purple-200 text-sm font-bold font-mono">{calculateMarketCap(token)} XRP</span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-purple-400 text-xs">Starting XRP Locked</span>
-          <span className="text-purple-200 text-sm font-bold">{token.amm_xrp_amount || 0} XRP</span>
+          <span className="text-purple-400 text-xs">XRP Locked (Live)</span>
+          <span className="text-purple-200 text-sm font-bold font-mono">{token.amm_xrp_amount ? token.amm_xrp_amount.toFixed(2) : '0.00'} XRP</span>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-purple-400 text-xs">Total Supply</span>
@@ -1016,8 +1049,8 @@ export default function Dashboard() {
       <td className="px-4 py-3 text-green-400 text-xs font-bold">
         {lpBalances[token.id] ? parseFloat(lpBalances[token.id]).toFixed(4) : '-'}
       </td>
-      <td className="px-4 py-3 text-purple-200 text-xs">{calculateMarketCap(token)} XRP</td>
-      <td className="px-4 py-3 text-purple-300 text-xs">{token.amm_xrp_amount || 0} XRP</td>
+      <td className="px-4 py-3 text-purple-200 text-xs font-mono">{calculateMarketCap(token)} XRP</td>
+      <td className="px-4 py-3 text-purple-300 text-xs font-mono">{token.amm_xrp_amount ? token.amm_xrp_amount.toFixed(2) : '0.00'} XRP</td>
       <td className="px-4 py-3">
         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
           token.amm_pool_created
@@ -1212,8 +1245,8 @@ export default function Dashboard() {
                     <th className="text-left px-4 py-3 text-purple-300 font-medium">Live Price</th>
                     <th className="text-left px-4 py-3 text-purple-300 font-medium">Volume 24h</th>
                     <th className="text-left px-4 py-3 text-purple-300 font-medium">Your LP</th>
-                    <th className="text-left px-4 py-3 text-purple-300 font-medium">Market Cap</th>
-                    <th className="text-left px-4 py-3 text-purple-300 font-medium">XRP Locked</th>
+                    <th className="text-left px-4 py-3 text-purple-300 font-medium">Market Cap (Live)</th>
+                    <th className="text-left px-4 py-3 text-purple-300 font-medium">XRP Locked (Live)</th>
                     <th className="text-left px-4 py-3 text-purple-300 font-medium">Status</th>
                     <th className="text-left px-4 py-3 text-purple-300 font-medium">Actions</th>
                   </tr>
@@ -1344,8 +1377,8 @@ export default function Dashboard() {
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Live Price</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Volume 24h</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Your LP</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Market Cap</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">XRP Locked</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Market Cap (Live)</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">XRP Locked (Live)</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Status</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Actions</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Admin</th>
@@ -1453,9 +1486,9 @@ export default function Dashboard() {
                   <tr className="border-b border-purple-500/20">
                     <th className="text-left py-3 px-4 text-purple-300">Token</th>
                     <th className="text-left py-3 px-4 text-purple-300">Supply</th>
-                    <th className="text-left py-3 px-4 text-purple-300">XRP Locked</th>
+                    <th className="text-left py-3 px-4 text-purple-300">XRP Locked (Live)</th>
                     <th className="text-left py-3 px-4 text-purple-300">Price</th>
-                    <th className="text-left py-3 px-4 text-purple-300">Market Cap</th>
+                    <th className="text-left py-3 px-4 text-purple-300">Market Cap (Live)</th>
                     <th className="text-left py-3 px-4 text-purple-300">Status</th>
                     <th className="text-left py-3 px-4 text-purple-300">Actions</th>
                   </tr>
@@ -1475,7 +1508,9 @@ export default function Dashboard() {
                       case 'supply': return b.supply - a.supply;
                       default: return new Date(b.created_at) - new Date(a.created_at);
                     }
-                  }).map(token => renderTokenRow(token))}
+                  }).map((token) => (
+                    <TokenRow key={token.id} token={token} />
+                  ))}
                 </tbody>
               </table>
             </div>
