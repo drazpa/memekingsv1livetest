@@ -9,9 +9,11 @@ import BotTrader from './pages/BotTrader';
 import Vault from './pages/Vault';
 import MyTokens from './pages/MyTokens';
 import Analytics from './pages/Analytics';
+import Top10 from './pages/Top10';
 import About from './pages/About';
 import WalletManagement from './components/WalletManagement';
 import Setup from './pages/Setup';
+import AIChat from './pages/AIChat';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -21,10 +23,16 @@ export default function App() {
       setCurrentPage('trade');
     };
 
+    const handleNavigateToPage = (event) => {
+      setCurrentPage(event.detail);
+    };
+
     window.addEventListener('navigateToTrade', handleNavigateToTrade);
+    window.addEventListener('navigateToPage', handleNavigateToPage);
 
     return () => {
       window.removeEventListener('navigateToTrade', handleNavigateToTrade);
+      window.removeEventListener('navigateToPage', handleNavigateToPage);
     };
   }, []);
 
@@ -46,12 +54,16 @@ export default function App() {
         return <MyTokens />;
       case 'analytics':
         return <Analytics />;
+      case 'top10':
+        return <Top10 />;
       case 'about':
         return <About />;
       case 'wallets':
         return <WalletManagement />;
       case 'setup':
         return <Setup />;
+      case 'aichat':
+        return <AIChat />;
       default:
         return <Dashboard />;
     }
