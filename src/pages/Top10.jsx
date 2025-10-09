@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import * as xrpl from 'xrpl';
+import { Buffer } from 'buffer';
 import TokenIcon from '../components/TokenIcon';
 import TokenDetailModal from '../components/TokenDetailModal';
 
@@ -82,6 +83,11 @@ export default function Top10() {
             ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
             : token.currency_code;
 
+          console.log(`Fetching AMM data for ${token.token_name} (${token.currency_code}):`, {
+            currencyHex,
+            issuer: token.issuer_address
+          });
+
           const ammInfoResponse = await client.request({
             command: 'amm_info',
             asset: { currency: 'XRP' },
@@ -98,15 +104,19 @@ export default function Top10() {
             const currentAsset = parseFloat(amm.amount2.value);
             const currentPrice = currentXRP / currentAsset;
 
+            console.log(`  ✓ Live price for ${token.token_name}: ${currentPrice.toFixed(8)} XRP`);
+
             token.amm_xrp_amount = currentXRP;
             token.amm_asset_amount = currentAsset;
             token.live_price = currentPrice;
 
             token.volume_24h = token.volume_24h || Math.random() * 10000;
             token.value_24h = token.value_24h || currentXRP * (Math.random() * 2);
+          } else {
+            console.log(`  ✗ No AMM pool found for ${token.token_name}`);
           }
         } catch (error) {
-          console.error(`Failed to fetch data for ${token.token_name}:`, error.message);
+          console.error(`  ✗ Failed to fetch data for ${token.token_name}:`, error.message);
         }
       }
 
