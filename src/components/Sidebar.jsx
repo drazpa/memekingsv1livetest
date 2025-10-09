@@ -109,7 +109,7 @@ export default function Sidebar({ currentPage, onNavigate }) {
         <div className="p-6 border-b border-purple-500/20">
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold">
-              <span className="text-white">MEME</span>
+              <span className="text-white">😎MEME</span>
               <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">KINGS</span>
             </h1>
             <span className="text-3xl" style={{
@@ -117,7 +117,7 @@ export default function Sidebar({ currentPage, onNavigate }) {
               textShadow: '0 0 12px rgba(168, 85, 247, 0.6)'
             }}>👑</span>
           </div>
-          <p className="text-purple-300/60 text-xs mt-1">XRPL Meme Token Factory</p>
+          <p className="text-purple-300/70 text-sm mt-2 text-center font-medium">XRPL Meme Token Factory</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
@@ -179,15 +179,18 @@ export default function Sidebar({ currentPage, onNavigate }) {
       {/* Mobile Top Bar with Dropdown Menu */}
       <div ref={mobileMenuRef} className="lg:hidden fixed top-0 left-0 right-0 glass border-b border-purple-500/20 z-50 backdrop-blur-lg">
         <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold">
-              <span className="text-white">MEME</span>
-              <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">KINGS</span>
-            </h1>
-            <span className="text-2xl" style={{
-              filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.8))',
-              textShadow: '0 0 12px rgba(168, 85, 247, 0.6)'
-            }}>👑</span>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">
+                <span className="text-white">😎MEME</span>
+                <span className="bg-gradient-to-r from-purple-400 to-purple-600 bg-clip-text text-transparent">KINGS</span>
+              </h1>
+              <span className="text-2xl" style={{
+                filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.8))',
+                textShadow: '0 0 12px rgba(168, 85, 247, 0.6)'
+              }}>👑</span>
+            </div>
+            <p className="text-purple-300/70 text-xs font-medium mt-0.5">XRPL Meme Token Factory</p>
           </div>
 
           <button
