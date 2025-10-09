@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { supabase } from '../utils/supabase';
 import * as xrpl from 'xrpl';
 import toast from 'react-hot-toast';
@@ -1023,11 +1023,7 @@ export default function BotTrader() {
     return map;
   }, [tokens]);
 
-  const BotCard = ({ bot }) => {
-    const token = tokensMap[bot.token_id];
-    const nextTradeTime = nextTradeTimes[bot.id];
-    const nextAction = nextTradeActions[bot.id];
-    const announcement = botAnnouncements[bot.id];
+  const BotCard = memo(({ bot, token, poolData, nextTradeTime, nextAction, announcement, onPause, onStop, onStart, onEdit, onViewActivity, onDelete }) => {
     const timeUntilNext = nextTradeTime ? Math.max(0, nextTradeTime - Date.now()) : 0;
     const minutesUntil = Math.floor(timeUntilNext / 60000);
     const secondsUntil = Math.floor((timeUntilNext % 60000) / 1000);
@@ -1058,10 +1054,10 @@ export default function BotTrader() {
             <div>
               <h3 className="text-lg font-bold text-blue-200">{bot.name}</h3>
               <p className="text-blue-400 text-xs">{token?.token_name || 'Unknown Token'}</p>
-              {token && poolsData[token.id] && (
+              {token && poolData && (
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-blue-300 text-xs font-mono">
-                    {poolsData[token.id].price.toFixed(8)} XRP
+                    {poolData.price.toFixed(8)} XRP
                   </span>
                 </div>
               )}
@@ -1203,13 +1199,13 @@ export default function BotTrader() {
           {bot.status === 'running' ? (
             <>
               <button
-                onClick={() => pauseBot(bot)}
+                onClick={onPause}
                 className="flex-1 glass hover:bg-yellow-500/10 text-yellow-200 py-2.5 rounded-lg text-sm font-medium transition-all"
               >
                 ⏸ Pause
               </button>
               <button
-                onClick={() => stopBot(bot)}
+                onClick={onStop}
                 className="flex-1 glass hover:bg-red-500/10 text-red-200 py-2.5 rounded-lg text-sm font-medium transition-all"
               >
                 ⏹ Stop
@@ -1218,13 +1214,13 @@ export default function BotTrader() {
           ) : bot.status === 'paused' ? (
             <>
               <button
-                onClick={() => startBot(bot)}
+                onClick={onStart}
                 className="flex-1 btn-primary text-white py-2.5 rounded-lg text-sm font-medium"
               >
                 ▶ Resume
               </button>
               <button
-                onClick={() => stopBot(bot)}
+                onClick={onStop}
                 className="flex-1 glass hover:bg-red-500/10 text-red-200 py-2.5 rounded-lg text-sm font-medium transition-all"
               >
                 ⏹ Stop
@@ -1232,14 +1228,14 @@ export default function BotTrader() {
             </>
           ) : (
             <button
-              onClick={() => startBot(bot)}
+              onClick={onStart}
               className="flex-1 btn-primary text-white py-2.5 rounded-lg text-sm font-medium"
             >
               ▶ Start
             </button>
           )}
           <button
-            onClick={() => openEditBot(bot)}
+            onClick={onEdit}
             className={`flex-1 glass hover:bg-blue-500/10 text-blue-200 py-2.5 rounded-lg text-sm font-medium transition-all ${
               bot.status === 'running' ? 'opacity-50 cursor-not-allowed' : ''
             }`}
@@ -1248,13 +1244,13 @@ export default function BotTrader() {
             ✏️ Edit
           </button>
           <button
-            onClick={() => setSelectedBot(bot)}
+            onClick={onViewActivity}
             className="flex-1 glass hover:bg-blue-500/10 text-blue-200 py-2.5 rounded-lg text-sm font-medium transition-all"
           >
             📊 Activity
           </button>
           <button
-            onClick={() => deleteBot(bot)}
+            onClick={onDelete}
             className="px-4 py-2.5 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-all text-sm font-medium"
           >
             🗑
@@ -1262,7 +1258,22 @@ export default function BotTrader() {
         </div>
       </div>
     );
-  };
+  }, (prevProps, nextProps) => {
+    return (
+      prevProps.bot.id === nextProps.bot.id &&
+      prevProps.bot.status === nextProps.bot.status &&
+      prevProps.bot.total_trades === nextProps.bot.total_trades &&
+      prevProps.bot.successful_trades === nextProps.bot.successful_trades &&
+      prevProps.bot.net_profit === nextProps.bot.net_profit &&
+      prevProps.bot.total_xrp_received === nextProps.bot.total_xrp_received &&
+      prevProps.bot.total_xrp_spent === nextProps.bot.total_xrp_spent &&
+      prevProps.token?.id === nextProps.token?.id &&
+      prevProps.poolData?.price === nextProps.poolData?.price &&
+      prevProps.nextTradeTime === nextProps.nextTradeTime &&
+      prevProps.nextAction?.action === nextProps.nextAction?.action &&
+      prevProps.announcement === nextProps.announcement
+    );
+  });
 
   const filteredBots = bots.filter(bot => {
     const token = tokensMap[bot.token_id];
@@ -1388,17 +1399,34 @@ export default function BotTrader() {
 
           {botViewMode === 'grid' ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {sortedBots.map(bot => (
-                <div key={bot.id} className="relative">
-                  <button
-                    onClick={() => toggleBotFavorite(bot.id)}
-                    className="absolute top-2 right-2 z-10 text-2xl hover:scale-110 transition-transform bg-black/50 rounded-full w-8 h-8 flex items-center justify-center"
-                  >
-                    {favoriteBots.includes(bot.id) ? '⭐' : '☆'}
-                  </button>
-                  <BotCard bot={bot} />
-                </div>
-              ))}
+              {sortedBots.map(bot => {
+                const token = tokensMap[bot.token_id];
+                const poolData = token ? poolsData[token.id] : null;
+                return (
+                  <div key={bot.id} className="relative">
+                    <button
+                      onClick={() => toggleBotFavorite(bot.id)}
+                      className="absolute top-2 right-2 z-10 text-2xl hover:scale-110 transition-transform bg-black/50 rounded-full w-8 h-8 flex items-center justify-center"
+                    >
+                      {favoriteBots.includes(bot.id) ? '⭐' : '☆'}
+                    </button>
+                    <BotCard
+                      bot={bot}
+                      token={token}
+                      poolData={poolData}
+                      nextTradeTime={nextTradeTimes[bot.id]}
+                      nextAction={nextTradeActions[bot.id]}
+                      announcement={botAnnouncements[bot.id]}
+                      onPause={() => pauseBot(bot)}
+                      onStop={() => stopBot(bot)}
+                      onStart={() => startBot(bot)}
+                      onEdit={() => openEditBot(bot)}
+                      onViewActivity={() => setSelectedBot(bot)}
+                      onDelete={() => deleteBot(bot)}
+                    />
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div className="glass rounded-lg overflow-hidden">
