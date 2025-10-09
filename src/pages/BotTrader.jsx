@@ -678,9 +678,25 @@ export default function BotTrader() {
     }
 
     const token = tokens.find(t => t.id === bot.token_id);
-    if (!token || !poolsData[token.id]) {
-      toast.error('Pool data not available');
+    if (!token) {
+      toast.error('Token not found');
       return;
+    }
+
+    if (!poolsData[token.id]) {
+      if (!fetchingPools.current.has(token.id)) {
+        console.log(`Fetching pool data for ${token.token_name}...`);
+        const poolData = await fetchPoolData(token);
+        if (poolData) {
+          setPoolsData(prev => ({ ...prev, [token.id]: poolData }));
+        } else {
+          toast.error(`Unable to fetch pool data for ${token.token_name}`);
+          return;
+        }
+      } else {
+        console.log('Pool data is being fetched, please wait...');
+        return;
+      }
     }
 
     const nextAction = determineNextAction(bot, poolsData[token.id]);
@@ -1004,10 +1020,21 @@ export default function BotTrader() {
       const token = tokens.find(t => t.id === bot.token_id);
       if (!token) return;
 
-      const poolData = poolsData[token.id];
+      let poolData = poolsData[token.id];
       if (!poolData) {
-        setBotAnnouncements(prev => ({ ...prev, [bot.id]: '⏳ Waiting for pool data...' }));
-        return;
+        if (!fetchingPools.current.has(token.id)) {
+          console.log(`Fetching pool data for bot trade: ${token.token_name}...`);
+          poolData = await fetchPoolData(token);
+          if (poolData) {
+            setPoolsData(prev => ({ ...prev, [token.id]: poolData }));
+          } else {
+            setBotAnnouncements(prev => ({ ...prev, [bot.id]: '⚠️ Unable to fetch pool data' }));
+            return;
+          }
+        } else {
+          setBotAnnouncements(prev => ({ ...prev, [bot.id]: '⏳ Waiting for pool data...' }));
+          return;
+        }
       }
 
       const strategy = bot.strategy || BOT_STRATEGIES.BALANCED;
