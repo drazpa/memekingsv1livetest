@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const IPFS_GATEWAYS = [
   'https://gateway.pinata.cloud/ipfs/',
@@ -7,11 +7,14 @@ const IPFS_GATEWAYS = [
   'https://dweb.link/ipfs/'
 ];
 
+const imageCache = new Map();
+
 export default function TokenIcon({ token, size = 'md', className = '' }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [currentGatewayIndex, setCurrentGatewayIndex] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
+  const imageUrlRef = useRef(null);
 
   const sizeClasses = {
     sm: 'w-8 h-8 text-sm',
@@ -23,11 +26,22 @@ export default function TokenIcon({ token, size = 'md', className = '' }) {
   const sizeClass = sizeClasses[size] || sizeClasses.md;
 
   useEffect(() => {
-    setImageError(false);
-    setImageLoaded(false);
-    setCurrentGatewayIndex(0);
-    setRetryCount(0);
-  }, [token.image_url, token.updated_at, token.id]);
+    const cacheKey = `${token.id}-${token.image_url}`;
+
+    if (imageCache.has(cacheKey)) {
+      setImageLoaded(true);
+      setImageError(false);
+      return;
+    }
+
+    if (imageUrlRef.current !== token.image_url) {
+      setImageError(false);
+      setImageLoaded(false);
+      setCurrentGatewayIndex(0);
+      setRetryCount(0);
+      imageUrlRef.current = token.image_url;
+    }
+  }, [token.image_url, token.id]);
 
   const extractIpfsHash = (url) => {
     if (!url) return null;
@@ -89,6 +103,8 @@ export default function TokenIcon({ token, size = 'md', className = '' }) {
           className={`${sizeClass} rounded-full object-cover border-2 border-purple-500 ${className} ${!imageLoaded ? 'absolute inset-0 opacity-0' : ''}`}
           onLoad={() => {
             console.log('Image loaded successfully:', token.token_name, 'Gateway:', IPFS_GATEWAYS[currentGatewayIndex]);
+            const cacheKey = `${token.id}-${token.image_url}`;
+            imageCache.set(cacheKey, true);
             setImageLoaded(true);
           }}
           onError={handleImageError}
