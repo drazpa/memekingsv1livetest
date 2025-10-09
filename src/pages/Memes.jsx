@@ -1205,16 +1205,6 @@ export default function Memes() {
 
       <div className="grid grid-cols-2 gap-2">
         <a
-          href={`https://firstledger.net/token/${token.issuer_address}/${Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn text-purple-300 text-xs px-2 py-2 rounded-lg text-center"
-          onClick={(e) => { e.stopPropagation(); }}
-          title="View on FirstLedger"
-        >
-          📊 FirstLedger
-        </a>
-        <a
           href={`https://xmagnetic.org/dex/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
           target="_blank"
           rel="noopener noreferrer"
@@ -1324,15 +1314,6 @@ export default function Memes() {
       </td>
       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex gap-1">
-          <a
-            href={`https://firstledger.net/token/${token.issuer_address}/${Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn text-purple-300 text-xs px-2 py-1 rounded"
-            title="FirstLedger"
-          >
-            📊
-          </a>
           <a
             href={`https://xmagnetic.org/dex/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
             target="_blank"
