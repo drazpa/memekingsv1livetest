@@ -585,15 +585,27 @@ export default function BotTrader() {
 
     const executeAndSchedule = async () => {
       try {
-        await executeBotTrade(bot);
+        const { data: freshBot } = await supabase
+          .from('trading_bots')
+          .select('*')
+          .eq('id', bot.id)
+          .maybeSingle();
+
+        if (!freshBot || freshBot.status !== 'running') {
+          return;
+        }
+
+        setBots(prev => prev.map(b => b.id === bot.id ? { ...b, ...freshBot } : b));
+
+        await executeBotTrade(freshBot);
 
         const updatedPoolData = poolsData[token.id];
         if (updatedPoolData) {
-          const newAction = determineNextAction(bot, updatedPoolData);
-          setNextTradeActions(prev => ({ ...prev, [bot.id]: newAction }));
+          const newAction = determineNextAction(freshBot, updatedPoolData);
+          setNextTradeActions(prev => ({ ...prev, [freshBot.id]: newAction }));
 
-          const nextTime = Date.now() + (bot.interval * 60 * 1000);
-          setNextTradeTimes(prev => ({ ...prev, [bot.id]: nextTime }));
+          const nextTime = Date.now() + (freshBot.interval * 60 * 1000);
+          setNextTradeTimes(prev => ({ ...prev, [freshBot.id]: nextTime }));
 
           await supabase
             .from('trading_bots')
@@ -604,7 +616,7 @@ export default function BotTrader() {
               next_xrp_amount: newAction.xrpAmount,
               next_price: newAction.estimatedPrice
             })
-            .eq('id', bot.id);
+            .eq('id', freshBot.id);
         }
       } catch (error) {
         console.error(`Error in bot ${bot.name}:`, error);
@@ -1044,8 +1056,12 @@ export default function BotTrader() {
       if (errorMessage.includes('tecPATH_DRY')) {
         errorMsg = '⚠️ No liquidity path found';
       } else if (errorMessage.includes('tecPATH_PARTIAL')) {
-        const suggestedSlippage = Math.min(Math.ceil(bot.slippage * 1.5), 30);
-        errorMsg = `⚠️ Slippage too low (currently ${bot.slippage}%) - Try increasing to ${suggestedSlippage}%`;
+        if (bot.slippage >= 25) {
+          errorMsg = `⚠️ Slippage tolerance reached (${bot.slippage}%) - Low liquidity or high volatility`;
+        } else {
+          const suggestedSlippage = Math.min(Math.max(Math.ceil(bot.slippage * 1.5), bot.slippage + 5), 30);
+          errorMsg = `⚠️ Slippage too low - Increase from ${bot.slippage}% to ${suggestedSlippage}%`;
+        }
       } else if (errorMessage.includes('tecUNFUNDED')) {
         errorMsg = '⚠️ Insufficient funds';
       } else if (errorMessage.includes('tefPAST_SEQ')) {
