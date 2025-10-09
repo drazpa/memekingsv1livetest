@@ -23,7 +23,7 @@ export default function Vault() {
   const [starting, setStarting] = useState({});
   const [stopping, setStopping] = useState({});
   const [loading, setLoading] = useState(false);
-  const [viewMode, setViewMode] = useState('grid');
+  const [viewMode, setViewMode] = useState('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState([]);
   const [claimProgress, setClaimProgress] = useState(null);
