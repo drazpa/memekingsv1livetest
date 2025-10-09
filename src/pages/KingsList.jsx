@@ -38,8 +38,7 @@ export default function KingsList() {
     try {
       const { data, error } = await supabase
         .from('meme_tokens')
-        .select('id, token_name, currency_code, issuer_address, image_url, supply')
-        .eq('status', 'completed')
+        .select('id, token_name, currency_code, issuer_address, image_url, supply, status')
         .order('token_name', { ascending: true });
 
       if (error) throw error;
@@ -50,7 +49,8 @@ export default function KingsList() {
         currency_code: token.currency_code,
         issuer_address: token.issuer_address,
         image_url: token.image_url,
-        supply: token.supply
+        supply: token.supply,
+        status: token.status
       }));
 
       setTokens(formattedTokens);
@@ -185,71 +185,78 @@ export default function KingsList() {
 
   return (
     <div className="min-h-screen p-4 md:p-6" style={{
-      background: 'linear-gradient(135deg, #1a0b2e 0%, #2d1b4e 100%)'
+      background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%)'
     }}>
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 bg-clip-text text-transparent mb-2">
-            👑 Kings List
-          </h1>
-          <p className="text-purple-300/80">
+        <div className="mb-8 text-center">
+          <div className="inline-flex items-center justify-center gap-3 mb-3">
+            <span className="text-5xl">👑</span>
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 bg-clip-text text-transparent">
+              Kings List
+            </h1>
+            <span className="text-5xl">👑</span>
+          </div>
+          <p className="text-slate-300 text-lg">
             Rich list rankings and distribution analytics for XRPL tokens
           </p>
         </div>
 
-        <div className="mb-6 rounded-xl overflow-hidden border border-yellow-500/30"
+        <div className="mb-6 rounded-2xl overflow-hidden border border-slate-600/50 shadow-2xl"
           style={{
-            background: 'linear-gradient(135deg, rgba(88, 28, 135, 0.95), rgba(59, 7, 100, 0.95))',
+            background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(49, 46, 129, 0.95))',
             backdropFilter: 'blur(20px)'
           }}
         >
-          <div className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-purple-200">
+          <div className="p-6 bg-gradient-to-r from-slate-800/50 to-slate-900/50">
+            <div className="flex items-center justify-between mb-3">
+              <label className="text-lg font-semibold text-slate-200">
                 Select Token
               </label>
               {tokens.length > 0 && (
-                <span className="text-xs text-purple-400">
-                  {tokens.length} tokens available
+                <span className="px-3 py-1 bg-blue-600/30 text-blue-300 rounded-full text-sm font-medium border border-blue-500/30">
+                  {tokens.length} {tokens.length === 1 ? 'token' : 'tokens'} available
                 </span>
               )}
             </div>
             {loadingTokens ? (
-              <div className="w-full bg-purple-950/60 border border-purple-500/40 rounded-lg px-4 py-3 text-purple-400">
-                Loading tokens...
+              <div className="flex items-center justify-center py-4 px-4 bg-slate-900/50 border border-slate-600/40 rounded-xl">
+                <div className="w-5 h-5 border-3 border-blue-400 border-t-transparent rounded-full animate-spin mr-3"></div>
+                <span className="text-slate-300">Loading tokens...</span>
               </div>
             ) : (
-              <select
-                value={selectedToken?.id || ''}
-                onChange={(e) => {
-                  const token = tokens.find(t => t.id === e.target.value);
-                  console.log('Selected token:', token);
-                  setSelectedToken(token);
-                }}
-                className="w-full bg-purple-950/60 border border-purple-500/40 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-400/60 focus:ring-2 focus:ring-purple-500/30 cursor-pointer"
-                disabled={tokens.length === 0}
-              >
-                <option value="" className="bg-purple-950 text-purple-400">
-                  {tokens.length === 0 ? 'No tokens available' : 'Choose a token...'}
-                </option>
-                {tokens.map(token => (
-                  <option key={token.id} value={token.id} className="bg-purple-950 text-white">
-                    {token.name} ({token.currency_code})
+              <div className="relative">
+                <select
+                  value={selectedToken?.id || ''}
+                  onChange={(e) => {
+                    const token = tokens.find(t => t.id === e.target.value);
+                    console.log('Selected token:', token);
+                    setSelectedToken(token);
+                  }}
+                  className="w-full bg-slate-900/70 border-2 border-slate-600/50 rounded-xl px-5 py-4 text-white text-lg focus:outline-none focus:border-blue-500/60 focus:ring-4 focus:ring-blue-500/20 cursor-pointer transition-all hover:border-slate-500/60"
+                  disabled={tokens.length === 0}
+                >
+                  <option value="" className="bg-slate-900 text-slate-400">
+                    {tokens.length === 0 ? 'No tokens available' : '🔍 Choose a token...'}
                   </option>
-                ))}
-              </select>
+                  {tokens.map(token => (
+                    <option key={token.id} value={token.id} className="bg-slate-900 text-white py-2">
+                      {token.name} ({token.currency_code})
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
           </div>
         </div>
 
         {selectedToken && (
-          <div className="mb-6 rounded-xl overflow-hidden border border-yellow-500/30"
+          <div className="mb-6 rounded-2xl overflow-hidden border border-yellow-500/40 shadow-2xl"
             style={{
-              background: 'linear-gradient(135deg, rgba(88, 28, 135, 0.95), rgba(59, 7, 100, 0.95))',
+              background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(49, 46, 129, 0.95))',
               backdropFilter: 'blur(20px)'
             }}
           >
-            <div className="p-6 border-b border-purple-500/30">
+            <div className="p-6 border-b border-slate-600/50 bg-gradient-to-r from-slate-800/50 to-slate-900/50">
               <div className="flex flex-col md:flex-row md:items-center gap-6">
                 <div className="flex items-center gap-4 flex-1">
                   <TokenIcon
@@ -258,43 +265,43 @@ export default function KingsList() {
                     size="lg"
                   />
                   <div>
-                    <h2 className="text-2xl font-bold text-white">{selectedToken.name}</h2>
-                    <p className="text-purple-300/80">{selectedToken.currency_code}</p>
+                    <h2 className="text-3xl font-bold text-white">{selectedToken.name}</h2>
+                    <p className="text-slate-400 text-lg">{selectedToken.currency_code}</p>
                   </div>
                 </div>
                 {richList.length > 0 && (
-                  <div className="relative rounded-xl overflow-hidden border-2 border-yellow-500/60"
+                  <div className="relative rounded-2xl overflow-hidden border-3 border-yellow-500/70 shadow-xl"
                     style={{
-                      background: 'linear-gradient(135deg, rgba(217, 119, 6, 0.3), rgba(251, 191, 36, 0.3))',
-                      backdropFilter: 'blur(10px)',
-                      boxShadow: '0 0 30px rgba(251, 191, 36, 0.4)'
+                      background: 'linear-gradient(135deg, rgba(217, 119, 6, 0.4), rgba(251, 191, 36, 0.4))',
+                      backdropFilter: 'blur(15px)',
+                      boxShadow: '0 0 40px rgba(251, 191, 36, 0.5), inset 0 0 20px rgba(251, 191, 36, 0.2)'
                     }}
                   >
-                    <div className="absolute top-2 right-2 text-3xl">
+                    <div className="absolute top-3 right-3 text-4xl animate-pulse">
                       👑
                     </div>
-                    <div className="p-6 pr-14">
-                      <div className="text-yellow-400/80 text-xs font-medium mb-1">MemeKing</div>
-                      <div className="text-yellow-200 font-bold text-lg mb-2">#{1} Holder</div>
-                      <div className="font-mono text-yellow-300 text-sm mb-2">
-                        {richList[0].address.slice(0, 8)}...{richList[0].address.slice(-6)}
+                    <div className="p-6 pr-16">
+                      <div className="text-yellow-300/90 text-xs font-bold mb-2 uppercase tracking-wider">MemeKing</div>
+                      <div className="text-yellow-100 font-extrabold text-xl mb-3">#{1} Top Holder</div>
+                      <div className="font-mono text-yellow-200 text-sm mb-3 bg-yellow-900/30 px-3 py-2 rounded-lg border border-yellow-500/40">
+                        {richList[0].address.slice(0, 10)}...{richList[0].address.slice(-8)}
                       </div>
-                      <div className="text-2xl font-bold text-yellow-100 mb-1">
+                      <div className="text-3xl font-extrabold text-yellow-50 mb-2">
                         {formatNumber(richList[0].balance)}
                       </div>
-                      <div className="text-xs text-yellow-400/80 mb-3">
+                      <div className="text-sm text-yellow-300/90 mb-3 font-medium">
                         {selectedToken.currency_code}
                       </div>
-                      <div className="text-yellow-300 font-bold text-sm mb-3">
+                      <div className="text-yellow-200 font-bold text-base mb-4 bg-yellow-900/40 px-3 py-2 rounded-lg border border-yellow-500/40">
                         {((richList[0].balance / stats.totalSupplyHeld) * 100).toFixed(2)}% of supply
                       </div>
                       <a
                         href={`https://${network === 'mainnet' ? '' : 'test.'}xrpscan.com/account/${richList[0].address}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-block px-3 py-1.5 bg-yellow-600/40 hover:bg-yellow-600/60 text-yellow-100 rounded text-xs font-medium transition-all duration-200 border border-yellow-500/50"
+                        className="inline-block px-4 py-2 bg-yellow-600/50 hover:bg-yellow-600/70 text-yellow-50 rounded-lg text-sm font-bold transition-all duration-200 border-2 border-yellow-500/60 hover:border-yellow-400 hover:shadow-lg hover:scale-105"
                       >
-                        View Wallet
+                        🔍 View Wallet
                       </a>
                     </div>
                   </div>
@@ -302,47 +309,47 @@ export default function KingsList() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6">
-              <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/20">
-                <div className="text-purple-400/80 text-sm mb-1">Total Holders</div>
-                <div className="text-2xl font-bold text-white">{stats.totalHolders}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6 bg-slate-900/20">
+              <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-600/40 hover:border-slate-500/60 transition-all hover:shadow-lg">
+                <div className="text-slate-400 text-sm mb-2 font-medium">Total Holders</div>
+                <div className="text-3xl font-bold text-white">{stats.totalHolders}</div>
               </div>
-              <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/20">
-                <div className="text-purple-400/80 text-sm mb-1">Total Supply Held</div>
-                <div className="text-2xl font-bold text-white">{formatNumber(stats.totalSupplyHeld)}</div>
+              <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-600/40 hover:border-slate-500/60 transition-all hover:shadow-lg">
+                <div className="text-slate-400 text-sm mb-2 font-medium">Total Supply Held</div>
+                <div className="text-3xl font-bold text-white">{formatNumber(stats.totalSupplyHeld)}</div>
               </div>
-              <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/20">
-                <div className="text-purple-400/80 text-sm mb-1">Average Holding</div>
-                <div className="text-2xl font-bold text-white">{formatNumber(stats.avgHolding)}</div>
+              <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-600/40 hover:border-slate-500/60 transition-all hover:shadow-lg">
+                <div className="text-slate-400 text-sm mb-2 font-medium">Average Holding</div>
+                <div className="text-3xl font-bold text-white">{formatNumber(stats.avgHolding)}</div>
               </div>
-              <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/20">
-                <div className="text-purple-400/80 text-sm mb-1">Median Holding</div>
-                <div className="text-2xl font-bold text-white">{formatNumber(stats.medianHolding)}</div>
+              <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-600/40 hover:border-slate-500/60 transition-all hover:shadow-lg">
+                <div className="text-slate-400 text-sm mb-2 font-medium">Median Holding</div>
+                <div className="text-3xl font-bold text-white">{formatNumber(stats.medianHolding)}</div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 pt-0">
-              <div className="bg-gradient-to-br from-yellow-900/30 to-orange-900/30 rounded-lg p-4 border border-yellow-500/30">
-                <div className="text-yellow-400/80 text-sm mb-1">Top Holder Share</div>
-                <div className="text-3xl font-bold text-yellow-300">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 pt-0 bg-slate-900/20">
+              <div className="bg-gradient-to-br from-yellow-900/40 to-orange-900/40 rounded-xl p-5 border border-yellow-500/40 hover:shadow-xl transition-all">
+                <div className="text-yellow-300/90 text-sm mb-2 font-medium">Top Holder Share</div>
+                <div className="text-4xl font-extrabold text-yellow-200">
                   {stats.topHolderPercentage.toFixed(2)}%
                 </div>
               </div>
-              <div className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 rounded-lg p-4 border border-purple-500/30">
-                <div className="text-purple-400/80 text-sm mb-1">Top 10 Concentration</div>
-                <div className="text-2xl font-bold text-white mb-1">
+              <div className="bg-gradient-to-br from-blue-900/40 to-indigo-900/40 rounded-xl p-5 border border-blue-500/40 hover:shadow-xl transition-all">
+                <div className="text-blue-300/90 text-sm mb-2 font-medium">Top 10 Concentration</div>
+                <div className="text-3xl font-bold text-white mb-2">
                   {stats.concentrationRatio.toFixed(2)}%
                 </div>
-                <div className={`text-sm font-medium ${concentration.color}`}>
+                <div className={`text-sm font-semibold ${concentration.color}`}>
                   {concentration.label}
                 </div>
               </div>
-              <div className="bg-gradient-to-br from-purple-900/30 to-pink-900/30 rounded-lg p-4 border border-purple-500/30">
-                <div className="text-purple-400/80 text-sm mb-1">Gini Coefficient</div>
-                <div className="text-2xl font-bold text-white mb-1">
+              <div className="bg-gradient-to-br from-purple-900/40 to-pink-900/40 rounded-xl p-5 border border-purple-500/40 hover:shadow-xl transition-all">
+                <div className="text-purple-300/90 text-sm mb-2 font-medium">Gini Coefficient</div>
+                <div className="text-3xl font-bold text-white mb-2">
                   {stats.giniCoefficient.toFixed(3)}
                 </div>
-                <div className={`text-sm font-medium ${giniLevel.color}`}>
+                <div className={`text-sm font-semibold ${giniLevel.color}`}>
                   {giniLevel.label}
                 </div>
               </div>
@@ -350,44 +357,47 @@ export default function KingsList() {
           </div>
         )}
 
-        <div className="rounded-xl overflow-hidden border border-yellow-500/30"
+        <div className="rounded-2xl overflow-hidden border border-slate-600/50 shadow-2xl"
           style={{
-            background: 'linear-gradient(135deg, rgba(88, 28, 135, 0.95), rgba(59, 7, 100, 0.95))',
+            background: 'linear-gradient(135deg, rgba(30, 27, 75, 0.95), rgba(49, 46, 129, 0.95))',
             backdropFilter: 'blur(20px)'
           }}
         >
-          <div className="p-6 border-b border-purple-500/30">
-            <h3 className="text-xl font-bold text-white">
-              {richList.length > 0 ? 'All Holders' : 'Rich List Rankings'}
+          <div className="p-6 border-b border-slate-600/50 bg-gradient-to-r from-slate-800/50 to-slate-900/50">
+            <h3 className="text-2xl font-bold text-white">
+              {richList.length > 0 ? '📊 All Holders' : '📊 Rich List Rankings'}
             </h3>
             {richList.length > 0 && (
-              <p className="text-purple-300/60 text-sm mt-1">
-                Showing all {richList.length} token holders
+              <p className="text-slate-400 text-sm mt-2">
+                Showing all {richList.length} token holders ranked by balance
               </p>
             )}
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-20">
+            <div className="flex items-center justify-center py-24">
               <div className="text-center">
-                <div className="w-12 h-12 border-4 border-purple-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-purple-300">Loading rich list...</p>
+                <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-slate-300 text-lg">Loading rich list data...</p>
               </div>
             </div>
           ) : richList.length === 0 ? (
-            <div className="text-center py-20 text-purple-300/60">
-              {selectedToken ? 'No holders found for this token' : 'Please select a token to view the rich list'}
+            <div className="text-center py-24">
+              <div className="text-6xl mb-4">👑</div>
+              <p className="text-slate-400 text-lg">
+                {selectedToken ? 'No holders found for this token' : 'Select a token above to view the rich list'}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-purple-500/30 bg-purple-900/40">
-                    <th className="text-left p-4 text-purple-200 font-medium">Rank</th>
-                    <th className="text-left p-4 text-purple-200 font-medium">Wallet Address</th>
-                    <th className="text-right p-4 text-purple-200 font-medium">Balance</th>
-                    <th className="text-right p-4 text-purple-200 font-medium">% of Supply</th>
-                    <th className="text-center p-4 text-purple-200 font-medium">Actions</th>
+                  <tr className="border-b border-slate-600/50 bg-slate-900/60">
+                    <th className="text-left p-4 text-slate-300 font-semibold">Rank</th>
+                    <th className="text-left p-4 text-slate-300 font-semibold">Wallet Address</th>
+                    <th className="text-right p-4 text-slate-300 font-semibold">Balance</th>
+                    <th className="text-right p-4 text-slate-300 font-semibold">% of Supply</th>
+                    <th className="text-center p-4 text-slate-300 font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -399,51 +409,51 @@ export default function KingsList() {
                     return (
                       <tr
                         key={holder.address}
-                        className={`border-b border-purple-500/10 hover:bg-purple-900/20 transition-colors ${
-                          isTopHolder ? 'bg-yellow-900/20' : isTopTen ? 'bg-purple-900/10' : ''
+                        className={`border-b border-slate-700/30 hover:bg-slate-800/50 transition-colors ${
+                          isTopHolder ? 'bg-yellow-900/20 hover:bg-yellow-900/30' : isTopTen ? 'bg-slate-800/30' : ''
                         }`}
                       >
                         <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            {isTopHolder && <span className="text-2xl">👑</span>}
-                            {!isTopHolder && isTopTen && <span className="text-xl">🥇</span>}
-                            <span className={`font-bold ${isTopHolder ? 'text-yellow-400 text-lg' : 'text-white'}`}>
+                          <div className="flex items-center gap-3">
+                            {isTopHolder && <span className="text-3xl animate-pulse">👑</span>}
+                            {!isTopHolder && isTopTen && <span className="text-2xl">🥇</span>}
+                            <span className={`font-bold ${isTopHolder ? 'text-yellow-400 text-xl' : 'text-white text-lg'}`}>
                               #{index + 1}
                             </span>
                           </div>
                         </td>
                         <td className="p-4">
-                          <div className="font-mono text-purple-200">
-                            {holder.address.slice(0, 8)}...{holder.address.slice(-6)}
+                          <div className="font-mono text-slate-300 text-sm bg-slate-900/50 px-3 py-1.5 rounded-lg inline-block border border-slate-700/40">
+                            {holder.address.slice(0, 10)}...{holder.address.slice(-8)}
                           </div>
                         </td>
                         <td className="p-4 text-right">
-                          <div className="font-bold text-white">
+                          <div className="font-bold text-white text-lg">
                             {formatNumber(holder.balance)}
                           </div>
-                          <div className="text-xs text-purple-400/60">
+                          <div className="text-xs text-slate-500 font-medium">
                             {selectedToken.currency_code}
                           </div>
                         </td>
                         <td className="p-4 text-right">
-                          <div className={`font-medium ${
+                          <div className={`font-bold text-base ${
                             percentage >= 10 ? 'text-yellow-400' :
                             percentage >= 5 ? 'text-orange-400' :
-                            percentage >= 1 ? 'text-purple-300' :
-                            'text-purple-400/80'
+                            percentage >= 1 ? 'text-blue-400' :
+                            'text-slate-400'
                           }`}>
                             {percentage.toFixed(2)}%
                           </div>
                         </td>
                         <td className="p-4">
-                          <div className="flex items-center justify-center gap-2">
+                          <div className="flex items-center justify-center">
                             <a
                               href={`https://${network === 'mainnet' ? '' : 'test.'}xrpscan.com/account/${holder.address}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="px-3 py-1.5 bg-blue-600/30 hover:bg-blue-600/50 text-blue-200 rounded text-xs font-medium transition-all duration-200 border border-blue-500/30"
+                              className="px-4 py-2 bg-blue-600/40 hover:bg-blue-600/60 text-blue-100 rounded-lg text-sm font-semibold transition-all duration-200 border border-blue-500/40 hover:border-blue-400/60 hover:shadow-lg hover:scale-105"
                             >
-                              View Wallet
+                              🔍 View
                             </a>
                           </div>
                         </td>
@@ -456,14 +466,17 @@ export default function KingsList() {
           )}
         </div>
 
-        <div className="mt-6 p-4 rounded-lg bg-purple-900/30 border border-purple-500/20">
-          <h4 className="text-sm font-medium text-purple-200 mb-2">Distribution Metrics Explained</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-purple-300/80">
-            <div>
-              <strong className="text-purple-200">Gini Coefficient:</strong> Measures wealth inequality. 0 = perfect equality, 1 = perfect inequality. Lower is better for distribution.
+        <div className="mt-6 p-6 rounded-xl bg-slate-800/50 border border-slate-600/40 shadow-lg">
+          <h4 className="text-base font-bold text-slate-200 mb-3 flex items-center gap-2">
+            <span>📚</span>
+            Distribution Metrics Explained
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-300">
+            <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/40">
+              <strong className="text-slate-200">Gini Coefficient:</strong> Measures wealth inequality. 0 = perfect equality, 1 = perfect inequality. Lower values indicate better distribution.
             </div>
-            <div>
-              <strong className="text-purple-200">Top 10 Concentration:</strong> Percentage of total supply held by top 10 holders. Lower percentages indicate better distribution.
+            <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700/40">
+              <strong className="text-slate-200">Top 10 Concentration:</strong> Percentage of total supply held by top 10 holders. Lower percentages indicate healthier distribution.
             </div>
           </div>
         </div>
