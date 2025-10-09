@@ -1033,7 +1033,7 @@ export default function Dashboard() {
           💱 Swap
         </button>
         <button
-          className="col-span-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white font-bold text-xs px-3 py-2 rounded shadow-lg"
+          className="col-span-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold text-xs px-3 py-2 rounded shadow-lg shadow-purple-500/50 hover:shadow-purple-500/70"
           onClick={(e) => { e.stopPropagation(); tweetToken(token); }}
         >
           𝕏 Post on X
@@ -1112,7 +1112,7 @@ export default function Dashboard() {
             💱 Swap
           </button>
           <button
-            className="bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 text-white font-bold text-xs px-2 py-1 rounded shadow-md"
+            className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold text-xs px-2 py-1 rounded shadow-md shadow-purple-500/50 hover:shadow-purple-500/70"
             onClick={(e) => { e.stopPropagation(); tweetToken(token); }}
             title="Post on X"
           >

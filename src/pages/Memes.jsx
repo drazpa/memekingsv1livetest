@@ -1216,7 +1216,7 @@ export default function Memes() {
           💱 Trade
         </a>
         <button
-          className="btn text-purple-300 text-xs px-2 py-2 rounded-lg"
+          className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold text-xs px-2 py-2 rounded-lg shadow-lg shadow-purple-500/50 hover:shadow-purple-500/70"
           onClick={(e) => { e.stopPropagation(); tweetToken(token); }}
           title="Post on X"
         >
@@ -1325,7 +1325,7 @@ export default function Memes() {
             💱
           </a>
           <button
-            className="btn text-purple-300 text-xs px-2 py-1 rounded"
+            className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold text-xs px-2 py-1 rounded shadow-md shadow-purple-500/50 hover:shadow-purple-500/70"
             onClick={(e) => { e.stopPropagation(); tweetToken(token); }}
             title="Post on X"
           >
