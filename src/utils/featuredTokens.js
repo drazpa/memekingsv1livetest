@@ -58,6 +58,10 @@ export const setFeaturedPosition = async (tokenId, position) => {
       return;
     }
 
+    if (position < 1 || position > 3) {
+      throw new Error('Featured position must be between 1 and 3');
+    }
+
     const { data: currentFeatured, error: fetchError } = await supabase
       .from('meme_tokens')
       .select('id, featured_order')
@@ -66,22 +70,73 @@ export const setFeaturedPosition = async (tokenId, position) => {
 
     if (fetchError) throw fetchError;
 
-    const updates = [];
+    const existingAtPosition = currentFeatured.find(t => t.featured_order === position);
 
-    currentFeatured.forEach((token) => {
-      if (token.id === tokenId) return;
+    if (existingAtPosition && existingAtPosition.id !== tokenId) {
+      const otherFeatured = currentFeatured.filter(t => t.id !== tokenId && t.id !== existingAtPosition.id);
+      const usedPositions = [position];
+      const availablePositions = [1, 2, 3].filter(p => p !== position);
 
-      if (token.featured_order && token.featured_order >= position) {
-        updates.push(
-          supabase
-            .from('meme_tokens')
-            .update({ featured_order: token.featured_order + 1 })
-            .eq('id', token.id)
-        );
-      }
-    });
+      const updates = [];
 
-    await Promise.all(updates);
+      otherFeatured.forEach(token => {
+        const nextPos = availablePositions.find(p => !usedPositions.includes(p));
+        if (nextPos) {
+          usedPositions.push(nextPos);
+          updates.push(
+            supabase
+              .from('meme_tokens')
+              .update({ featured_order: nextPos })
+              .eq('id', token.id)
+          );
+        } else {
+          updates.push(
+            supabase
+              .from('meme_tokens')
+              .update({ is_featured: false, featured_order: null })
+              .eq('id', token.id)
+          );
+        }
+      });
+
+      const bumppedPosition = availablePositions[0];
+      updates.push(
+        supabase
+          .from('meme_tokens')
+          .update({ featured_order: bumppedPosition })
+          .eq('id', existingAtPosition.id)
+      );
+
+      await Promise.all(updates);
+    } else {
+      const otherFeatured = currentFeatured.filter(t => t.id !== tokenId);
+      const usedPositions = [position];
+      const availablePositions = [1, 2, 3].filter(p => p !== position);
+
+      const updates = [];
+
+      otherFeatured.forEach(token => {
+        const nextPos = availablePositions.find(p => !usedPositions.includes(p));
+        if (nextPos) {
+          usedPositions.push(nextPos);
+          updates.push(
+            supabase
+              .from('meme_tokens')
+              .update({ featured_order: nextPos })
+              .eq('id', token.id)
+          );
+        } else {
+          updates.push(
+            supabase
+              .from('meme_tokens')
+              .update({ is_featured: false, featured_order: null })
+              .eq('id', token.id)
+          );
+        }
+      });
+
+      await Promise.all(updates);
+    }
 
     const { error: updateError } = await supabase
       .from('meme_tokens')
@@ -89,14 +144,6 @@ export const setFeaturedPosition = async (tokenId, position) => {
       .eq('id', tokenId);
 
     if (updateError) throw updateError;
-
-    const { error: cleanupError } = await supabase
-      .from('meme_tokens')
-      .update({ is_featured: false, featured_order: null })
-      .eq('is_featured', true)
-      .gt('featured_order', 3);
-
-    if (cleanupError) throw cleanupError;
 
     console.log(`Token set to featured position ${position}`);
   } catch (error) {
