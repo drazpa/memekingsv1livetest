@@ -1940,12 +1940,12 @@ export default function Dashboard() {
               </a>
 
               <a
-                href={`https://firstledger.net/token/${createdToken.issuer_address}/${Buffer.from(createdToken.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')}`}
+                href={`https://xmagnetic.org/amm/${createdToken.currency_code}+${createdToken.issuer_address}_XRP+XRP?network=testnet`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn text-purple-300 w-full px-6 py-3 rounded-lg font-medium text-center block"
               >
-                View on FirstLedger
+                AMM Pool
               </a>
 
               <a
