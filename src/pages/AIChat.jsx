@@ -77,7 +77,7 @@ export default function AIChat() {
     const welcomeMsg = {
       id: `welcome_${Date.now()}`,
       role: 'assistant',
-      content: 'Hello! I\'m your advanced XRPL AI assistant. I can help you with:\n\n• Check wallet balances and transactions\n• Get token information and prices\n• Execute trades and swaps\n• Create and manage tokens\n• Analyze market data\n• Navigate the platform\n\nHow can I assist you today?',
+      content: 'Hello! I\'m your advanced XRPL AI assistant. I can help you with:\n\n• Check wallet balances and transactions\n• Send and receive tokens\n• Get token information and prices\n• Execute trades and swaps\n• Create and manage tokens\n• Analyze market data\n• Navigate the platform\n• And 100+ more commands!\n\nHow can I assist you today?',
       timestamp: new Date(),
       data: null
     };
@@ -162,11 +162,11 @@ export default function AIChat() {
   };
 
   return (
-    <div className="h-[calc(100vh-120px)] flex flex-col">
-      <div className="glass rounded-t-xl p-4 sm:p-6 border-b border-purple-500/20">
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 140px)' }}>
+      <div className="glass rounded-t-xl p-4 sm:p-6 border-b border-purple-500/20 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center animate-pulse">
               <span className="text-2xl">🤖</span>
             </div>
             <div>
@@ -177,13 +177,13 @@ export default function AIChat() {
           <div className="flex gap-2">
             <button
               onClick={handleNewSession}
-              className="px-3 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 rounded-lg transition-all duration-200 text-sm border border-purple-500/30"
+              className="px-3 py-2 bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 rounded-lg transition-all duration-200 text-sm border border-purple-500/30 hover:scale-105"
             >
               New Chat
             </button>
             <button
               onClick={handleClearChat}
-              className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-300 rounded-lg transition-all duration-200 text-sm border border-red-500/30"
+              className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-300 rounded-lg transition-all duration-200 text-sm border border-red-500/30 hover:scale-105"
             >
               Clear
             </button>
@@ -191,14 +191,20 @@ export default function AIChat() {
         </div>
       </div>
 
-      <div className="flex-1 glass p-4 sm:p-6 overflow-y-auto">
+      <div className="flex-1 glass p-4 sm:p-6 overflow-y-auto" style={{ minHeight: 0 }}>
         <div className="space-y-4">
-          {messages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
+          {messages.map((message, index) => (
+            <div
+              key={message.id}
+              className="animate-fadeInUp"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <ChatMessage message={message} />
+            </div>
           ))}
           {isTyping && (
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+            <div className="flex items-start gap-3 animate-fadeInUp">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0 animate-pulse">
                 <span className="text-sm">🤖</span>
               </div>
               <div className="flex-1 bg-purple-900/30 rounded-lg p-4 border border-purple-500/20">
@@ -214,7 +220,7 @@ export default function AIChat() {
         </div>
       </div>
 
-      <div className="glass rounded-b-xl p-4 border-t border-purple-500/20">
+      <div className="glass rounded-b-xl p-4 border-t border-purple-500/20 flex-shrink-0">
         <ChatInput onSend={handleSendMessage} disabled={isTyping} />
       </div>
     </div>

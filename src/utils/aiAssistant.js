@@ -23,7 +23,13 @@ class AIAssistant {
   async processMessage(message) {
     const lowerMessage = message.toLowerCase();
 
-    if (this.isBalanceQuery(lowerMessage)) {
+    if (this.isSendTokenQuery(lowerMessage)) {
+      return await this.handleSendToken();
+    } else if (this.isReceiveTokenQuery(lowerMessage)) {
+      return this.handleReceiveToken();
+    } else if (this.isWalletAssetsQuery(lowerMessage)) {
+      return await this.handleWalletAssets();
+    } else if (this.isBalanceQuery(lowerMessage)) {
       return await this.handleBalanceQuery();
     } else if (this.isTokenQuery(lowerMessage)) {
       return await this.handleTokenQuery(message);
@@ -37,6 +43,10 @@ class AIAssistant {
       return await this.handleWalletInfo();
     } else if (this.isNavigationQuery(lowerMessage)) {
       return this.handleNavigation(lowerMessage);
+    } else if (this.isTokenStatsQuery(lowerMessage)) {
+      return await this.handleTokenStats();
+    } else if (this.isBotQuery(lowerMessage)) {
+      return await this.handleBotQuery();
     } else if (this.isHelpQuery(lowerMessage)) {
       return this.handleHelp();
     } else {
@@ -74,6 +84,26 @@ class AIAssistant {
 
   isHelpQuery(msg) {
     return msg.includes('help') || msg.includes('what can you') || msg.includes('how do i');
+  }
+
+  isSendTokenQuery(msg) {
+    return (msg.includes('send') && (msg.includes('token') || msg.includes('xrp'))) || msg.includes('transfer');
+  }
+
+  isReceiveTokenQuery(msg) {
+    return msg.includes('receive') || msg.includes('get token') || msg.includes('my address');
+  }
+
+  isWalletAssetsQuery(msg) {
+    return (msg.includes('wallet') && msg.includes('asset')) || msg.includes('what tokens') || msg.includes('my holdings');
+  }
+
+  isTokenStatsQuery(msg) {
+    return (msg.includes('token') && (msg.includes('stat') || msg.includes('analytic') || msg.includes('performance')));
+  }
+
+  isBotQuery(msg) {
+    return msg.includes('bot') && (msg.includes('status') || msg.includes('trading') || msg.includes('performance'));
   }
 
   async handleBalanceQuery() {
@@ -424,17 +454,285 @@ class AIAssistant {
     };
   }
 
+  async handleSendToken() {
+    if (!this.context.connectedWallet) {
+      return {
+        content: 'Please connect a wallet first to send tokens.',
+        data: {
+          actions: [
+            {
+              label: 'Connect Wallet',
+              icon: '🔗',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+            }
+          ]
+        }
+      };
+    }
+
+    return {
+      content: 'I can help you send tokens! You can send XRP or any other tokens from your wallet.',
+      data: {
+        card: {
+          icon: '📤',
+          title: 'Send Tokens',
+          badge: 'Connected',
+          items: [
+            { label: 'From Wallet', value: this.context.connectedWallet.name },
+            { label: 'Address', value: `${this.context.connectedWallet.address.slice(0, 12)}...` }
+          ],
+          description: 'Go to the Wallets page to send XRP or tokens to any XRPL address.'
+        },
+        actions: [
+          {
+            label: 'Send Tokens',
+            icon: '📤',
+            style: 'primary',
+            onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+          }
+        ]
+      }
+    };
+  }
+
+  handleReceiveToken() {
+    if (!this.context.connectedWallet) {
+      return {
+        content: 'Please connect a wallet first to receive tokens.',
+        data: {
+          actions: [
+            {
+              label: 'Connect Wallet',
+              icon: '🔗',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+            }
+          ]
+        }
+      };
+    }
+
+    return {
+      content: 'Here is your wallet address for receiving tokens:',
+      data: {
+        card: {
+          icon: '📥',
+          title: 'Receive Tokens',
+          badge: 'Your Address',
+          items: [
+            { label: 'Wallet Name', value: this.context.connectedWallet.name },
+            { label: 'Address', value: this.context.connectedWallet.address },
+            { label: 'Network', value: 'XRPL Mainnet' }
+          ],
+          description: 'Share this address with others to receive XRP and tokens. Make sure senders are using the XRPL network.'
+        },
+        quickActions: [
+          { label: 'Copy Address', onClick: () => navigator.clipboard.writeText(this.context.connectedWallet.address) },
+          { label: 'View on Explorer', onClick: () => window.open(`https://xrpscan.com/account/${this.context.connectedWallet.address}`, '_blank') }
+        ]
+      }
+    };
+  }
+
+  async handleWalletAssets() {
+    if (!this.context.connectedWallet) {
+      return {
+        content: 'Please connect a wallet to view your assets.',
+        data: {
+          actions: [
+            {
+              label: 'Connect Wallet',
+              icon: '🔗',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+            }
+          ]
+        }
+      };
+    }
+
+    try {
+      const balance = await getXRPBalance(this.context.connectedWallet.address);
+
+      return {
+        content: 'Here are your wallet assets:',
+        data: {
+          card: {
+            icon: '💎',
+            title: 'Wallet Assets',
+            badge: 'Live',
+            items: [
+              { label: 'XRP Balance', value: `${balance.toFixed(6)} XRP` },
+              { label: 'Wallet', value: this.context.connectedWallet.name },
+              { label: 'Address', value: `${this.context.connectedWallet.address.slice(0, 12)}...` }
+            ],
+            description: 'View all your assets including tokens and XRP holdings in the Wallets page.'
+          },
+          actions: [
+            {
+              label: 'View All Assets',
+              icon: '💼',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+            },
+            {
+              label: 'Send Tokens',
+              icon: '📤',
+              style: 'secondary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+            }
+          ]
+        }
+      };
+    } catch (error) {
+      return {
+        content: 'I had trouble fetching your wallet assets. Please try again.',
+        data: null
+      };
+    }
+  }
+
+  async handleTokenStats() {
+    try {
+      const { data: tokens, error } = await supabase
+        .from('tokens')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      const { count: totalTokens } = await supabase
+        .from('tokens')
+        .select('*', { count: 'exact', head: true });
+
+      return {
+        content: 'Here are the latest token statistics:',
+        data: {
+          card: {
+            icon: '📊',
+            title: 'Token Statistics',
+            badge: 'Real-time',
+            items: [
+              { label: 'Total Tokens', value: `${totalTokens || 0}` },
+              { label: 'Recent Tokens', value: `${tokens?.length || 0} new` },
+              { label: 'Network', value: 'XRPL Mainnet' }
+            ]
+          },
+          table: {
+            headers: ['Token', 'Symbol', 'Created'],
+            rows: tokens?.slice(0, 5).map(token => [
+              token.name || 'Unknown',
+              token.currency_code || 'N/A',
+              new Date(token.created_at).toLocaleDateString()
+            ]) || []
+          },
+          actions: [
+            {
+              label: 'View All Tokens',
+              icon: '📋',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'mytokens' }))
+            },
+            {
+              label: 'Create Token',
+              icon: '✨',
+              style: 'secondary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'memes' }))
+            }
+          ]
+        }
+      };
+    } catch (error) {
+      return {
+        content: 'I had trouble fetching token statistics. Please try again.',
+        data: null
+      };
+    }
+  }
+
+  async handleBotQuery() {
+    try {
+      const { data: bots, error } = await supabase
+        .from('trading_bots')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+
+      if (!bots || bots.length === 0) {
+        return {
+          content: 'You don\'t have any trading bots yet. Create your first bot to automate your trading!',
+          data: {
+            actions: [
+              {
+                label: 'Create Trading Bot',
+                icon: '🤖',
+                style: 'primary',
+                onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'bottrader' }))
+              }
+            ]
+          }
+        };
+      }
+
+      const activeBots = bots.filter(bot => bot.status === 'active').length;
+      const totalTrades = bots.reduce((sum, bot) => sum + (bot.total_trades || 0), 0);
+
+      return {
+        content: 'Here is your trading bot overview:',
+        data: {
+          card: {
+            icon: '🤖',
+            title: 'Trading Bots',
+            badge: `${activeBots} Active`,
+            items: [
+              { label: 'Total Bots', value: `${bots.length}` },
+              { label: 'Active Bots', value: `${activeBots}` },
+              { label: 'Total Trades', value: `${totalTrades}` }
+            ]
+          },
+          table: {
+            headers: ['Bot', 'Status', 'Strategy', 'Trades'],
+            rows: bots.slice(0, 5).map(bot => [
+              bot.name || 'Unnamed Bot',
+              bot.status || 'Unknown',
+              bot.strategy || 'N/A',
+              `${bot.total_trades || 0}`
+            ])
+          },
+          actions: [
+            {
+              label: 'Manage Bots',
+              icon: '⚙️',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'bottrader' }))
+            }
+          ]
+        }
+      };
+    } catch (error) {
+      return {
+        content: 'I had trouble fetching bot information. Please try again.',
+        data: null
+      };
+    }
+  }
+
   handleGeneral(message) {
     const suggestions = [
       'Check my balance',
+      'Send tokens',
       'Show me the top tokens',
       'What\'s happening in the market?',
       'Show my recent trades',
-      'Help me navigate'
+      'View my bot status'
     ];
 
     return {
-      content: 'I understand you\'re asking about XRPL and the platform. I can help you with:\n\n• Checking wallet balances\n• Getting token information\n• Viewing trade history\n• Market overviews\n• Navigating the platform\n\nTry asking one of these:',
+      content: 'I understand you\'re asking about XRPL and the platform. I can help you with:\n\n• Checking wallet balances\n• Sending and receiving tokens\n• Getting token information\n• Viewing trade history\n• Managing trading bots\n• Market overviews\n• Navigating the platform\n\nTry asking one of these:',
       data: {
         quickActions: suggestions.map(label => ({
           label,
