@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, memo } from 'react';
+import { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
 import { supabase } from '../utils/supabase';
 import * as xrpl from 'xrpl';
 import toast from 'react-hot-toast';
@@ -1259,6 +1259,8 @@ export default function BotTrader() {
       </div>
     );
   }, (prevProps, nextProps) => {
+    const timeChanged = Math.floor((prevProps.nextTradeTime || 0) / 1000) !== Math.floor((nextProps.nextTradeTime || 0) / 1000);
+
     return (
       prevProps.bot.id === nextProps.bot.id &&
       prevProps.bot.status === nextProps.bot.status &&
@@ -1268,12 +1270,29 @@ export default function BotTrader() {
       prevProps.bot.total_xrp_received === nextProps.bot.total_xrp_received &&
       prevProps.bot.total_xrp_spent === nextProps.bot.total_xrp_spent &&
       prevProps.token?.id === nextProps.token?.id &&
+      prevProps.token?.image_url === nextProps.token?.image_url &&
       prevProps.poolData?.price === nextProps.poolData?.price &&
-      prevProps.nextTradeTime === nextProps.nextTradeTime &&
+      !timeChanged &&
       prevProps.nextAction?.action === nextProps.nextAction?.action &&
+      prevProps.nextAction?.tokenAmount === nextProps.nextAction?.tokenAmount &&
       prevProps.announcement === nextProps.announcement
     );
   });
+
+  const botHandlers = useMemo(() => {
+    const handlers = {};
+    bots.forEach(bot => {
+      handlers[bot.id] = {
+        onPause: () => pauseBot(bot),
+        onStop: () => stopBot(bot),
+        onStart: () => startBot(bot),
+        onEdit: () => openEditBot(bot),
+        onViewActivity: () => setSelectedBot(bot),
+        onDelete: () => deleteBot(bot)
+      };
+    });
+    return handlers;
+  }, [bots.map(b => b.id).join(',')]);
 
   const filteredBots = bots.filter(bot => {
     const token = tokensMap[bot.token_id];
@@ -1402,6 +1421,7 @@ export default function BotTrader() {
               {sortedBots.map(bot => {
                 const token = tokensMap[bot.token_id];
                 const poolData = token ? poolsData[token.id] : null;
+                const handlers = botHandlers[bot.id] || {};
                 return (
                   <div key={bot.id} className="relative">
                     <button
@@ -1417,12 +1437,7 @@ export default function BotTrader() {
                       nextTradeTime={nextTradeTimes[bot.id]}
                       nextAction={nextTradeActions[bot.id]}
                       announcement={botAnnouncements[bot.id]}
-                      onPause={() => pauseBot(bot)}
-                      onStop={() => stopBot(bot)}
-                      onStart={() => startBot(bot)}
-                      onEdit={() => openEditBot(bot)}
-                      onViewActivity={() => setSelectedBot(bot)}
-                      onDelete={() => deleteBot(bot)}
+                      {...handlers}
                     />
                   </div>
                 );
