@@ -1339,7 +1339,6 @@ export default function BotTrader() {
       prevProps.bot.total_xrp_received === nextProps.bot.total_xrp_received &&
       prevProps.bot.total_xrp_spent === nextProps.bot.total_xrp_spent &&
       prevProps.token?.id === nextProps.token?.id &&
-      prevProps.token?.image_url === nextProps.token?.image_url &&
       prevProps.poolData?.price === nextProps.poolData?.price &&
       !timeChanged &&
       prevProps.nextAction?.action === nextProps.nextAction?.action &&
@@ -1526,6 +1525,8 @@ export default function BotTrader() {
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Interval</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Amount Range</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Total Trades</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">XRP Earned</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">XRP Spent</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Next Trade</th>
                       <th className="px-4 py-3 text-right text-sm font-semibold text-blue-200">Actions</th>
                     </tr>
@@ -1590,6 +1591,16 @@ export default function BotTrader() {
                           </td>
                           <td className="px-4 py-3">
                             <span className="text-sm text-blue-300">{bot.total_trades || 0}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-green-400 font-medium">
+                              {(bot.total_xrp_received || 0).toFixed(4)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="text-sm text-red-400 font-medium">
+                              {(bot.total_xrp_spent || 0).toFixed(4)}
+                            </span>
                           </td>
                           <td className="px-4 py-3">
                             {bot.status === 'running' ? (
