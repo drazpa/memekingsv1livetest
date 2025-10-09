@@ -945,8 +945,8 @@ export default function Dashboard() {
   const userTokens = tokens.filter(t => t.issuer_address !== ISSUER_ADDRESS);
 
   const topTokens = [...tokens]
-    .filter(t => t.amm_pool_created)
-    .sort((a, b) => parseFloat(calculateMarketCap(b)) - parseFloat(calculateMarketCap(a)))
+    .filter(t => t.is_featured === true && t.amm_pool_created)
+    .sort((a, b) => (a.featured_order || 999) - (b.featured_order || 999))
     .slice(0, 3);
 
   const TokenCard = ({ token, featured = false }) => (
@@ -1983,7 +1983,7 @@ export default function Dashboard() {
       )}
 
       {editingToken && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+        <div key={editingToken.id} className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="glass rounded-lg p-8 max-w-2xl w-full">
             <h3 className="text-2xl font-bold text-purple-200 mb-6">Edit Token</h3>
 
