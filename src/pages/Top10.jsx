@@ -15,23 +15,23 @@ export default function Top10() {
   }, []);
 
   const calculatePrice = (token) => {
+    if (token.live_price) return token.live_price;
     if (!token.amm_pool_created || !token.amm_xrp_amount || !token.amm_asset_amount) return 0;
     return token.amm_xrp_amount / token.amm_asset_amount;
   };
 
   const calculateMarketCap = (token) => {
-    if (!token.amm_pool_created || !token.amm_xrp_amount || !token.amm_asset_amount) return 0;
-    const priceInXRP = token.amm_xrp_amount / token.amm_asset_amount;
-    return token.supply * priceInXRP;
+    const price = calculatePrice(token);
+    if (!price) return 0;
+    return token.supply * price;
   };
 
   const calculate24hChange = (token) => {
-    if (!token.amm_xrp_amount || !token.amm_asset_amount) return 0;
+    const currentPrice = calculatePrice(token);
+    if (!currentPrice) return 0;
     if (!token.initial_xrp_amount || !token.initial_asset_amount) return 0;
 
-    const currentPrice = token.amm_xrp_amount / token.amm_asset_amount;
     const initialPrice = token.initial_xrp_amount / token.initial_asset_amount;
-
     if (!initialPrice || initialPrice === 0) return 0;
 
     const change = ((currentPrice - initialPrice) / initialPrice) * 100;
@@ -96,9 +96,11 @@ export default function Top10() {
             const amm = ammInfoResponse.result.amm;
             const currentXRP = parseFloat(amm.amount) / 1000000;
             const currentAsset = parseFloat(amm.amount2.value);
+            const currentPrice = currentXRP / currentAsset;
 
             token.amm_xrp_amount = currentXRP;
             token.amm_asset_amount = currentAsset;
+            token.live_price = currentPrice;
 
             token.volume_24h = token.volume_24h || Math.random() * 10000;
             token.value_24h = token.value_24h || currentXRP * (Math.random() * 2);
