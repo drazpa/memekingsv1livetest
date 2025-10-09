@@ -809,7 +809,11 @@ export default function Dashboard() {
         if (error) throw error;
         toast.success(`Token ${adminAction.token.token_name} deleted!`);
       } else if (adminAction.type === 'edit') {
-        setEditingToken(adminAction.token);
+        setEditingToken({
+          ...adminAction.token,
+          is_featured: adminAction.token.is_featured || false,
+          featured_order: adminAction.token.featured_order || null
+        });
         setEditImageFile(null);
         setEditImagePreview(null);
         setShowAdminModal(false);
@@ -2030,9 +2034,12 @@ export default function Dashboard() {
                 <div className="grid grid-cols-4 gap-2">
                   <button
                     type="button"
-                    onClick={() => setEditingToken({ ...editingToken, is_featured: false, featured_order: null })}
+                    onClick={() => {
+                      console.log('Setting to None');
+                      setEditingToken(prev => ({ ...prev, is_featured: false, featured_order: null }));
+                    }}
                     className={`px-4 py-2 rounded-lg transition-colors ${
-                      !editingToken.is_featured
+                      !editingToken.is_featured || editingToken.is_featured === false
                         ? 'bg-purple-600 text-white'
                         : 'glass text-purple-300 hover:bg-purple-500/20'
                     }`}
@@ -2043,9 +2050,12 @@ export default function Dashboard() {
                     <button
                       key={position}
                       type="button"
-                      onClick={() => setEditingToken({ ...editingToken, is_featured: true, featured_order: position })}
+                      onClick={() => {
+                        console.log('Setting to position:', position);
+                        setEditingToken(prev => ({ ...prev, is_featured: true, featured_order: position }));
+                      }}
                       className={`px-4 py-2 rounded-lg transition-colors ${
-                        editingToken.is_featured && editingToken.featured_order === position
+                        editingToken.is_featured === true && editingToken.featured_order === position
                           ? 'bg-purple-600 text-white'
                           : 'glass text-purple-300 hover:bg-purple-500/20'
                       }`}
@@ -2055,9 +2065,10 @@ export default function Dashboard() {
                   ))}
                 </div>
                 <p className="text-purple-400 text-xs mt-2">
-                  {editingToken.is_featured && editingToken.featured_order
-                    ? `This token will appear in position ${editingToken.featured_order} on the featured list`
-                    : 'This token will not be featured'}
+                  Current: is_featured={String(editingToken.is_featured)}, order={editingToken.featured_order || 'null'} -
+                  {editingToken.is_featured === true && editingToken.featured_order
+                    ? ` This token will appear in position ${editingToken.featured_order} on the featured list`
+                    : ' This token will not be featured'}
                 </p>
               </div>
 
