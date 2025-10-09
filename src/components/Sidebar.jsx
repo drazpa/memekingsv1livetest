@@ -89,6 +89,7 @@ export default function Sidebar({ currentPage, onNavigate }) {
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'top10', label: 'Top 10', icon: '👑' },
     { id: 'memes', label: 'Memes', icon: '🚀' },
     { id: 'pools', label: 'Pools', icon: '🏊' },
     { id: 'trade', label: 'Trade', icon: '💱' },
