@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '../utils/supabase';
 import * as xrpl from 'xrpl';
 import toast from 'react-hot-toast';
@@ -966,8 +966,16 @@ export default function BotTrader() {
     }
   };
 
+  const tokensMap = useMemo(() => {
+    const map = {};
+    tokens.forEach(token => {
+      map[token.id] = token;
+    });
+    return map;
+  }, [tokens]);
+
   const BotCard = ({ bot }) => {
-    const token = tokens.find(t => t.id === bot.token_id);
+    const token = tokensMap[bot.token_id];
     const nextTradeTime = nextTradeTimes[bot.id];
     const nextAction = nextTradeActions[bot.id];
     const announcement = botAnnouncements[bot.id];
@@ -1208,7 +1216,7 @@ export default function BotTrader() {
   };
 
   const filteredBots = bots.filter(bot => {
-    const token = tokens.find(t => t.id === bot.token_id);
+    const token = tokensMap[bot.token_id];
     const matchesSearch = bot.name.toLowerCase().includes(botSearchQuery.toLowerCase()) ||
                           token?.token_name.toLowerCase().includes(botSearchQuery.toLowerCase()) ||
                           token?.currency_code.toLowerCase().includes(botSearchQuery.toLowerCase());
@@ -1363,7 +1371,7 @@ export default function BotTrader() {
                   </thead>
                   <tbody className="divide-y divide-blue-500/20">
                     {sortedBots.map(bot => {
-                      const token = tokens.find(t => t.id === bot.token_id);
+                      const token = tokensMap[bot.token_id];
                       const nextTime = nextTradeTimes[bot.id];
                       const timeUntil = nextTime ? Math.max(0, Math.floor((nextTime - Date.now()) / 1000)) : 0;
                       const minutes = Math.floor(timeUntil / 60);
