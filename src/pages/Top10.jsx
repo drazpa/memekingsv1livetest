@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import * as xrpl from 'xrpl';
 import TokenIcon from '../components/TokenIcon';
+import TokenDetailModal from '../components/TokenDetailModal';
 
 export default function Top10() {
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('price-gainers');
+  const [selectedToken, setSelectedToken] = useState(null);
 
   useEffect(() => {
     loadTokensData();
@@ -431,7 +433,8 @@ export default function Top10() {
                 return (
                   <tr
                     key={token.id}
-                    className={`border-t border-blue-500/20 hover:bg-blue-900/20 transition-colors ${getRankBg(index)}`}
+                    onClick={() => setSelectedToken(token)}
+                    className={`border-t border-blue-500/20 hover:bg-blue-900/20 transition-colors cursor-pointer ${getRankBg(index)}`}
                   >
                     <td className="px-4 py-4">
                       <div className={`text-2xl font-bold ${getRankColor(index)}`}>
@@ -506,7 +509,11 @@ export default function Top10() {
               const marketShare = totalMarketCap > 0 ? (marketCap / totalMarketCap) * 100 : 0;
 
               return (
-                <div key={token.id} className="p-4 glass rounded-lg">
+                <div
+                  key={token.id}
+                  onClick={() => setSelectedToken(token)}
+                  className="p-4 glass rounded-lg cursor-pointer hover:bg-blue-500/10 transition-colors"
+                >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <div className={`text-xl font-bold ${getRankColor(index)}`}>#{index + 1}</div>
@@ -659,7 +666,11 @@ export default function Top10() {
                   : 0;
 
                 return (
-                  <tr key={token.id} className="border-t border-blue-500/20 hover:bg-blue-900/20">
+                  <tr
+                    key={token.id}
+                    onClick={() => setSelectedToken(token)}
+                    className="border-t border-blue-500/20 hover:bg-blue-900/20 cursor-pointer"
+                  >
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         <TokenIcon token={token} size="sm" className="!w-6 !h-6" />
@@ -694,6 +705,13 @@ export default function Top10() {
           </table>
         </div>
       </div>
+
+      {selectedToken && (
+        <TokenDetailModal
+          token={selectedToken}
+          onClose={() => setSelectedToken(null)}
+        />
+      )}
     </div>
   );
 }
