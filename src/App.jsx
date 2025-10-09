@@ -22,8 +22,8 @@ export default function App() {
   useEffect(() => {
     const handleNavigateToTrade = (event) => {
       setCurrentPage('trade');
-      if (event.detail && event.detail.token) {
-        setSelectedTradeToken(event.detail.token);
+      if (event.detail) {
+        setSelectedTradeToken(event.detail);
       }
     };
 
