@@ -38,6 +38,27 @@ export default function Top10() {
     return change;
   };
 
+  const calculateVolumeToLiquidityRatio = (token) => {
+    if (!token.amm_xrp_amount || token.amm_xrp_amount === 0) return 0;
+    return ((token.value_24h || 0) / token.amm_xrp_amount) * 100;
+  };
+
+  const calculateMarketDominance = (token) => {
+    const totalMarketCap = tokens.reduce((sum, t) => sum + calculateMarketCap(t), 0);
+    if (totalMarketCap === 0) return 0;
+    return (calculateMarketCap(token) / totalMarketCap) * 100;
+  };
+
+  const calculateLiquidityDepth = (token) => {
+    if (!token.amm_xrp_amount || !token.amm_asset_amount) return 0;
+    return Math.sqrt(token.amm_xrp_amount * token.amm_asset_amount);
+  };
+
+  const calculatePriceImpact = (token, tradeSize = 1) => {
+    if (!token.amm_xrp_amount) return 0;
+    return (tradeSize / token.amm_xrp_amount) * 100;
+  };
+
   const loadTokensData = async () => {
     setLoading(true);
     const client = new xrpl.Client('wss://xrplcluster.com');
@@ -153,16 +174,23 @@ export default function Top10() {
 
   const getRankColor = (index) => {
     if (index === 0) return 'text-yellow-400';
-    if (index === 1) return 'text-slate-300';
-    if (index === 2) return 'text-amber-600';
+    if (index === 1) return 'text-gray-300';
+    if (index === 2) return 'text-orange-500';
     return 'text-blue-400';
   };
 
   const getRankBg = (index) => {
-    if (index === 0) return 'bg-yellow-500/10 border-yellow-500/30';
-    if (index === 1) return 'bg-slate-500/10 border-slate-400/30';
-    if (index === 2) return 'bg-amber-500/10 border-amber-600/30';
+    if (index === 0) return 'bg-gradient-to-r from-yellow-500/20 to-yellow-600/10 border-l-4 border-yellow-500 shadow-lg shadow-yellow-500/20';
+    if (index === 1) return 'bg-gradient-to-r from-gray-400/20 to-gray-500/10 border-l-4 border-gray-400 shadow-lg shadow-gray-400/20';
+    if (index === 2) return 'bg-gradient-to-r from-orange-500/20 to-orange-600/10 border-l-4 border-orange-500 shadow-lg shadow-orange-500/20';
     return '';
+  };
+
+  const getRankBadge = (index) => {
+    if (index === 0) return '🥇';
+    if (index === 1) return '🥈';
+    if (index === 2) return '🥉';
+    return `#${index + 1}`;
   };
 
   const totalMarketCap = tokens.reduce((sum, t) => sum + calculateMarketCap(t), 0);
@@ -172,15 +200,6 @@ export default function Top10() {
   const avgPriceChange = tokens.length > 0
     ? tokens.reduce((sum, t) => sum + calculate24hChange(t), 0) / tokens.length
     : 0;
-
-  const categoryStats = {
-    'price-gainers': topTokens.length > 0 ? calculate24hChange(topTokens[0]) : 0,
-    'price-losers': topTokens.length > 0 ? calculate24hChange(topTokens[0]) : 0,
-    'volume-high': topTokens.length > 0 ? (topTokens[0].volume_24h || 0) : 0,
-    'volume-low': topTokens.length > 0 ? (topTokens[0].volume_24h || 0) : 0,
-    'value-high': topTokens.length > 0 ? (topTokens[0].value_24h || 0) : 0,
-    'value-low': topTokens.length > 0 ? (topTokens[0].value_24h || 0) : 0,
-  };
 
   const getCategoryAverage = () => {
     if (topTokens.length === 0) return 0;
@@ -203,12 +222,29 @@ export default function Top10() {
     return ((10 - index) / 10) * 100;
   };
 
+  const compareToLeader = (token, leaderToken) => {
+    const metricValue = selectedCategory.includes('price')
+      ? calculate24hChange(token)
+      : selectedCategory.includes('volume')
+      ? (token.volume_24h || 0)
+      : (token.value_24h || 0);
+
+    const leaderValue = selectedCategory.includes('price')
+      ? calculate24hChange(leaderToken)
+      : selectedCategory.includes('volume')
+      ? (leaderToken.volume_24h || 0)
+      : (leaderToken.value_24h || 0);
+
+    if (leaderValue === 0) return 0;
+    return ((metricValue / leaderValue) * 100);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-blue-200">Top 10 Analytics</h2>
-          <p className="text-blue-400 mt-1">Real-time market leaders and comprehensive comparisons</p>
+          <h2 className="text-3xl font-bold text-blue-200">Top 10 Advanced Analytics</h2>
+          <p className="text-blue-400 mt-1">Comprehensive market analysis with detailed comparisons</p>
         </div>
         <button
           onClick={loadTokensData}
@@ -220,12 +256,12 @@ export default function Top10() {
       </div>
 
       <div className="glass rounded-lg p-6">
-        <h3 className="text-xl font-bold text-blue-200 mb-4">Market Overview - Advanced Stats</h3>
+        <h3 className="text-xl font-bold text-blue-200 mb-4">Global Market Metrics</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="p-4 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/20">
             <div className="text-blue-400 text-xs mb-1">Total Market Cap</div>
             <div className="text-2xl font-bold text-blue-200">{totalMarketCap.toFixed(2)}</div>
-            <div className="text-blue-500 text-xs mt-1">XRP (Live)</div>
+            <div className="text-blue-500 text-xs mt-1">XRP</div>
           </div>
 
           <div className="p-4 bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-lg border border-green-500/20">
@@ -235,13 +271,13 @@ export default function Top10() {
           </div>
 
           <div className="p-4 bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-lg border border-orange-500/20">
-            <div className="text-orange-400 text-xs mb-1">24h Volume</div>
+            <div className="text-orange-400 text-xs mb-1">24h Trade Count</div>
             <div className="text-2xl font-bold text-orange-200">{totalVolume24h.toFixed(0)}</div>
-            <div className="text-orange-500 text-xs mt-1">Total trades</div>
+            <div className="text-orange-500 text-xs mt-1">transactions</div>
           </div>
 
           <div className="p-4 bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/20">
-            <div className="text-purple-400 text-xs mb-1">24h Value</div>
+            <div className="text-purple-400 text-xs mb-1">24h XRP Volume</div>
             <div className="text-2xl font-bold text-purple-200">{totalValue24h.toFixed(2)}</div>
             <div className="text-purple-500 text-xs mt-1">XRP traded</div>
           </div>
@@ -252,7 +288,7 @@ export default function Top10() {
               : 'bg-gradient-to-br from-red-500/10 to-rose-500/10 border-red-500/20'
           }`}>
             <div className={avgPriceChange >= 0 ? 'text-green-400' : 'text-red-400'}>
-              <div className="text-xs mb-1">Avg Price Change</div>
+              <div className="text-xs mb-1">Avg Price Δ</div>
             </div>
             <div className={`text-2xl font-bold ${avgPriceChange >= 0 ? 'text-green-200' : 'text-red-200'}`}>
               {avgPriceChange >= 0 ? '+' : ''}{avgPriceChange.toFixed(2)}%
@@ -263,9 +299,9 @@ export default function Top10() {
           </div>
 
           <div className="p-4 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 rounded-lg border border-cyan-500/20">
-            <div className="text-cyan-400 text-xs mb-1">Active Tokens</div>
+            <div className="text-cyan-400 text-xs mb-1">Active Pools</div>
             <div className="text-2xl font-bold text-cyan-200">{tokens.length}</div>
-            <div className="text-cyan-500 text-xs mt-1">With pools</div>
+            <div className="text-cyan-500 text-xs mt-1">AMM tokens</div>
           </div>
         </div>
       </div>
@@ -330,7 +366,7 @@ export default function Top10() {
             }`}
           >
             <div className="text-2xl mb-1">💰</div>
-            <div className="text-sm font-medium">High Value</div>
+            <div className="text-sm font-medium">High XRP Value</div>
           </button>
 
           <button
@@ -342,7 +378,7 @@ export default function Top10() {
             }`}
           >
             <div className="text-2xl mb-1">🪙</div>
-            <div className="text-sm font-medium">Low Value</div>
+            <div className="text-sm font-medium">Low XRP Value</div>
           </button>
         </div>
       </div>
@@ -353,17 +389,40 @@ export default function Top10() {
           <h3 className="text-2xl font-bold text-blue-200">{getCategoryTitle()}</h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="glass bg-blue-500/5 rounded-lg p-4">
-            <div className="text-blue-400 text-sm mb-2">Category Leader</div>
-            <div className="text-2xl font-bold text-blue-200">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+          <div className="glass bg-yellow-500/5 rounded-lg p-4 border border-yellow-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">🥇</span>
+              <div className="text-yellow-400 text-sm font-bold">Gold Leader</div>
+            </div>
+            <div className="text-xl font-bold text-yellow-200">
               {topTokens.length > 0 ? topTokens[0].token_name : 'N/A'}
+            </div>
+          </div>
+
+          <div className="glass bg-gray-500/5 rounded-lg p-4 border border-gray-400/30">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">🥈</span>
+              <div className="text-gray-400 text-sm font-bold">Silver Runner-up</div>
+            </div>
+            <div className="text-xl font-bold text-gray-200">
+              {topTokens.length > 1 ? topTokens[1].token_name : 'N/A'}
+            </div>
+          </div>
+
+          <div className="glass bg-orange-500/5 rounded-lg p-4 border border-orange-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-2xl">🥉</span>
+              <div className="text-orange-400 text-sm font-bold">Bronze Third</div>
+            </div>
+            <div className="text-xl font-bold text-orange-200">
+              {topTokens.length > 2 ? topTokens[2].token_name : 'N/A'}
             </div>
           </div>
 
           <div className="glass bg-purple-500/5 rounded-lg p-4">
             <div className="text-purple-400 text-sm mb-2">Category Average</div>
-            <div className="text-2xl font-bold text-purple-200">
+            <div className="text-xl font-bold text-purple-200">
               {selectedCategory.includes('price')
                 ? `${getCategoryAverage().toFixed(2)}%`
                 : getCategoryAverage().toFixed(2)
@@ -371,16 +430,9 @@ export default function Top10() {
             </div>
           </div>
 
-          <div className="glass bg-green-500/5 rounded-lg p-4">
-            <div className="text-green-400 text-sm mb-2">Top 3 Dominance</div>
-            <div className="text-2xl font-bold text-green-200">
-              {topTokens.length >= 3 ? '30%' : `${(topTokens.length / 10 * 100).toFixed(0)}%`}
-            </div>
-          </div>
-
-          <div className="glass bg-orange-500/5 rounded-lg p-4">
-            <div className="text-orange-400 text-sm mb-2">Performance Spread</div>
-            <div className="text-2xl font-bold text-orange-200">
+          <div className="glass bg-cyan-500/5 rounded-lg p-4">
+            <div className="text-cyan-400 text-sm mb-2">Performance Spread</div>
+            <div className="text-xl font-bold text-cyan-200">
               {topTokens.length >= 2 ? (() => {
                 const first = selectedCategory.includes('price')
                   ? calculate24hChange(topTokens[0])
@@ -409,11 +461,14 @@ export default function Top10() {
                 <th className="text-right px-4 py-3 text-blue-300 font-medium">Price (XRP)</th>
                 <th className="text-right px-4 py-3 text-blue-300 font-medium">24h Change</th>
                 <th className="text-right px-4 py-3 text-blue-300 font-medium">vs Category Avg</th>
-                <th className="text-right px-4 py-3 text-blue-300 font-medium">24h Volume</th>
-                <th className="text-right px-4 py-3 text-blue-300 font-medium">24h Value</th>
+                <th className="text-right px-4 py-3 text-blue-300 font-medium">vs Leader</th>
+                <th className="text-right px-4 py-3 text-blue-300 font-medium">24h Trades</th>
+                <th className="text-right px-4 py-3 text-blue-300 font-medium">24h XRP Volume</th>
+                <th className="text-right px-4 py-3 text-blue-300 font-medium">Vol/Liq Ratio</th>
                 <th className="text-right px-4 py-3 text-blue-300 font-medium">Market Cap</th>
+                <th className="text-right px-4 py-3 text-blue-300 font-medium">Market Share</th>
                 <th className="text-right px-4 py-3 text-blue-300 font-medium">Liquidity</th>
-                <th className="text-right px-4 py-3 text-blue-300 font-medium">Percentile</th>
+                <th className="text-right px-4 py-3 text-blue-300 font-medium">Price Impact</th>
               </tr>
             </thead>
             <tbody>
@@ -428,17 +483,22 @@ export default function Top10() {
                   : selectedCategory.includes('volume')
                   ? (token.volume_24h || 0) - categoryAvg
                   : (token.value_24h || 0) - categoryAvg;
-                const percentile = getTokenPercentile(token, index);
+                const vsLeader = topTokens.length > 0 ? compareToLeader(token, topTokens[0]) : 0;
+                const volLiqRatio = calculateVolumeToLiquidityRatio(token);
+                const marketShare = calculateMarketDominance(token);
+                const priceImpact = calculatePriceImpact(token, 1);
 
                 return (
                   <tr
                     key={token.id}
                     onClick={() => setSelectedToken(token)}
-                    className={`border-t border-blue-500/20 hover:bg-blue-900/20 transition-colors cursor-pointer ${getRankBg(index)}`}
+                    className={`border-t border-blue-500/20 hover:bg-blue-900/30 transition-all cursor-pointer ${getRankBg(index)}`}
                   >
                     <td className="px-4 py-4">
-                      <div className={`text-2xl font-bold ${getRankColor(index)}`}>
-                        #{index + 1}
+                      <div className="flex items-center gap-2">
+                        <div className={`text-3xl font-bold ${getRankColor(index)}`}>
+                          {getRankBadge(index)}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-4">
@@ -464,23 +524,51 @@ export default function Top10() {
                       </div>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <div className="text-blue-200 font-semibold">{(token.volume_24h || 0).toFixed(0)}</div>
-                      <div className="text-xs text-blue-400">trades</div>
+                      <div className={`font-semibold ${
+                        vsLeader >= 90 ? 'text-green-400' :
+                        vsLeader >= 70 ? 'text-yellow-400' :
+                        vsLeader >= 50 ? 'text-orange-400' :
+                        'text-red-400'
+                      }`}>
+                        {vsLeader.toFixed(1)}%
+                      </div>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <div className="text-blue-200 font-semibold">{(token.value_24h || 0).toFixed(4)}</div>
-                      <div className="text-xs text-blue-400">XRP</div>
+                      <div className="text-blue-200 font-semibold">{(token.volume_24h || 0).toFixed(0)}</div>
+                      <div className="text-xs text-blue-400">txs</div>
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <div className="text-purple-200 font-bold">{(token.value_24h || 0).toFixed(4)}</div>
+                      <div className="text-xs text-purple-400">XRP</div>
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <div className={`font-bold ${
+                        volLiqRatio > 100 ? 'text-green-400' :
+                        volLiqRatio > 50 ? 'text-yellow-400' :
+                        'text-orange-400'
+                      }`}>
+                        {volLiqRatio.toFixed(2)}%
+                      </div>
                     </td>
                     <td className="px-4 py-4 text-right">
                       <div className="text-blue-200 font-semibold">{marketCap.toFixed(4)}</div>
                       <div className="text-xs text-blue-400">XRP</div>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <div className="text-blue-200">{(token.amm_xrp_amount || 0).toFixed(2)}</div>
-                      <div className="text-xs text-blue-400">XRP</div>
+                      <div className="text-cyan-200 font-bold">{marketShare.toFixed(2)}%</div>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <div className="text-blue-200 font-bold">{percentile.toFixed(0)}%</div>
+                      <div className="text-green-200 font-semibold">{(token.amm_xrp_amount || 0).toFixed(2)}</div>
+                      <div className="text-xs text-green-400">XRP</div>
+                    </td>
+                    <td className="px-4 py-4 text-right">
+                      <div className={`font-semibold ${
+                        priceImpact < 1 ? 'text-green-400' :
+                        priceImpact < 3 ? 'text-yellow-400' :
+                        'text-red-400'
+                      }`}>
+                        {priceImpact.toFixed(3)}%
+                      </div>
                     </td>
                   </tr>
                 );
@@ -500,45 +588,71 @@ export default function Top10() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="glass rounded-lg p-6">
-          <h3 className="text-xl font-bold text-blue-200 mb-4">Detailed Token Comparisons</h3>
-          <div className="space-y-3">
-            {topTokens.slice(0, 5).map((token, index) => {
+          <h3 className="text-xl font-bold text-blue-200 mb-4">Podium Performance Analysis</h3>
+          <div className="space-y-4">
+            {topTokens.slice(0, 3).map((token, index) => {
               const price = calculatePrice(token);
               const priceChange = calculate24hChange(token);
               const marketCap = calculateMarketCap(token);
-              const marketShare = totalMarketCap > 0 ? (marketCap / totalMarketCap) * 100 : 0;
+              const marketShare = calculateMarketDominance(token);
+              const volLiqRatio = calculateVolumeToLiquidityRatio(token);
+              const priceImpact = calculatePriceImpact(token, 1);
+
+              const borderColors = ['border-yellow-500', 'border-gray-400', 'border-orange-500'];
+              const bgColors = ['bg-yellow-500/10', 'bg-gray-400/10', 'bg-orange-500/10'];
 
               return (
                 <div
                   key={token.id}
                   onClick={() => setSelectedToken(token)}
-                  className="p-4 glass rounded-lg cursor-pointer hover:bg-blue-500/10 transition-colors"
+                  className={`p-5 glass rounded-lg cursor-pointer hover:bg-blue-500/10 transition-colors border-2 ${borderColors[index]} ${bgColors[index]}`}
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className={`text-xl font-bold ${getRankColor(index)}`}>#{index + 1}</div>
-                      <TokenIcon token={token} size="sm" />
-                      <span className="font-bold text-blue-200">{token.token_name}</span>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="text-4xl">{getRankBadge(index)}</div>
+                      <TokenIcon token={token} size="lg" />
+                      <div>
+                        <div className="font-bold text-lg text-blue-200">{token.token_name}</div>
+                        <div className="text-sm text-blue-400">{token.currency_code}</div>
+                      </div>
                     </div>
-                    <div className={`font-bold ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <div className={`text-2xl font-bold ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-3 text-sm">
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                     <div>
-                      <div className="text-blue-400 text-xs">Market Share</div>
-                      <div className="text-blue-200 font-semibold">{marketShare.toFixed(2)}%</div>
+                      <div className="text-blue-400 text-xs mb-1">Market Share</div>
+                      <div className="text-blue-200 font-bold">{marketShare.toFixed(2)}%</div>
                     </div>
                     <div>
-                      <div className="text-blue-400 text-xs">Price Impact</div>
-                      <div className="text-blue-200 font-semibold">
-                        {token.amm_xrp_amount > 0 ? ((1 / token.amm_xrp_amount) * 100).toFixed(4) : 0}%
+                      <div className="text-purple-400 text-xs mb-1">24h XRP Vol</div>
+                      <div className="text-purple-200 font-bold">{(token.value_24h || 0).toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <div className="text-green-400 text-xs mb-1">Vol/Liq Ratio</div>
+                      <div className="text-green-200 font-bold">{volLiqRatio.toFixed(1)}%</div>
+                    </div>
+                    <div>
+                      <div className="text-orange-400 text-xs mb-1">Price Impact</div>
+                      <div className="text-orange-200 font-bold">{priceImpact.toFixed(3)}%</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-blue-500/20">
+                    <div className="grid grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <div className="text-blue-400 mb-1">Liquidity</div>
+                        <div className="text-blue-200 font-semibold">{(token.amm_xrp_amount || 0).toFixed(2)} XRP</div>
                       </div>
-                    </div>
-                    <div>
-                      <div className="text-blue-400 text-xs">Liquidity Ratio</div>
-                      <div className="text-blue-200 font-semibold">
-                        {totalLiquidity > 0 ? ((token.amm_xrp_amount / totalLiquidity) * 100).toFixed(2) : 0}%
+                      <div>
+                        <div className="text-blue-400 mb-1">Market Cap</div>
+                        <div className="text-blue-200 font-semibold">{marketCap.toFixed(2)} XRP</div>
+                      </div>
+                      <div>
+                        <div className="text-blue-400 mb-1">24h Trades</div>
+                        <div className="text-blue-200 font-semibold">{(token.volume_24h || 0).toFixed(0)}</div>
                       </div>
                     </div>
                   </div>
@@ -549,92 +663,121 @@ export default function Top10() {
         </div>
 
         <div className="glass rounded-lg p-6">
-          <h3 className="text-xl font-bold text-blue-200 mb-4">Category Performance Insights</h3>
+          <h3 className="text-xl font-bold text-blue-200 mb-4">Advanced Category Insights</h3>
           <div className="space-y-4">
-            <div className="p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-500/30">
-              <div className="text-green-400 text-sm mb-2">Best Performer</div>
-              {topTokens.length > 0 && (() => {
-                const best = topTokens[0];
-                const value = selectedCategory.includes('price')
-                  ? calculate24hChange(best)
-                  : selectedCategory.includes('volume')
-                  ? best.volume_24h
-                  : best.value_24h;
-                return (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <TokenIcon token={best} size="sm" />
-                      <span className="font-bold text-green-200">{best.token_name}</span>
-                    </div>
-                    <span className="text-xl font-bold text-green-300">
-                      {selectedCategory.includes('price')
-                        ? `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
-                        : value.toFixed(2)
-                      }
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
-
             <div className="p-4 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-lg border border-blue-500/30">
-              <div className="text-blue-400 text-sm mb-2">Median Performance</div>
-              {topTokens.length >= 5 && (() => {
-                const median = topTokens[Math.floor(topTokens.length / 2)];
-                const value = selectedCategory.includes('price')
-                  ? calculate24hChange(median)
-                  : selectedCategory.includes('volume')
-                  ? median.volume_24h
-                  : median.value_24h;
-                return (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <TokenIcon token={median} size="sm" />
-                      <span className="font-bold text-blue-200">{median.token_name}</span>
-                    </div>
-                    <span className="text-xl font-bold text-blue-300">
-                      {selectedCategory.includes('price')
-                        ? `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
-                        : value.toFixed(2)
-                      }
-                    </span>
-                  </div>
-                );
-              })()}
+              <div className="text-blue-400 text-sm mb-3 font-bold">XRP Volume Distribution</div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-blue-300 text-sm">Top 3 Combined</span>
+                  <span className="text-blue-200 font-bold">
+                    {topTokens.slice(0, 3).reduce((sum, t) => sum + (t.value_24h || 0), 0).toFixed(2)} XRP
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-blue-300 text-sm">Remaining 7</span>
+                  <span className="text-blue-200 font-bold">
+                    {topTokens.slice(3).reduce((sum, t) => sum + (t.value_24h || 0), 0).toFixed(2)} XRP
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-blue-500/30">
+                  <span className="text-blue-300 text-sm font-bold">Top 3 Dominance</span>
+                  <span className="text-cyan-200 font-bold text-lg">
+                    {topTokens.length >= 3 ? (
+                      ((topTokens.slice(0, 3).reduce((sum, t) => sum + (t.value_24h || 0), 0) /
+                        topTokens.reduce((sum, t) => sum + (t.value_24h || 0), 0)) * 100).toFixed(1)
+                    ) : 0}%
+                  </span>
+                </div>
+              </div>
             </div>
 
             <div className="p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/30">
-              <div className="text-purple-400 text-sm mb-2">Category Statistics</div>
-              <div className="grid grid-cols-2 gap-3 mt-3">
-                <div>
-                  <div className="text-purple-300 text-xs">Total Entries</div>
-                  <div className="text-2xl font-bold text-purple-200">{topTokens.length}</div>
+              <div className="text-purple-400 text-sm mb-3 font-bold">Liquidity Analysis</div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-purple-300 text-sm">Avg Liquidity Depth</span>
+                  <span className="text-purple-200 font-bold">
+                    {topTokens.length > 0 ? (
+                      topTokens.reduce((sum, t) => sum + calculateLiquidityDepth(t), 0) / topTokens.length
+                    ).toFixed(2) : 0}
+                  </span>
                 </div>
-                <div>
-                  <div className="text-purple-300 text-xs">Avg Performance</div>
-                  <div className="text-2xl font-bold text-purple-200">
-                    {selectedCategory.includes('price')
-                      ? `${getCategoryAverage().toFixed(2)}%`
-                      : getCategoryAverage().toFixed(2)
-                    }
-                  </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-purple-300 text-sm">Avg Vol/Liq Ratio</span>
+                  <span className="text-purple-200 font-bold">
+                    {topTokens.length > 0 ? (
+                      topTokens.reduce((sum, t) => sum + calculateVolumeToLiquidityRatio(t), 0) / topTokens.length
+                    ).toFixed(2) : 0}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-purple-300 text-sm">Total Pool Liquidity</span>
+                  <span className="text-purple-200 font-bold">
+                    {topTokens.reduce((sum, t) => sum + (t.amm_xrp_amount || 0), 0).toFixed(2)} XRP
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-500/30">
+              <div className="text-green-400 text-sm mb-3 font-bold">Trading Efficiency Metrics</div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-green-300 text-sm">Most Efficient</span>
+                  <span className="text-green-200 font-bold">
+                    {topTokens.length > 0 ? topTokens.reduce((max, t) =>
+                      calculateVolumeToLiquidityRatio(t) > calculateVolumeToLiquidityRatio(max) ? t : max
+                    ).token_name : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-green-300 text-sm">Lowest Price Impact</span>
+                  <span className="text-green-200 font-bold">
+                    {topTokens.length > 0 ? topTokens.reduce((min, t) =>
+                      calculatePriceImpact(t, 1) < calculatePriceImpact(min, 1) ? t : min
+                    ).token_name : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-green-300 text-sm">Avg Price Impact (1 XRP)</span>
+                  <span className="text-green-200 font-bold">
+                    {topTokens.length > 0 ? (
+                      topTokens.reduce((sum, t) => sum + calculatePriceImpact(t, 1), 0) / topTokens.length
+                    ).toFixed(3) : 0}%
+                  </span>
                 </div>
               </div>
             </div>
 
             <div className="p-4 bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-lg border border-orange-500/30">
-              <div className="text-orange-400 text-sm mb-2">Market Distribution</div>
-              <div className="space-y-2 mt-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-orange-300">Top 3 Combined</span>
+              <div className="text-orange-400 text-sm mb-3 font-bold">Market Concentration</div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-orange-300 text-sm">Top Token Share</span>
                   <span className="text-orange-200 font-bold">
-                    {topTokens.slice(0, 3).reduce((sum, t) => sum + calculateMarketCap(t), 0).toFixed(2)} XRP
+                    {topTokens.length > 0 ? calculateMarketDominance(topTokens[0]).toFixed(2) : 0}%
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-orange-300">Remaining 7</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-orange-300 text-sm">HHI Index</span>
                   <span className="text-orange-200 font-bold">
-                    {topTokens.slice(3).reduce((sum, t) => sum + calculateMarketCap(t), 0).toFixed(2)} XRP
+                    {topTokens.length > 0 ? (
+                      topTokens.reduce((sum, t) => sum + Math.pow(calculateMarketDominance(t), 2), 0)
+                    ).toFixed(0) : 0}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-orange-300 text-sm">Market Health</span>
+                  <span className={`font-bold ${
+                    topTokens.length > 0 && topTokens.reduce((sum, t) => sum + Math.pow(calculateMarketDominance(t), 2), 0) < 2000
+                      ? 'text-green-400'
+                      : 'text-yellow-400'
+                  }`}>
+                    {topTokens.length > 0 && topTokens.reduce((sum, t) => sum + Math.pow(calculateMarketDominance(t), 2), 0) < 2000
+                      ? 'Competitive'
+                      : 'Concentrated'
+                    }
                   </span>
                 </div>
               </div>
@@ -644,26 +787,32 @@ export default function Top10() {
       </div>
 
       <div className="glass rounded-lg p-6">
-        <h3 className="text-xl font-bold text-blue-200 mb-4">Cross-Category Comparison Matrix</h3>
+        <h3 className="text-xl font-bold text-blue-200 mb-4">Comprehensive Comparison Matrix</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-blue-900/30">
               <tr>
+                <th className="text-left px-3 py-2 text-blue-300">Rank</th>
                 <th className="text-left px-3 py-2 text-blue-300">Token</th>
-                <th className="text-right px-3 py-2 text-blue-300">Price Change</th>
-                <th className="text-right px-3 py-2 text-blue-300">Volume</th>
-                <th className="text-right px-3 py-2 text-blue-300">Value</th>
+                <th className="text-right px-3 py-2 text-blue-300">Price Δ %</th>
+                <th className="text-right px-3 py-2 text-blue-300">Trade Count</th>
+                <th className="text-right px-3 py-2 text-blue-300">XRP Volume</th>
                 <th className="text-right px-3 py-2 text-blue-300">Market Cap</th>
-                <th className="text-right px-3 py-2 text-blue-300">Efficiency Score</th>
+                <th className="text-right px-3 py-2 text-blue-300">Market %</th>
+                <th className="text-right px-3 py-2 text-blue-300">Liquidity</th>
+                <th className="text-right px-3 py-2 text-blue-300">Vol/Liq</th>
+                <th className="text-right px-3 py-2 text-blue-300">Impact</th>
+                <th className="text-right px-3 py-2 text-blue-300">Efficiency</th>
               </tr>
             </thead>
             <tbody>
-              {topTokens.map((token) => {
+              {topTokens.map((token, index) => {
                 const priceChange = calculate24hChange(token);
                 const marketCap = calculateMarketCap(token);
-                const efficiency = token.amm_xrp_amount > 0
-                  ? ((token.value_24h || 0) / token.amm_xrp_amount) * 100
-                  : 0;
+                const marketShare = calculateMarketDominance(token);
+                const volLiqRatio = calculateVolumeToLiquidityRatio(token);
+                const priceImpact = calculatePriceImpact(token, 1);
+                const efficiency = volLiqRatio;
 
                 return (
                   <tr
@@ -672,22 +821,51 @@ export default function Top10() {
                     className="border-t border-blue-500/20 hover:bg-blue-900/20 cursor-pointer"
                   >
                     <td className="px-3 py-2">
+                      <div className={`text-xl font-bold ${getRankColor(index)}`}>
+                        {getRankBadge(index)}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
                         <TokenIcon token={token} size="sm" className="!w-6 !h-6" />
                         <span className="font-semibold text-blue-200">{token.token_name}</span>
                       </div>
                     </td>
-                    <td className={`px-3 py-2 text-right font-semibold ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    <td className={`px-3 py-2 text-right font-bold ${priceChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
                     </td>
-                    <td className="px-3 py-2 text-right text-blue-200">
+                    <td className="px-3 py-2 text-right text-blue-200 font-semibold">
                       {(token.volume_24h || 0).toFixed(0)}
                     </td>
-                    <td className="px-3 py-2 text-right text-blue-200">
+                    <td className="px-3 py-2 text-right text-purple-200 font-bold">
                       {(token.value_24h || 0).toFixed(4)}
                     </td>
                     <td className="px-3 py-2 text-right text-blue-200 font-semibold">
                       {marketCap.toFixed(4)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-cyan-200 font-bold">
+                      {marketShare.toFixed(2)}%
+                    </td>
+                    <td className="px-3 py-2 text-right text-green-200 font-semibold">
+                      {(token.amm_xrp_amount || 0).toFixed(2)}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <span className={`font-bold ${
+                        volLiqRatio > 100 ? 'text-green-400' :
+                        volLiqRatio > 50 ? 'text-yellow-400' :
+                        'text-orange-400'
+                      }`}>
+                        {volLiqRatio.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <span className={`font-semibold ${
+                        priceImpact < 1 ? 'text-green-400' :
+                        priceImpact < 3 ? 'text-yellow-400' :
+                        'text-red-400'
+                      }`}>
+                        {priceImpact.toFixed(3)}%
+                      </span>
                     </td>
                     <td className="px-3 py-2 text-right">
                       <span className={`font-bold ${
@@ -695,7 +873,7 @@ export default function Top10() {
                         efficiency > 50 ? 'text-yellow-400' :
                         'text-orange-400'
                       }`}>
-                        {efficiency.toFixed(1)}%
+                        {efficiency.toFixed(1)}
                       </span>
                     </td>
                   </tr>
