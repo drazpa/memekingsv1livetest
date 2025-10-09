@@ -60,6 +60,7 @@ export default function BotTrader() {
     message: ''
   });
   const [ticker, setTicker] = useState(0);
+  const [tokenBalances, setTokenBalances] = useState({});
   const botIntervals = useRef({});
   const fetchingPools = useRef(new Set());
 
@@ -88,14 +89,22 @@ export default function BotTrader() {
       loadBots();
       loadFavorites();
       loadBotFavorites();
+      fetchTokenBalances();
 
       const interval = setInterval(() => {
         refreshBotsFromDatabase();
+        fetchTokenBalances();
       }, 5000);
 
       return () => clearInterval(interval);
     }
   }, [connectedWallet]);
+
+  useEffect(() => {
+    if (connectedWallet && tokens.length > 0) {
+      fetchTokenBalances();
+    }
+  }, [tokens, connectedWallet]);
 
   useEffect(() => {
     const handleWalletChange = () => {
@@ -198,6 +207,35 @@ export default function BotTrader() {
       setTokens(data || []);
     } catch (error) {
       console.error('Error loading tokens:', error);
+    }
+  };
+
+  const fetchTokenBalances = async () => {
+    if (!connectedWallet || tokens.length === 0) return;
+
+    try {
+      const client = new xrpl.Client('wss://xrplcluster.com');
+      await client.connect();
+
+      const accountLines = await client.request({
+        command: 'account_lines',
+        account: connectedWallet.address,
+        ledger_index: 'validated'
+      });
+
+      await client.disconnect();
+
+      const balances = {};
+      tokens.forEach(token => {
+        const tokenLine = accountLines.result.lines.find(
+          line => line.currency === token.currency_code && line.account === token.issuer_address
+        );
+        balances[token.id] = tokenLine ? parseFloat(tokenLine.balance) : 0;
+      });
+
+      setTokenBalances(balances);
+    } catch (error) {
+      console.error('Error fetching token balances:', error);
     }
   };
 
@@ -934,22 +972,12 @@ export default function BotTrader() {
           return;
         }
       } else {
-        const accountLines = await client.request({
-          command: 'account_lines',
-          account: connectedWallet.address,
-          ledger_index: 'validated'
-        });
+        const currentTokenBalance = tokenBalances[token.id] || 0;
 
-        const tokenLine = accountLines.result.lines.find(
-          line => line.currency === token.currency_code && line.account === token.issuer_address
-        );
-
-        const tokenBalance = tokenLine ? parseFloat(tokenLine.balance) : 0;
-
-        if (tokenBalance < estimatedTokenAmount) {
+        if (currentTokenBalance < estimatedTokenAmount) {
           setBotAnnouncements(prev => ({
             ...prev,
-            [bot.id]: `⚠️ Insufficient ${token.token_name} (have ${formatToken(tokenBalance)}, need ${formatToken(estimatedTokenAmount)})`
+            [bot.id]: `⚠️ Insufficient ${token.token_name} (have ${formatToken(currentTokenBalance)}, need ${formatToken(estimatedTokenAmount)})`
           }));
           await client.disconnect();
           return;
@@ -1060,6 +1088,8 @@ export default function BotTrader() {
           [bot.id]: `✅ ${isBuy ? 'Bought' : 'Sold'} ${formatToken(actualAmount)} ${token.token_name} for ${xrpAmount.toFixed(4)} XRP`
         }));
 
+        fetchTokenBalances();
+
       } else {
         throw new Error(`Transaction failed: ${result.result.meta.TransactionResult}`);
       }
@@ -1111,7 +1141,7 @@ export default function BotTrader() {
     return map;
   }, [tokens]);
 
-  const BotCard = memo(({ bot, token, poolData, nextTradeTime, nextAction, announcement, onPause, onStop, onStart, onEdit, onViewActivity, onDelete }) => {
+  const BotCard = memo(({ bot, token, poolData, nextTradeTime, nextAction, announcement, tokenBalance, onPause, onStop, onStart, onEdit, onViewActivity, onDelete }) => {
     const timeUntilNext = nextTradeTime ? Math.max(0, nextTradeTime - Date.now()) : 0;
     const minutesUntil = Math.floor(timeUntilNext / 60000);
     const secondsUntil = Math.floor((timeUntilNext % 60000) / 1000);
@@ -1146,6 +1176,13 @@ export default function BotTrader() {
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-blue-300 text-xs font-mono">
                     {poolData.price.toFixed(8)} XRP
+                  </span>
+                </div>
+              )}
+              {token && tokenBalance !== undefined && (
+                <div className="mt-1">
+                  <span className="text-green-400 text-xs font-medium">
+                    Balance: {formatToken(tokenBalance)} {token.token_name}
                   </span>
                 </div>
               )}
@@ -1362,7 +1399,8 @@ export default function BotTrader() {
       !timeChanged &&
       prevProps.nextAction?.action === nextProps.nextAction?.action &&
       prevProps.nextAction?.tokenAmount === nextProps.nextAction?.tokenAmount &&
-      prevProps.announcement === nextProps.announcement
+      prevProps.announcement === nextProps.announcement &&
+      prevProps.tokenBalance === nextProps.tokenBalance
     );
   });
 
@@ -1524,6 +1562,7 @@ export default function BotTrader() {
                       nextTradeTime={nextTradeTimes[bot.id]}
                       nextAction={nextTradeActions[bot.id]}
                       announcement={botAnnouncements[bot.id]}
+                      tokenBalance={token ? tokenBalances[token.id] : undefined}
                       {...handlers}
                     />
                   </div>
