@@ -7,6 +7,7 @@ import Pools from './pages/Pools';
 import Trade from './pages/Trade';
 import BotTrader from './pages/BotTrader';
 import Vault from './pages/Vault';
+import KingsList from './pages/KingsList';
 import MyTokens from './pages/MyTokens';
 import Analytics from './pages/Analytics';
 import Top10 from './pages/Top10';
@@ -50,6 +51,8 @@ export default function App() {
         return <BotTrader />;
       case 'vault':
         return <Vault />;
+      case 'kingslist':
+        return <KingsList />;
       case 'mytokens':
         return <MyTokens />;
       case 'analytics':
