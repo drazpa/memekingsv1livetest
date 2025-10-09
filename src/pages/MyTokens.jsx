@@ -55,7 +55,7 @@ export default function MyTokens() {
       fetchHoldings();
       loadFavorites();
     }
-  }, [connectedWallet?.address]);
+  }, [connectedWallet]);
 
   useEffect(() => {
     fetchXRPPrice();

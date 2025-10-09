@@ -47,7 +47,7 @@ export default function Analytics() {
     if (connectedWallet) {
       loadWalletAnalytics();
     }
-  }, [connectedWallet?.address, tokens.length]);
+  }, [connectedWallet, tokens]);
 
   const loadConnectedWallet = async () => {
     const stored = localStorage.getItem('connectedWallet');

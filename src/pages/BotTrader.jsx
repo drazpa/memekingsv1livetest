@@ -72,7 +72,7 @@ export default function BotTrader() {
     if (tokens.length > 0) {
       fetchAllPoolsData();
     }
-  }, [tokens.length]);
+  }, [tokens]);
 
   useEffect(() => {
     if (connectedWallet) {
@@ -84,7 +84,7 @@ export default function BotTrader() {
 
       return () => clearInterval(interval);
     }
-  }, [connectedWallet?.address]);
+  }, [connectedWallet]);
 
   useEffect(() => {
     const handleWalletChange = () => {
@@ -371,11 +371,10 @@ export default function BotTrader() {
         buyProbability: 50
       });
 
-      const selectedToken = tokens.find(t => t.id === data.token_id);
       await logActivity({
         userAddress: connectedWallet.address,
         actionType: ACTION_TYPES.BOT_CREATED,
-        description: `Created trading bot: ${data.name} | Token: ${selectedToken?.token_name || 'Unknown'} | Bot Wallet: ${data.wallet_address} | Connected Wallet: ${connectedWallet.address}`
+        description: `Created trading bot: ${data.name}`
       });
 
     } catch (error) {

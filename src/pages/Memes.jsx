@@ -73,19 +73,19 @@ export default function Memes() {
     if (tokens.length > 0) {
       fetchAllPoolsData();
     }
-  }, [tokens.length]);
+  }, [tokens]);
 
   useEffect(() => {
     if (connectedWallet && Object.keys(poolsData).length > 0) {
       fetchLPBalances();
     }
-  }, [connectedWallet?.address, Object.keys(poolsData).length]);
+  }, [connectedWallet, poolsData]);
 
   useEffect(() => {
     if (connectedWallet) {
       loadFavorites();
     }
-  }, [connectedWallet?.address]);
+  }, [connectedWallet]);
 
   const loadConnectedWallet = () => {
     const stored = localStorage.getItem('connectedWallet');

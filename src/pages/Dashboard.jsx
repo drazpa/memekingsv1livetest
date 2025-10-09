@@ -109,22 +109,27 @@ export default function Dashboard() {
   useEffect(() => {
     if (tokens.length > 0) {
       fetchAllPoolsData();
-      fetchTrustlineStats();
-      calculate24hTokens();
     }
-  }, [tokens.length]);
+  }, [tokens]);
 
   useEffect(() => {
     if (Object.keys(poolsData).length > 0) {
       calculateLivePoolStats();
     }
-  }, [Object.keys(poolsData).length]);
+  }, [poolsData]);
+
+  useEffect(() => {
+    if (tokens.length > 0) {
+      fetchTrustlineStats();
+      calculate24hTokens();
+    }
+  }, [tokens]);
 
   useEffect(() => {
     if (connectedWallet && Object.keys(poolsData).length > 0) {
       fetchLPBalances();
     }
-  }, [connectedWallet?.address, Object.keys(poolsData).length]);
+  }, [connectedWallet, poolsData]);
 
   const loadConnectedWallet = () => {
     const stored = localStorage.getItem('connectedWallet');
@@ -787,7 +792,6 @@ export default function Dashboard() {
         if (error) throw error;
         toast.success(`Token ${adminAction.token.token_name} deleted!`);
       } else if (adminAction.type === 'edit') {
-        console.log('Opening edit modal for token:', adminAction.token.token_name, 'Image URL:', adminAction.token.image_url);
         setEditingToken(adminAction.token);
         setEditImageFile(null);
         setEditImagePreview(null);
@@ -808,22 +812,12 @@ export default function Dashboard() {
   const handleEditImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      console.log('Edit image file selected:', file.name, file.type, file.size);
       setEditImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        console.log('Edit image preview generated, length:', reader.result.length);
         setEditImagePreview(reader.result);
       };
-      reader.onerror = (error) => {
-        console.error('FileReader error:', error);
-        toast.error('Failed to read image file');
-      };
       reader.readAsDataURL(file);
-    } else {
-      console.log('No file selected');
-      setEditImageFile(null);
-      setEditImagePreview(null);
     }
   };
 
@@ -842,7 +836,6 @@ export default function Dashboard() {
         imageUrl = await uploadImageToPinata(editImageFile);
         toast.dismiss();
         toast.success('Image uploaded successfully!');
-        console.log('New image URL:', imageUrl);
       }
 
       const updateData = {
@@ -851,11 +844,8 @@ export default function Dashboard() {
         amm_xrp_amount: parseFloat(editingToken.amm_xrp_amount),
         amm_asset_amount: parseFloat(editingToken.amm_asset_amount),
         image_url: imageUrl,
-        is_featured: editingToken.is_featured || false,
-        featured_order: editingToken.is_featured ? (editingToken.featured_order || null) : null
+        updated_at: new Date().toISOString()
       };
-
-      console.log('Updating token with data:', updateData);
 
       const { data, error } = await supabase
         .from('meme_tokens')
@@ -866,20 +856,23 @@ export default function Dashboard() {
       if (error) throw error;
 
       const updatedToken = data[0];
-      console.log('Updated token from database:', updatedToken);
 
-      const tokenId = editingToken.id;
+      setTokens(prevTokens =>
+        prevTokens.map(t => t.id === editingToken.id ? { ...updatedToken } : t)
+      );
+
+      emitTokenUpdate(editingToken.id);
 
       setEditingToken(null);
       setAdminPassword('');
       setEditImageFile(null);
       setEditImagePreview(null);
 
-      toast.success(`Token updated successfully! Refreshing...`);
+      toast.success(`Token updated successfully!`);
 
-      await loadTokens();
-
-      emitTokenUpdate(tokenId);
+      setTimeout(() => {
+        loadTokens();
+      }, 1000);
     } catch (error) {
       console.error('Update error:', error);
       toast.error('Failed to update token: ' + error.message);
@@ -925,17 +918,9 @@ export default function Dashboard() {
   const userTokens = tokens.filter(t => t.issuer_address !== ISSUER_ADDRESS);
 
   const topTokens = [...tokens]
-    .filter(t => t.is_featured && t.amm_pool_created)
-    .sort((a, b) => (a.featured_order || 999) - (b.featured_order || 999))
+    .filter(t => t.amm_pool_created)
+    .sort((a, b) => parseFloat(calculateMarketCap(b)) - parseFloat(calculateMarketCap(a)))
     .slice(0, 3);
-
-  if (topTokens.length < 3) {
-    const nonFeaturedTokens = [...tokens]
-      .filter(t => !t.is_featured && t.amm_pool_created)
-      .sort((a, b) => parseFloat(calculateMarketCap(b)) - parseFloat(calculateMarketCap(a)))
-      .slice(0, 3 - topTokens.length);
-    topTokens.push(...nonFeaturedTokens);
-  }
 
   const TokenCard = ({ token, featured = false }) => (
     <div
@@ -2018,32 +2003,6 @@ export default function Dashboard() {
               </div>
 
               <div>
-                <label className="block text-purple-300 mb-2">Featured Token</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={editingToken.is_featured || false}
-                    onChange={(e) => setEditingToken({ ...editingToken, is_featured: e.target.checked })}
-                    className="w-5 h-5 rounded border-purple-500 bg-purple-900/50 text-purple-600 focus:ring-purple-500"
-                  />
-                  <span className="text-purple-300">Mark as featured token (top 3)</span>
-                </div>
-                {editingToken.is_featured && (
-                  <div className="mt-2">
-                    <label className="block text-purple-300 text-sm mb-1">Featured Order (1-3)</label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="3"
-                      value={editingToken.featured_order || 1}
-                      onChange={(e) => setEditingToken({ ...editingToken, featured_order: parseInt(e.target.value) })}
-                      className="input w-32 text-purple-200"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div>
                 <label className="block text-purple-300 mb-2">Token Icon</label>
                 <div className="flex gap-4">
                   <div className="flex-1">
@@ -2056,37 +2015,21 @@ export default function Dashboard() {
                     />
                     <p className="text-purple-400 text-xs mt-1">Upload new image or leave blank to keep current</p>
                   </div>
-                  <div className="w-20 h-20 rounded-lg border-2 border-purple-500/30 overflow-hidden bg-gradient-to-br from-purple-900 to-purple-800 flex items-center justify-center">
-                    {editImagePreview ? (
+                  {(editImagePreview || editingToken.image_url) && (
+                    <div className="w-20 h-20 rounded-lg border-2 border-purple-500/30 overflow-hidden bg-gradient-to-br from-purple-900 to-purple-800 flex items-center justify-center">
                       <img
-                        src={editImagePreview}
+                        src={editImagePreview || editingToken.image_url}
                         alt="Preview"
                         className="w-full h-full object-cover"
-                        onLoad={() => console.log('Preview image loaded')}
-                        onError={() => console.error('Preview image failed to load')}
-                      />
-                    ) : editingToken.image_url ? (
-                      <img
-                        src={editingToken.image_url}
-                        alt="Current"
-                        className="w-full h-full object-cover"
-                        onLoad={() => console.log('Current token image loaded:', editingToken.image_url)}
                         onError={(e) => {
-                          console.error('Current token image failed to load:', editingToken.image_url);
                           e.target.style.display = 'none';
-                          const parent = e.target.parentElement;
-                          if (parent && !parent.querySelector('span')) {
-                            const span = document.createElement('span');
-                            span.className = 'text-2xl text-purple-300';
-                            span.textContent = editingToken.token_name[0];
-                            parent.appendChild(span);
-                          }
                         }}
                       />
-                    ) : (
-                      <span className="text-2xl text-purple-300">{editingToken.token_name[0]}</span>
-                    )}
-                  </div>
+                      {!editImagePreview && !editingToken.image_url && (
+                        <span className="text-3xl">{editingToken.token_name[0]}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
