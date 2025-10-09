@@ -828,13 +828,61 @@ export default function Trade({ preselectedToken = null }) {
         ledger_index: 'validated'
       });
 
+      let volume24h = 0;
+
       if (ammInfoResponse.result.amm) {
         const amm = ammInfoResponse.result.amm;
+        const ammAccount = amm.account;
         const xrpAmount = parseFloat(amm.amount) / 1000000;
         const tokenAmount = parseFloat(amm.amount2.value);
         const price = xrpAmount / tokenAmount;
         const marketCap = price * selectedToken.supply;
-        const volume24h = xrpAmount * 0.15;
+
+        try {
+          const oneDayAgo = Math.floor(Date.now() / 1000) - 86400;
+
+          const txResponse = await client.request({
+            command: 'account_tx',
+            account: ammAccount,
+            ledger_index_min: -1,
+            ledger_index_max: -1,
+            limit: 100
+          });
+
+          if (txResponse.result.transactions) {
+            txResponse.result.transactions.forEach(tx => {
+              const transaction = tx.tx;
+              const meta = tx.meta;
+
+              if (!transaction || !meta || !transaction.date) return;
+
+              const txTime = transaction.date + 946684800;
+              if (txTime < oneDayAgo) return;
+
+              if (transaction.TransactionType === 'Payment' ||
+                  transaction.TransactionType === 'OfferCreate' ||
+                  transaction.TransactionType === 'AMMDeposit' ||
+                  transaction.TransactionType === 'AMMWithdraw') {
+
+                if (meta.delivered_amount) {
+                  const amount = typeof meta.delivered_amount === 'string'
+                    ? parseFloat(meta.delivered_amount) / 1000000
+                    : 0;
+                  if (amount > 0) {
+                    volume24h += amount;
+                  }
+                }
+              }
+            });
+          }
+        } catch (volError) {
+          console.error('Error fetching volume:', volError);
+          volume24h = xrpAmount * 0.15;
+        }
+
+        if (volume24h === 0) {
+          volume24h = xrpAmount * 0.15;
+        }
 
         setMarketData({
           marketCap,
@@ -1353,8 +1401,8 @@ export default function Trade({ preselectedToken = null }) {
           <div className="glass rounded-lg p-4 overflow-hidden">
             {selectedToken && (
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <TokenIcon token={selectedToken} size="sm" />
+                <div className="flex items-center gap-3">
+                  <TokenIcon token={selectedToken} size="lg" />
                   <div>
                     <h3 className="text-base font-bold text-purple-200">{selectedToken.token_name}/XRP</h3>
                     <div className="flex items-center gap-2">
