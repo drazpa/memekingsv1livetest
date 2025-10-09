@@ -81,6 +81,12 @@ export default function BotTrader() {
   useEffect(() => {
     if (tokens.length > 0) {
       fetchAllPoolsData();
+
+      const poolRefreshInterval = setInterval(() => {
+        fetchAllPoolsData();
+      }, 30000);
+
+      return () => clearInterval(poolRefreshInterval);
     }
   }, [tokens]);
 
@@ -311,22 +317,6 @@ export default function BotTrader() {
       const results = await Promise.all(poolPromises);
       await client.disconnect();
 
-      const updatePromises = results
-        .filter(({ poolData }) => poolData)
-        .map(({ tokenId, poolData }) =>
-          supabase
-            .from('meme_tokens')
-            .update({
-              current_price: poolData.price,
-              amm_xrp_amount: poolData.amm_xrp_amount,
-              amm_asset_amount: poolData.amm_asset_amount,
-              price_updated_at: new Date().toISOString()
-            })
-            .eq('id', tokenId)
-        );
-
-      await Promise.all(updatePromises);
-
       setPoolsData(prev => {
         const updated = { ...prev };
         results.forEach(({ tokenId, poolData }) => {
@@ -391,6 +381,12 @@ export default function BotTrader() {
       if (error) throw error;
 
       setBots(prev => {
+        let hasChanges = false;
+
+        if (prev.length !== (data || []).length) {
+          hasChanges = true;
+        }
+
         const updated = (data || []).map(newBot => {
           const existing = prev.find(b => b.id === newBot.id);
 
@@ -408,11 +404,24 @@ export default function BotTrader() {
           }
 
           if (existing) {
+            if (
+              existing.status !== newBot.status ||
+              existing.total_trades !== newBot.total_trades ||
+              existing.successful_trades !== newBot.successful_trades ||
+              existing.net_profit !== newBot.net_profit ||
+              existing.total_xrp_received !== newBot.total_xrp_received ||
+              existing.total_xrp_spent !== newBot.total_xrp_spent ||
+              existing.updated_at !== newBot.updated_at
+            ) {
+              hasChanges = true;
+            }
             return { ...newBot, _localStatus: existing._localStatus };
           }
+          hasChanges = true;
           return newBot;
         });
-        return updated;
+
+        return hasChanges ? updated : prev;
       });
     } catch (error) {
       console.error('Error refreshing bots:', error);
@@ -1465,6 +1474,7 @@ export default function BotTrader() {
       prevProps.bot.total_xrp_received === nextProps.bot.total_xrp_received &&
       prevProps.bot.total_xrp_spent === nextProps.bot.total_xrp_spent &&
       prevProps.token?.id === nextProps.token?.id &&
+      prevProps.token?.image_url === nextProps.token?.image_url &&
       prevProps.poolData?.price === nextProps.poolData?.price &&
       !timeChanged &&
       prevProps.nextAction?.action === nextProps.nextAction?.action &&
