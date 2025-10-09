@@ -325,6 +325,8 @@ export default function Memes() {
           amm_pool_created: true,
           status: 'manual',
           amm_asset_amount: parseFloat(newToken.supply) * 0.9,
+          initial_xrp_amount: parseFloat(newToken.xrpLocked),
+          initial_asset_amount: parseFloat(newToken.supply) * 0.9,
           image_url: imageUrl,
           description: newToken.description || null,
           twitter_handle: newToken.twitterHandle || null,
@@ -585,7 +587,9 @@ export default function Memes() {
           await supabase.from('meme_tokens').update({
             amm_pool_created: true,
             amm_asset_amount: ammAssetAmount,
-            amm_xrp_amount: ammXrpAmount
+            amm_xrp_amount: ammXrpAmount,
+            initial_asset_amount: ammAssetAmount,
+            initial_xrp_amount: ammXrpAmount
           }).eq('id', tokenId);
 
           updatedSteps[currentStep + 1 + (newToken.image ? 1 : 0)] = {
@@ -887,6 +891,8 @@ export default function Memes() {
                 amm_tx_hash: ammResult.result.hash,
                 amm_asset_amount: ammAssetAmount,
                 amm_xrp_amount: parseFloat(newToken.xrpLocked),
+                initial_asset_amount: ammAssetAmount,
+                initial_xrp_amount: parseFloat(newToken.xrpLocked),
                 status: 'amm_created'
               })
               .eq('id', insertedToken.id);
@@ -1002,12 +1008,19 @@ export default function Memes() {
 
   const calculate24hChange = (token) => {
     const poolData = poolsData[token.id];
-    if (!poolData || !poolData.price || !token.amm_xrp_amount || !token.amm_asset_amount) {
+    if (!poolData || !poolData.price) {
+      return '0.00';
+    }
+
+    const initialXrp = parseFloat(token.initial_xrp_amount) || parseFloat(token.amm_xrp_amount);
+    const initialAsset = parseFloat(token.initial_asset_amount) || parseFloat(token.amm_asset_amount);
+
+    if (!initialXrp || !initialAsset || initialAsset === 0) {
       return '0.00';
     }
 
     const currentPrice = poolData.price;
-    const startingPrice = token.amm_xrp_amount / token.amm_asset_amount;
+    const startingPrice = initialXrp / initialAsset;
 
     if (!startingPrice || startingPrice === 0) {
       return '0.00';

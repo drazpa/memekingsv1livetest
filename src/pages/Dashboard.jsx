@@ -665,6 +665,8 @@ export default function Dashboard() {
               amm_tx_hash: ammResult.result.hash,
               amm_asset_amount: 900000,
               amm_xrp_amount: 1,
+              initial_asset_amount: 900000,
+              initial_xrp_amount: 1,
               status: 'amm_created'
             })
             .eq('id', insertedToken.id);
@@ -739,12 +741,19 @@ export default function Dashboard() {
 
   const calculate24hChange = (token) => {
     const poolData = poolsData[token.id];
-    if (!poolData || !poolData.price || !token.amm_xrp_amount || !token.amm_asset_amount) {
+    if (!poolData || !poolData.price) {
+      return '0.00';
+    }
+
+    const initialXrp = parseFloat(token.initial_xrp_amount) || parseFloat(token.amm_xrp_amount);
+    const initialAsset = parseFloat(token.initial_asset_amount) || parseFloat(token.amm_asset_amount);
+
+    if (!initialXrp || !initialAsset || initialAsset === 0) {
       return '0.00';
     }
 
     const currentPrice = poolData.price;
-    const startingPrice = token.amm_xrp_amount / token.amm_asset_amount;
+    const startingPrice = initialXrp / initialAsset;
 
     if (!startingPrice || startingPrice === 0) {
       return '0.00';
