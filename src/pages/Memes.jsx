@@ -1203,7 +1203,7 @@ export default function Memes() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <a
           href={`https://xmagnetic.org/dex/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
           target="_blank"
@@ -1230,6 +1230,16 @@ export default function Memes() {
           title="AMM Pool"
         >
           🔗 AMM Pool
+        </a>
+        <a
+          href={`https://xrpl.services/?issuer=${token.issuer_address}&currency=${token.currency_code.length > 3 ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0') : token.currency_code}&limit=${token.supply}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn text-purple-300 text-xs px-2 py-2 rounded-lg text-center"
+          onClick={(e) => { e.stopPropagation(); }}
+          title="Set up Trustline"
+        >
+          ✅ Trustline
         </a>
       </div>
     </div>
@@ -1328,6 +1338,16 @@ export default function Memes() {
             title="AMM"
           >
             🔗
+          </a>
+          <a
+            href={`https://xrpl.services/?issuer=${token.issuer_address}&currency=${token.currency_code.length > 3 ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0') : token.currency_code}&limit=${token.supply}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn text-purple-300 text-xs px-2 py-1 rounded"
+            title="Trustline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            ✅
           </a>
         </div>
       </td>
