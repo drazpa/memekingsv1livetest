@@ -1183,8 +1183,8 @@ export default function Dashboard() {
             rel="noopener noreferrer"
             className="btn text-white px-4 py-3 rounded-lg font-medium flex items-center gap-2 relative overflow-hidden group animate-glow"
             style={{
-              background: 'linear-gradient(135deg, #1DA1F2 0%, #14171A 100%)',
-              boxShadow: '0 0 20px rgba(29, 161, 242, 0.3)'
+              background: 'linear-gradient(135deg, #9333ea 0%, #7e22ce 100%)',
+              boxShadow: '0 0 20px rgba(147, 51, 234, 0.5)'
             }}
           >
             <span className="text-xl">𝕏</span> Twitter
