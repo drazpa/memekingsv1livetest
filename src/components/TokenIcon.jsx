@@ -10,8 +10,11 @@ const IPFS_GATEWAYS = [
 const imageCache = new Map();
 
 export default function TokenIcon({ token, size = 'md', className = '' }) {
+  const cacheKey = `${token.id}-${token.image_url}`;
+  const isCached = imageCache.has(cacheKey);
+
   const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(isCached);
   const [currentGatewayIndex, setCurrentGatewayIndex] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const imageUrlRef = useRef(null);
@@ -26,8 +29,6 @@ export default function TokenIcon({ token, size = 'md', className = '' }) {
   const sizeClass = sizeClasses[size] || sizeClasses.md;
 
   useEffect(() => {
-    const cacheKey = `${token.id}-${token.image_url}`;
-
     if (imageCache.has(cacheKey)) {
       setImageLoaded(true);
       setImageError(false);
@@ -41,7 +42,7 @@ export default function TokenIcon({ token, size = 'md', className = '' }) {
       setRetryCount(0);
       imageUrlRef.current = token.image_url;
     }
-  }, [token.image_url, token.id]);
+  }, [token.image_url, token.id, cacheKey]);
 
   const extractIpfsHash = (url) => {
     if (!url) return null;
@@ -90,9 +91,9 @@ export default function TokenIcon({ token, size = 'md', className = '' }) {
     const finalUrl = imageUrl;
 
     return (
-      <div className="relative inline-block">
+      <div className={`relative inline-block ${sizeClass}`}>
         {!imageLoaded && (
-          <div className={`${sizeClass} rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white font-bold ${className}`}>
+          <div className={`absolute inset-0 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white font-bold ${className}`}>
             {token.token_name[0]}
           </div>
         )}
@@ -100,9 +101,8 @@ export default function TokenIcon({ token, size = 'md', className = '' }) {
           key={`${token.id}-${currentGatewayIndex}-${retryCount}`}
           src={finalUrl}
           alt={token.token_name}
-          className={`${sizeClass} rounded-full object-cover border-2 border-purple-500 ${className} ${!imageLoaded ? 'absolute inset-0 opacity-0' : ''}`}
+          className={`${sizeClass} rounded-full object-cover border-2 border-purple-500 ${className} transition-opacity duration-200 ${!imageLoaded ? 'opacity-0' : 'opacity-100'}`}
           onLoad={() => {
-            console.log('Image loaded successfully:', token.token_name, 'Gateway:', IPFS_GATEWAYS[currentGatewayIndex]);
             const cacheKey = `${token.id}-${token.image_url}`;
             imageCache.set(cacheKey, true);
             setImageLoaded(true);
