@@ -5,6 +5,7 @@ import { Buffer } from 'buffer';
 import toast from 'react-hot-toast';
 import TokenIcon from '../components/TokenIcon';
 import SendTokenModal from '../components/SendTokenModal';
+import ReceiveTokenModal from '../components/ReceiveTokenModal';
 import { onTokenUpdate } from '../utils/tokenEvents';
 
 export default function MyTokens() {
@@ -13,6 +14,7 @@ export default function MyTokens() {
   const [poolsData, setPoolsData] = useState({});
   const [loading, setLoading] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [selectedHolding, setSelectedHolding] = useState(null);
   const [analytics, setAnalytics] = useState({
     totalValue: 0,
@@ -581,7 +583,10 @@ export default function MyTokens() {
                           📤 Send
                         </button>
                         <button
-                          onClick={() => toast.info('Receive: Share your wallet address with the sender')}
+                          onClick={() => {
+                            setSelectedHolding(holding);
+                            setShowReceiveModal(true);
+                          }}
                           className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold px-3 py-1.5 text-xs rounded-lg shadow-lg transition-all"
                           title="Receive tokens"
                         >
@@ -615,6 +620,17 @@ export default function MyTokens() {
           }}
           onSuccess={() => {
             fetchHoldings();
+          }}
+        />
+      )}
+
+      {showReceiveModal && selectedHolding && (
+        <ReceiveTokenModal
+          token={selectedHolding.token}
+          wallet={connectedWallet}
+          onClose={() => {
+            setShowReceiveModal(false);
+            setSelectedHolding(null);
           }}
         />
       )}
