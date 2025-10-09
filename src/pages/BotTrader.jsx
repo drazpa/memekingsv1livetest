@@ -945,12 +945,11 @@ export default function BotTrader() {
         );
 
         const tokenBalance = tokenLine ? parseFloat(tokenLine.balance) : 0;
-        const tokensNeeded = estimatedTokenAmount * (1 + parseFloat(bot.slippage) / 100);
 
-        if (tokenBalance < tokensNeeded) {
+        if (tokenBalance < estimatedTokenAmount) {
           setBotAnnouncements(prev => ({
             ...prev,
-            [bot.id]: `⚠️ Insufficient ${token.token_name} (need ${formatToken(tokensNeeded)})`
+            [bot.id]: `⚠️ Insufficient ${token.token_name} (have ${formatToken(tokenBalance)}, need ${formatToken(estimatedTokenAmount)})`
           }));
           await client.disconnect();
           return;
