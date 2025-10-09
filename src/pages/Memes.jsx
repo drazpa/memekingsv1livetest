@@ -10,6 +10,7 @@ import TokenCreationProgressModal from '../components/TokenCreationProgressModal
 import { getXRPBalance, checkWalletFunded } from '../utils/xrplBalance';
 import { logActivity, ACTION_TYPES } from '../utils/activityLogger';
 import { onTokenUpdate } from '../utils/tokenEvents';
+import { promoteToFeatured } from '../utils/featuredTokens';
 
 const ISSUER_SEED = 'sEd7bAfzqZWKxaatJpoWzTvENyaTg1Y';
 const ISSUER_ADDRESS = 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6';
@@ -600,6 +601,8 @@ export default function Memes() {
       setCurrentProgressStep(steps.length - 1);
       toast.success(`Token ${newToken.name} created successfully!`);
 
+      await promoteToFeatured(tokenId);
+
       await logActivity({
         userAddress: issuerWallet.address,
         actionType: ACTION_TYPES.TOKEN_CREATED,
@@ -901,6 +904,8 @@ export default function Memes() {
       await client.disconnect();
       setCurrentProgressStep(currentStep);
       setCanCloseProgress(true);
+
+      await promoteToFeatured(insertedToken.id);
 
       await logActivity({
         userAddress: ISSUER_ADDRESS,

@@ -9,6 +9,7 @@ import TokenIcon from '../components/TokenIcon';
 import { logActivity, ACTION_TYPES } from '../utils/activityLogger';
 import { getRandomWord } from '../utils/dictionary';
 import { emitTokenUpdate } from '../utils/tokenEvents';
+import { setFeaturedPosition, promoteToFeatured } from '../utils/featuredTokens';
 
 const ISSUER_SEED = 'sEd7bAfzqZWKxaatJpoWzTvENyaTg1Y';
 const ISSUER_ADDRESS = 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6';
@@ -452,11 +453,16 @@ export default function Dashboard() {
         insertData.image_url = imageUrl;
       }
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('meme_tokens')
-        .insert([insertData]);
+        .insert([insertData])
+        .select();
 
       if (error) throw error;
+
+      if (data && data[0]) {
+        await promoteToFeatured(data[0].id);
+      }
 
       toast.success(`Token ${manualTokenData.name} added successfully!`);
       setShowManualAdd(false);
@@ -616,6 +622,8 @@ export default function Dashboard() {
         updateStep(5, 'error', { error: insertError.message });
         throw insertError;
       }
+
+      await promoteToFeatured(insertedToken.id);
 
       await logActivity({
         userAddress: issuerWallet.address,
@@ -836,6 +844,12 @@ export default function Dashboard() {
         imageUrl = await uploadImageToPinata(editImageFile);
         toast.dismiss();
         toast.success('Image uploaded successfully!');
+      }
+
+      if (editingToken.is_featured && editingToken.featured_order) {
+        await setFeaturedPosition(editingToken.id, editingToken.featured_order);
+      } else if (editingToken.is_featured === false) {
+        await setFeaturedPosition(editingToken.id, null);
       }
 
       const updateData = {
@@ -2000,6 +2014,42 @@ export default function Dashboard() {
                   onChange={(e) => setEditingToken({ ...editingToken, amm_asset_amount: e.target.value })}
                   className="input w-full text-purple-200"
                 />
+              </div>
+
+              <div className="border-t border-purple-500/20 pt-4">
+                <label className="block text-purple-300 mb-3">Featured Token Position</label>
+                <div className="grid grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingToken({ ...editingToken, is_featured: false, featured_order: null })}
+                    className={`px-4 py-2 rounded-lg transition-colors ${
+                      !editingToken.is_featured
+                        ? 'bg-purple-600 text-white'
+                        : 'glass text-purple-300 hover:bg-purple-500/20'
+                    }`}
+                  >
+                    None
+                  </button>
+                  {[1, 2, 3].map((position) => (
+                    <button
+                      key={position}
+                      type="button"
+                      onClick={() => setEditingToken({ ...editingToken, is_featured: true, featured_order: position })}
+                      className={`px-4 py-2 rounded-lg transition-colors ${
+                        editingToken.is_featured && editingToken.featured_order === position
+                          ? 'bg-purple-600 text-white'
+                          : 'glass text-purple-300 hover:bg-purple-500/20'
+                      }`}
+                    >
+                      Top {position}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-purple-400 text-xs mt-2">
+                  {editingToken.is_featured && editingToken.featured_order
+                    ? `This token will appear in position ${editingToken.featured_order} on the featured list`
+                    : 'This token will not be featured'}
+                </p>
               </div>
 
               <div>
