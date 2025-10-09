@@ -51,14 +51,29 @@ export async function executeSendXRP(data) {
     return {
       status: 'success',
       title: 'XRP Sent Successfully',
-      message: `Successfully sent ${amount} XRP to ${destinationAddress}`,
+      message: `Successfully sent ${amount} XRP to ${destinationAddress.slice(0, 12)}...`,
       transactionHash: result.result.hash,
       data: {
         amount: `${amount} XRP`,
-        destination: destinationAddress,
+        destination: `${destinationAddress.slice(0, 12)}...`,
         fee: `${parseFloat(result.result.Fee) / 1000000} XRP`,
-        ledger: result.result.ledger_index
-      }
+        ledger: result.result.ledger_index,
+        timestamp: new Date().toLocaleString()
+      },
+      actions: [
+        {
+          label: 'Send More XRP',
+          icon: '📤',
+          style: 'secondary',
+          onClick: () => window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'send XRP' }))
+        },
+        {
+          label: 'Check Balance',
+          icon: '💰',
+          style: 'secondary',
+          onClick: () => window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'check my balance' }))
+        }
+      ]
     };
   } catch (error) {
     throw new Error(error.message || 'Failed to send XRP');
@@ -68,7 +83,17 @@ export async function executeSendXRP(data) {
 }
 
 export async function executeSendToken(data) {
-  const { destinationAddress, currencyCode, issuerAddress, amount, memo } = data;
+  let { destinationAddress, currencyCode, issuerAddress, amount, memo, tokenId } = data;
+
+  if (tokenId) {
+    try {
+      const tokenData = JSON.parse(tokenId);
+      currencyCode = tokenData.code;
+      issuerAddress = tokenData.issuer;
+    } catch (e) {
+      console.error('Failed to parse tokenId:', e);
+    }
+  }
 
   const walletData = JSON.parse(localStorage.getItem('connectedWallet'));
   if (!walletData || !walletData.seed) {
@@ -119,13 +144,23 @@ export async function executeSendToken(data) {
     return {
       status: 'success',
       title: 'Token Sent Successfully',
-      message: `Successfully sent ${amount} ${currencyCode} to ${destinationAddress}`,
+      message: `Successfully sent ${amount} ${currencyCode} to ${destinationAddress.slice(0, 12)}...`,
       transactionHash: result.result.hash,
       data: {
+        token: currencyCode,
         amount: `${amount} ${currencyCode}`,
-        destination: destinationAddress,
-        fee: `${parseFloat(result.result.Fee) / 1000000} XRP`
-      }
+        destination: `${destinationAddress.slice(0, 12)}...`,
+        fee: `${parseFloat(result.result.Fee) / 1000000} XRP`,
+        ledger: result.result.ledger_index
+      },
+      actions: [
+        {
+          label: 'Send More',
+          icon: '📤',
+          style: 'secondary',
+          onClick: () => window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'send tokens' }))
+        }
+      ]
     };
   } catch (error) {
     throw new Error(error.message || 'Failed to send token');

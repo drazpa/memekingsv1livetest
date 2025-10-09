@@ -31,8 +31,12 @@ class AIAssistant {
       return await this.handleSellToken();
     } else if (this.isCreateBotQuery(lowerMessage)) {
       return await this.handleCreateBot();
+    } else if (this.isSendXRPQuery(lowerMessage)) {
+      return await this.handleSendXRP();
+    } else if (this.isSendCustomTokenQuery(lowerMessage)) {
+      return await this.handleSendCustomToken();
     } else if (this.isSendTokenQuery(lowerMessage)) {
-      return await this.handleSendToken();
+      return await this.handleSendToken(message);
     } else if (this.isReceiveTokenQuery(lowerMessage)) {
       return this.handleReceiveToken();
     } else if (this.isWalletAssetsQuery(lowerMessage)) {
@@ -95,7 +99,15 @@ class AIAssistant {
   }
 
   isSendTokenQuery(msg) {
-    return (msg.includes('send') && (msg.includes('token') || msg.includes('xrp'))) || msg.includes('transfer');
+    return (msg.includes('send') && (msg.includes('token') || msg.includes('xrp'))) || msg.includes('transfer') || msg.includes('payment');
+  }
+
+  isSendXRPQuery(msg) {
+    return msg.includes('send') && msg.includes('xrp') && !msg.includes('custom') && !msg.includes('token');
+  }
+
+  isSendCustomTokenQuery(msg) {
+    return (msg.includes('send') && (msg.includes('custom') || msg.includes('specific'))) || (msg.includes('send') && msg.includes('token') && !msg.includes('xrp'));
   }
 
   isReceiveTokenQuery(msg) {
@@ -582,7 +594,169 @@ class AIAssistant {
     };
   }
 
-  async handleSendToken() {
+  async handleSendXRP() {
+    if (!this.context.connectedWallet) {
+      return {
+        content: 'Please connect a wallet first to send XRP.',
+        data: {
+          actions: [{
+            label: 'Connect Wallet',
+            icon: '🔗',
+            style: 'primary',
+            onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+          }]
+        }
+      };
+    }
+
+    return {
+      content: 'Ready to send XRP! Fill in the details below and I\'ll execute the transaction for you.',
+      data: {
+        execution: {
+          type: 'send_xrp',
+          icon: '📤',
+          title: 'Send XRP',
+          description: 'Direct XRP transfer to any XRPL address',
+          badge: 'Ready to Execute',
+          fields: [
+            {
+              name: 'destinationAddress',
+              label: 'Destination Address',
+              type: 'text',
+              placeholder: 'rXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+              required: true,
+              hint: 'Enter recipient XRPL address or use Address Book'
+            },
+            {
+              name: 'amount',
+              label: 'Amount (XRP)',
+              type: 'number',
+              placeholder: '10',
+              required: true,
+              hint: 'Amount of XRP to send'
+            },
+            {
+              name: 'memo',
+              label: 'Memo (Optional)',
+              type: 'text',
+              placeholder: 'Payment for services',
+              hint: 'Optional memo for this transaction'
+            }
+          ],
+          steps: [
+            { label: 'Validate destination', description: 'Verifying XRPL address format' },
+            { label: 'Check balance', description: 'Ensuring sufficient XRP balance' },
+            { label: 'Prepare payment', description: 'Creating XRP payment transaction' },
+            { label: 'Sign with wallet', description: 'Cryptographically signing transaction' },
+            { label: 'Broadcast to network', description: 'Submitting to XRPL' },
+            { label: 'Wait for confirmation', description: 'Transaction being validated' }
+          ],
+          defaultValues: {
+            amount: '10'
+          }
+        }
+      }
+    };
+  }
+
+  async handleSendCustomToken() {
+    if (!this.context.connectedWallet) {
+      return {
+        content: 'Please connect a wallet first to send custom tokens.',
+        data: {
+          actions: [{
+            label: 'Connect Wallet',
+            icon: '🔗',
+            style: 'primary',
+            onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+          }]
+        }
+      };
+    }
+
+    const { data: tokens } = await supabase
+      .from('tokens')
+      .select('*')
+      .order('name', { ascending: true })
+      .limit(100);
+
+    if (!tokens || tokens.length === 0) {
+      return {
+        content: 'No custom tokens found in the platform. You can only send tokens that exist in the system.',
+        data: {
+          actions: [{
+            label: 'View Available Tokens',
+            icon: '🪙',
+            style: 'primary',
+            onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'trade' }))
+          }]
+        }
+      };
+    }
+
+    return {
+      content: `I can help you send any of the ${tokens.length} available tokens. Select the token and provide details:`,
+      data: {
+        execution: {
+          type: 'send_token',
+          icon: '🪙',
+          title: 'Send Custom Token',
+          description: 'Transfer tokens to any XRPL address with trustline',
+          badge: `${tokens.length} Tokens Available`,
+          fields: [
+            {
+              name: 'tokenId',
+              label: 'Select Token',
+              type: 'select',
+              required: true,
+              options: tokens.map(t => ({
+                value: JSON.stringify({ code: t.currency_code, issuer: t.issuer_address, name: t.name }),
+                label: `${t.name} (${t.currency_code})`
+              })),
+              hint: 'Choose which token to send'
+            },
+            {
+              name: 'destinationAddress',
+              label: 'Destination Address',
+              type: 'text',
+              placeholder: 'rXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+              required: true,
+              hint: 'Recipient must have trustline for this token'
+            },
+            {
+              name: 'amount',
+              label: 'Amount',
+              type: 'number',
+              placeholder: '100',
+              required: true,
+              hint: 'Amount of tokens to send'
+            },
+            {
+              name: 'memo',
+              label: 'Memo (Optional)',
+              type: 'text',
+              placeholder: 'Payment note',
+              hint: 'Optional transaction memo'
+            }
+          ],
+          steps: [
+            { label: 'Parse token selection', description: 'Extracting token details' },
+            { label: 'Validate addresses', description: 'Checking destination and issuer' },
+            { label: 'Verify trustline', description: 'Ensuring recipient can receive' },
+            { label: 'Prepare payment', description: 'Creating token payment transaction' },
+            { label: 'Sign transaction', description: 'Signing with your wallet' },
+            { label: 'Submit to XRPL', description: 'Broadcasting transaction' },
+            { label: 'Confirm delivery', description: 'Waiting for ledger confirmation' }
+          ],
+          defaultValues: {
+            amount: '100'
+          }
+        }
+      }
+    };
+  }
+
+  async handleSendToken(message) {
     if (!this.context.connectedWallet) {
       return {
         content: 'Please connect a wallet first to send tokens.',
@@ -602,65 +776,106 @@ class AIAssistant {
     const { data: tokens } = await supabase
       .from('tokens')
       .select('id, name, currency_code, issuer_address')
-      .limit(20);
+      .limit(50);
+
+    const lowerMessage = message?.toLowerCase() || '';
+    const isSpecificToken = lowerMessage.includes('send') && tokens?.some(t =>
+      lowerMessage.includes(t.name.toLowerCase()) || lowerMessage.includes(t.currency_code.toLowerCase())
+    );
+
+    if (isSpecificToken) {
+      const matchedToken = tokens.find(t =>
+        lowerMessage.includes(t.name.toLowerCase()) || lowerMessage.includes(t.currency_code.toLowerCase())
+      );
+
+      return {
+        content: `I'll help you send ${matchedToken.name} (${matchedToken.currency_code}). Please provide the details:`,
+        data: {
+          execution: {
+            type: 'send_token',
+            icon: '📤',
+            title: `Send ${matchedToken.name}`,
+            description: `Send ${matchedToken.currency_code} tokens to any XRPL address`,
+            badge: 'Token Transfer',
+            fields: [
+              {
+                name: 'destinationAddress',
+                label: 'Destination Address',
+                type: 'text',
+                placeholder: 'rXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+                required: true,
+                hint: 'Enter recipient address or use Address Book'
+              },
+              {
+                name: 'amount',
+                label: `Amount (${matchedToken.currency_code})`,
+                type: 'number',
+                placeholder: '100',
+                required: true,
+                hint: `Amount of ${matchedToken.currency_code} to send`
+              },
+              {
+                name: 'currencyCode',
+                label: 'Currency Code',
+                type: 'text',
+                placeholder: matchedToken.currency_code,
+                required: true,
+                hint: 'Token currency code'
+              },
+              {
+                name: 'issuerAddress',
+                label: 'Issuer Address',
+                type: 'text',
+                placeholder: matchedToken.issuer_address,
+                required: true,
+                hint: 'Token issuer address'
+              },
+              {
+                name: 'memo',
+                label: 'Memo (Optional)',
+                type: 'text',
+                placeholder: 'Payment for services',
+                hint: 'Optional memo to include'
+              }
+            ],
+            steps: [
+              { label: 'Validate addresses', description: 'Checking destination and issuer addresses' },
+              { label: 'Check trustline', description: 'Verifying recipient has trustline' },
+              { label: 'Prepare transaction', description: 'Creating token payment' },
+              { label: 'Sign transaction', description: 'Signing with your wallet' },
+              { label: 'Submit to XRPL', description: 'Broadcasting to network' },
+              { label: 'Confirm transaction', description: 'Waiting for confirmation' }
+            ],
+            defaultValues: {
+              amount: '100',
+              currencyCode: matchedToken.currency_code,
+              issuerAddress: matchedToken.issuer_address
+            }
+          }
+        }
+      };
+    }
 
     return {
-      content: 'I can help you send XRP or tokens directly from the chat! Use the Address Book button to select saved contacts.',
+      content: 'I can help you send XRP or custom tokens directly from chat! What would you like to send?',
       data: {
-        execution: {
-          type: 'send_xrp',
-          icon: '📤',
-          title: 'Send XRP',
-          description: 'Send XRP to any XRPL address or saved contact',
-          badge: 'Connected',
-          fields: [
-            {
-              name: 'destinationAddress',
-              label: 'Destination Address',
-              type: 'text',
-              placeholder: 'rXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-              required: true,
-              hint: 'Enter recipient address or use Address Book'
-            },
-            {
-              name: 'amount',
-              label: 'Amount (XRP)',
-              type: 'number',
-              placeholder: '10',
-              required: true,
-              hint: 'Amount of XRP to send'
-            },
-            {
-              name: 'memo',
-              label: 'Memo (Optional)',
-              type: 'text',
-              placeholder: 'Payment for services',
-              hint: 'Optional memo to include'
-            }
-          ],
-          steps: [
-            { label: 'Validate address', description: 'Checking destination address format' },
-            { label: 'Prepare transaction', description: 'Creating payment transaction' },
-            { label: 'Sign transaction', description: 'Signing with your wallet' },
-            { label: 'Submit to XRPL', description: 'Broadcasting to the network' },
-            { label: 'Confirm transaction', description: 'Waiting for ledger confirmation' }
-          ],
-          defaultValues: {
-            amount: '10'
-          }
+        card: {
+          icon: '💱',
+          title: 'Send Options',
+          badge: 'Choose Type',
+          items: [
+            { label: 'XRP', value: 'Native XRPL currency' },
+            { label: 'Custom Tokens', value: `${tokens?.length || 0} available` }
+          ]
         },
         quickActions: [
           {
-            label: 'Send Token Instead',
-            onClick: () => {
-              window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'I want to send a specific token' }));
-            }
+            label: 'Send XRP',
+            onClick: () => window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'send XRP' }))
           },
           {
-            label: 'Manage Address Book',
-            onClick: () => {
-              window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'Show my address book' }));
-            }
+            label: 'Send Custom Token',
+            onClick: () => window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'send custom token' }))
           }
         ]
       }
@@ -1201,17 +1416,47 @@ class AIAssistant {
   }
 
   handleGeneral(message) {
+    const lowerMessage = message.toLowerCase();
+
+    if (lowerMessage.includes('create') && lowerMessage.includes('token')) {
+      return {
+        content: 'I cannot create tokens through the chat. Token creation requires admin access and must be done through the Memes page of the platform.',
+        data: {
+          actions: [{
+            label: 'Go to Memes Page',
+            icon: '🎨',
+            style: 'primary',
+            onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'memes' }))
+          }]
+        }
+      };
+    }
+
+    if (lowerMessage.includes('admin') || lowerMessage.includes('settings') || lowerMessage.includes('configure')) {
+      return {
+        content: 'I don\'t have access to administrative functions or platform settings. I can only help with:\n\n• Wallet operations (balance, send, receive)\n• Token trading (buy/sell)\n• Market information\n• Address book management\n• Trading bot creation\n\nWhat would you like help with?',
+        data: null
+      };
+    }
+
+    if (!message || message.length < 3) {
+      return {
+        content: 'I\'m not sure I understand. Could you please provide more details about what you\'d like to do?\n\nFor example, you can ask me to:\n• "Send 10 XRP to an address"\n• "Buy some tokens"\n• "Check my balance"\n• "Show my address book"\n• "What are the top tokens?"\n\nWhat would you like help with?',
+        data: null
+      };
+    }
+
     const suggestions = [
       'Check my balance',
-      'Send tokens',
+      'Send XRP',
+      'Send custom token',
       'Buy token',
       'Sell token',
-      'Create trading bot',
       'Show address book'
     ];
 
     return {
-      content: 'I understand you\'re asking about XRPL and the platform. I can help you with:\n\n• Checking wallet balances\n• Sending and receiving tokens\n• Managing address book contacts\n• Buying and selling tokens\n• Creating trading bots\n• Getting token information\n• Viewing trade history\n• Market analytics\n• And much more!\n\nTry asking one of these:',
+      content: 'I\'m not sure what you\'re asking for. I can help you with:\n\n• Wallet Operations: Check balance, send/receive XRP and tokens\n• Trading: Buy and sell tokens from the platform\n• Address Book: Manage saved contacts for easy sending\n• Market Data: View prices, volumes, and analytics\n• Trading Bots: Create automated trading strategies\n\nNote: I cannot create tokens or access admin functions.\n\nTry one of these:',
       data: {
         quickActions: suggestions.map(label => ({
           label,
