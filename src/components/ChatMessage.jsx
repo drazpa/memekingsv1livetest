@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { XRPScanLink } from './XRPScanLink';
+import ExecutionCard from './ExecutionCard';
+import ExecutionResult from './ExecutionResult';
+import * as executionHandlers from '../utils/executionHandlers';
+import toast from 'react-hot-toast';
 
-export default function ChatMessage({ message }) {
+export default function ChatMessage({ message, onAddResult }) {
   const isUser = message.role === 'user';
   const [copiedId, setCopiedId] = useState(null);
+  const [executionResult, setExecutionResult] = useState(null);
 
   const handleCopy = (text, id) => {
     navigator.clipboard.writeText(text);
@@ -138,6 +143,67 @@ export default function ChatMessage({ message }) {
     );
   };
 
+  const handleExecute = async (formData) => {
+    const execution = message.data.execution;
+
+    try {
+      let result;
+
+      switch (execution.type) {
+        case 'send_xrp':
+          result = await executionHandlers.executeSendXRP(formData);
+          break;
+        case 'send_token':
+          result = await executionHandlers.executeSendToken(formData);
+          break;
+        case 'setup_trustline':
+          result = await executionHandlers.executeSetupTrustline(formData);
+          break;
+        case 'buy_token':
+          result = await executionHandlers.executeBuyToken(formData);
+          break;
+        case 'sell_token':
+          result = await executionHandlers.executeSellToken(formData);
+          break;
+        case 'create_bot':
+          result = await executionHandlers.executeCreateTradingBot(formData);
+          break;
+        default:
+          throw new Error('Unknown execution type');
+      }
+
+      setExecutionResult(result);
+      toast.success(result.message);
+
+      if (onAddResult) {
+        onAddResult(result);
+      }
+    } catch (error) {
+      const errorResult = {
+        status: 'error',
+        title: 'Execution Failed',
+        message: error.message || 'An error occurred during execution',
+        data: null
+      };
+      setExecutionResult(errorResult);
+      toast.error(error.message);
+    }
+  };
+
+  const renderExecution = () => {
+    if (!message.data?.execution) return null;
+
+    return (
+      <>
+        <ExecutionCard
+          execution={message.data.execution}
+          onExecute={handleExecute}
+        />
+        {executionResult && <ExecutionResult result={executionResult} />}
+      </>
+    );
+  };
+
   const formatContent = (text) => {
     return text.split('\n').map((line, index) => {
       if (line.startsWith('•')) {
@@ -179,6 +245,7 @@ export default function ChatMessage({ message }) {
             <>
               {renderDataCard()}
               {renderTable()}
+              {renderExecution()}
               {renderActionButtons()}
               {renderQuickActions()}
             </>

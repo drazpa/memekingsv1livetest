@@ -23,7 +23,13 @@ class AIAssistant {
   async processMessage(message) {
     const lowerMessage = message.toLowerCase();
 
-    if (this.isSendTokenQuery(lowerMessage)) {
+    if (this.isBuyTokenQuery(lowerMessage)) {
+      return await this.handleBuyToken();
+    } else if (this.isSellTokenQuery(lowerMessage)) {
+      return await this.handleSellToken();
+    } else if (this.isCreateBotQuery(lowerMessage)) {
+      return await this.handleCreateBot();
+    } else if (this.isSendTokenQuery(lowerMessage)) {
       return await this.handleSendToken();
     } else if (this.isReceiveTokenQuery(lowerMessage)) {
       return this.handleReceiveToken();
@@ -104,6 +110,18 @@ class AIAssistant {
 
   isBotQuery(msg) {
     return msg.includes('bot') && (msg.includes('status') || msg.includes('trading') || msg.includes('performance'));
+  }
+
+  isBuyTokenQuery(msg) {
+    return (msg.includes('buy') && msg.includes('token')) || msg.includes('purchase token');
+  }
+
+  isSellTokenQuery(msg) {
+    return (msg.includes('sell') && msg.includes('token')) || msg.includes('sell my');
+  }
+
+  isCreateBotQuery(msg) {
+    return (msg.includes('create') && msg.includes('bot')) || msg.includes('new bot') || msg.includes('setup bot');
   }
 
   async handleBalanceQuery() {
@@ -567,25 +585,62 @@ class AIAssistant {
       };
     }
 
+    const { data: tokens } = await supabase
+      .from('tokens')
+      .select('id, name, currency_code, issuer_address')
+      .limit(20);
+
     return {
-      content: 'I can help you send tokens! You can send XRP or any other tokens from your wallet.',
+      content: 'I can help you send XRP or tokens directly from the chat! Choose what you want to send:',
       data: {
-        card: {
+        execution: {
+          type: 'send_xrp',
           icon: '📤',
-          title: 'Send Tokens',
+          title: 'Send XRP',
+          description: 'Send XRP to any XRPL address',
           badge: 'Connected',
-          items: [
-            { label: 'From Wallet', value: this.context.connectedWallet.name },
-            { label: 'Address', value: `${this.context.connectedWallet.address.slice(0, 12)}...` }
+          fields: [
+            {
+              name: 'destinationAddress',
+              label: 'Destination Address',
+              type: 'text',
+              placeholder: 'rXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+              required: true,
+              hint: 'Enter the recipient XRPL address'
+            },
+            {
+              name: 'amount',
+              label: 'Amount (XRP)',
+              type: 'number',
+              placeholder: '10',
+              required: true,
+              hint: 'Amount of XRP to send'
+            },
+            {
+              name: 'memo',
+              label: 'Memo (Optional)',
+              type: 'text',
+              placeholder: 'Payment for services',
+              hint: 'Optional memo to include'
+            }
           ],
-          description: 'Go to the Wallets page to send XRP or tokens to any XRPL address.'
+          steps: [
+            { label: 'Validate address', description: 'Checking destination address format' },
+            { label: 'Prepare transaction', description: 'Creating payment transaction' },
+            { label: 'Sign transaction', description: 'Signing with your wallet' },
+            { label: 'Submit to XRPL', description: 'Broadcasting to the network' },
+            { label: 'Confirm transaction', description: 'Waiting for ledger confirmation' }
+          ],
+          defaultValues: {
+            amount: '10'
+          }
         },
-        actions: [
+        quickActions: [
           {
-            label: 'Send Tokens',
-            icon: '📤',
-            style: 'primary',
-            onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+            label: 'Send Token Instead',
+            onClick: () => {
+              window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'I want to send a specific token' }));
+            }
           }
         ]
       }
@@ -817,18 +872,261 @@ class AIAssistant {
     }
   }
 
+  async handleBuyToken() {
+    if (!this.context.connectedWallet) {
+      return {
+        content: 'Please connect a wallet to buy tokens.',
+        data: {
+          actions: [{
+            label: 'Connect Wallet',
+            icon: '🔗',
+            style: 'primary',
+            onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+          }]
+        }
+      };
+    }
+
+    const { data: tokens } = await supabase
+      .from('tokens')
+      .select('id, name, currency_code')
+      .limit(50);
+
+    return {
+      content: 'Let\'s buy some tokens! I\'ll guide you through the process step by step.',
+      data: {
+        execution: {
+          type: 'buy_token',
+          icon: '🛒',
+          title: 'Buy Token',
+          description: 'Purchase tokens using XRP',
+          badge: 'Trade',
+          fields: [
+            {
+              name: 'tokenId',
+              label: 'Select Token',
+              type: 'select',
+              required: true,
+              options: tokens?.map(t => ({ value: t.id, label: `${t.name} (${t.currency_code})` })) || [],
+              hint: 'Choose which token to buy'
+            },
+            {
+              name: 'amountXRP',
+              label: 'Amount to Spend (XRP)',
+              type: 'number',
+              placeholder: '100',
+              required: true,
+              hint: 'Amount of XRP to spend'
+            },
+            {
+              name: 'slippage',
+              label: 'Slippage Tolerance (%)',
+              type: 'number',
+              placeholder: '2',
+              required: true,
+              hint: 'Maximum price slippage allowed'
+            }
+          ],
+          steps: [
+            { label: 'Select token', description: 'Choose token to purchase' },
+            { label: 'Create offer', description: 'Preparing buy order on XRPL' },
+            { label: 'Sign transaction', description: 'Signing with wallet' },
+            { label: 'Submit order', description: 'Submitting to ledger' },
+            { label: 'Confirm purchase', description: 'Waiting for confirmation' }
+          ],
+          defaultValues: {
+            amountXRP: '100',
+            slippage: '2'
+          }
+        }
+      }
+    };
+  }
+
+  async handleSellToken() {
+    if (!this.context.connectedWallet) {
+      return {
+        content: 'Please connect a wallet to sell tokens.',
+        data: {
+          actions: [{
+            label: 'Connect Wallet',
+            icon: '🔗',
+            style: 'primary',
+            onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+          }]
+        }
+      };
+    }
+
+    const { data: tokens } = await supabase
+      .from('tokens')
+      .select('id, name, currency_code')
+      .limit(50);
+
+    return {
+      content: 'Ready to sell tokens! I\'ll help you create a sell order.',
+      data: {
+        execution: {
+          type: 'sell_token',
+          icon: '💸',
+          title: 'Sell Token',
+          description: 'Sell tokens for XRP',
+          badge: 'Trade',
+          fields: [
+            {
+              name: 'tokenId',
+              label: 'Select Token',
+              type: 'select',
+              required: true,
+              options: tokens?.map(t => ({ value: t.id, label: `${t.name} (${t.currency_code})` })) || [],
+              hint: 'Choose which token to sell'
+            },
+            {
+              name: 'amountToken',
+              label: 'Amount to Sell',
+              type: 'number',
+              placeholder: '1000',
+              required: true,
+              hint: 'Amount of tokens to sell'
+            },
+            {
+              name: 'minXRP',
+              label: 'Minimum XRP to Receive',
+              type: 'number',
+              placeholder: '50',
+              required: true,
+              hint: 'Minimum XRP you want to receive'
+            }
+          ],
+          steps: [
+            { label: 'Validate holdings', description: 'Checking token balance' },
+            { label: 'Create sell order', description: 'Preparing sell order' },
+            { label: 'Sign transaction', description: 'Signing with wallet' },
+            { label: 'Submit order', description: 'Submitting to ledger' },
+            { label: 'Confirm sale', description: 'Waiting for confirmation' }
+          ],
+          defaultValues: {
+            amountToken: '1000',
+            minXRP: '50'
+          }
+        }
+      }
+    };
+  }
+
+  async handleCreateBot() {
+    if (!this.context.connectedWallet) {
+      return {
+        content: 'Please connect a wallet to create a trading bot.',
+        data: {
+          actions: [{
+            label: 'Connect Wallet',
+            icon: '🔗',
+            style: 'primary',
+            onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+          }]
+        }
+      };
+    }
+
+    const { data: tokens } = await supabase
+      .from('tokens')
+      .select('id, name, currency_code')
+      .limit(50);
+
+    return {
+      content: 'Let\'s create an automated trading bot! I\'ll set it up for you.',
+      data: {
+        execution: {
+          type: 'create_bot',
+          icon: '🤖',
+          title: 'Create Trading Bot',
+          description: 'Automate your token trading',
+          badge: 'Automation',
+          fields: [
+            {
+              name: 'name',
+              label: 'Bot Name',
+              type: 'text',
+              placeholder: 'My Trading Bot',
+              required: true,
+              hint: 'Give your bot a name'
+            },
+            {
+              name: 'tokenId',
+              label: 'Token to Trade',
+              type: 'select',
+              required: true,
+              options: tokens?.map(t => ({ value: t.id, label: `${t.name} (${t.currency_code})` })) || [],
+              hint: 'Which token should the bot trade'
+            },
+            {
+              name: 'strategy',
+              label: 'Trading Strategy',
+              type: 'select',
+              required: true,
+              options: [
+                { value: 'dca', label: 'Dollar Cost Averaging (DCA)' },
+                { value: 'momentum', label: 'Momentum Trading' },
+                { value: 'scalping', label: 'Scalping' }
+              ],
+              hint: 'Choose trading strategy'
+            },
+            {
+              name: 'buyAmount',
+              label: 'Buy Amount (XRP)',
+              type: 'number',
+              placeholder: '50',
+              required: true,
+              hint: 'Amount to spend per trade'
+            },
+            {
+              name: 'buyThreshold',
+              label: 'Buy Threshold (%)',
+              type: 'number',
+              placeholder: '-5',
+              required: true,
+              hint: 'Buy when price drops by this %'
+            },
+            {
+              name: 'sellThreshold',
+              label: 'Sell Threshold (%)',
+              type: 'number',
+              placeholder: '10',
+              required: true,
+              hint: 'Sell when price rises by this %'
+            }
+          ],
+          steps: [
+            { label: 'Validate settings', description: 'Checking bot configuration' },
+            { label: 'Create bot', description: 'Setting up trading bot' },
+            { label: 'Configure strategy', description: 'Applying trading rules' },
+            { label: 'Activate bot', description: 'Starting automated trading' }
+          ],
+          defaultValues: {
+            name: 'Trading Bot',
+            strategy: 'dca',
+            buyAmount: '50',
+            buyThreshold: '-5',
+            sellThreshold: '10'
+          }
+        }
+      }
+    };
+  }
+
   handleGeneral(message) {
     const suggestions = [
       'Check my balance',
       'Send tokens',
-      'Show me the top tokens',
-      'What\'s happening in the market?',
-      'Show my recent trades',
-      'View my bot status'
+      'Buy token',
+      'Sell token',
+      'Create trading bot',
+      'Show me the top tokens'
     ];
 
     return {
-      content: 'I understand you\'re asking about XRPL and the platform. I can help you with:\n\n• Checking wallet balances\n• Sending and receiving tokens\n• Getting token information\n• Viewing trade history\n• Managing trading bots\n• Market overviews\n• Navigating the platform\n\nTry asking one of these:',
+      content: 'I understand you\'re asking about XRPL and the platform. I can help you with:\n\n• Checking wallet balances\n• Sending and receiving tokens\n• Buying and selling tokens\n• Creating trading bots\n• Getting token information\n• Viewing trade history\n• Market overviews\n• And much more!\n\nTry asking one of these:',
       data: {
         quickActions: suggestions.map(label => ({
           label,
