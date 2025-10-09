@@ -572,6 +572,18 @@ export default function BotTrader() {
     const nextTime = Date.now() + (bot.interval * 60 * 1000);
     setNextTradeTimes(prev => ({ ...prev, [bot.id]: nextTime }));
 
+    setBotAnnouncements(prev => {
+      const newAnnouncements = { ...prev };
+      if (newAnnouncements[bot.id] && (
+        newAnnouncements[bot.id].includes('Slippage') ||
+        newAnnouncements[bot.id].includes('❌') ||
+        newAnnouncements[bot.id].includes('⚠️')
+      )) {
+        delete newAnnouncements[bot.id];
+      }
+      return newAnnouncements;
+    });
+
     await supabase
       .from('trading_bots')
       .update({
@@ -821,6 +833,14 @@ export default function BotTrader() {
         strategy: editingBot.strategy,
         trade_mode: editingBot.buyProbability
       } : b));
+
+      setBotAnnouncements(prev => {
+        const newAnnouncements = { ...prev };
+        if (newAnnouncements[editingBot.id]) {
+          delete newAnnouncements[editingBot.id];
+        }
+        return newAnnouncements;
+      });
 
       toast.success('Bot updated successfully!');
       setShowEditBot(false);
