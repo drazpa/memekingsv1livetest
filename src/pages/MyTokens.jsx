@@ -31,12 +31,6 @@ export default function MyTokens() {
   useEffect(() => {
     loadConnectedWallet();
 
-    const unsubscribe = onTokenUpdate(() => {
-      if (connectedWallet) {
-        loadHoldings();
-      }
-    });
-
     const handleWalletChange = () => {
       loadConnectedWallet();
     };
@@ -44,9 +38,21 @@ export default function MyTokens() {
     window.addEventListener('walletDisconnected', handleWalletChange);
 
     return () => {
-      unsubscribe();
       window.removeEventListener('walletConnected', handleWalletChange);
       window.removeEventListener('walletDisconnected', handleWalletChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onTokenUpdate(() => {
+      const stored = localStorage.getItem('connectedWallet');
+      if (stored) {
+        fetchHoldings();
+      }
+    });
+
+    return () => {
+      unsubscribe();
     };
   }, []);
 
