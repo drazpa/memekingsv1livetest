@@ -781,7 +781,8 @@ export default function Dashboard() {
       `✅ Status: ${token.amm_pool_created ? 'AMM Pool Active' : 'Pending'}\n\n` +
       `🔗 Trust Line:\n${trustLineLink}\n\n` +
       `💱 Trade on Magnetic:\n${magneticLink}\n\n` +
-      `#XRPL #Crypto #MemeToken`;
+      `MORE #MEME COINS @ MEMEKINGS.ONLINE\n\n` +
+      `#XRPL #Crypto`;
 
     const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
     window.open(tweetUrl, '_blank', 'width=550,height=420');
