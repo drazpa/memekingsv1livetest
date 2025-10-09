@@ -1175,14 +1175,14 @@ export default function BotTrader() {
               {token && poolData && (
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-blue-300 text-xs font-mono">
-                    {poolData.price.toFixed(8)} XRP
+                    Price: {poolData.price.toFixed(8)} XRP
                   </span>
                 </div>
               )}
-              {token && tokenBalance !== undefined && (
-                <div className="mt-1">
-                  <span className="text-green-400 text-xs font-medium">
-                    Balance: {formatToken(tokenBalance)} {token.token_name}
+              {token && (
+                <div className="mt-1 bg-green-500/10 px-2 py-1 rounded border border-green-500/30">
+                  <span className="text-green-400 text-xs font-bold">
+                    💰 {tokenBalance !== undefined ? formatToken(tokenBalance) : '0.00'} {token.token_name}
                   </span>
                 </div>
               )}
@@ -1578,6 +1578,7 @@ export default function BotTrader() {
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Fav</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Bot Name</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Token</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Token Balance</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Status</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Strategy</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Interval</th>
@@ -1619,6 +1620,13 @@ export default function BotTrader() {
                                   <div className="text-xs text-blue-400">{token.currency_code}</div>
                                 </div>
                               </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {token && (
+                              <span className="text-sm text-green-400 font-medium">
+                                {tokenBalances[token.id] !== undefined ? formatToken(tokenBalances[token.id]) : '0.00'}
+                              </span>
                             )}
                           </td>
                           <td className="px-4 py-3">
