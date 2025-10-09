@@ -992,7 +992,8 @@ export default function BotTrader() {
       if (errorMessage.includes('tecPATH_DRY')) {
         errorMsg = '⚠️ No liquidity path found';
       } else if (errorMessage.includes('tecPATH_PARTIAL')) {
-        errorMsg = `⚠️ Slippage too low - Increase to ${Math.min(bot.slippage + 5, 20)}%`;
+        const suggestedSlippage = Math.min(Math.ceil(bot.slippage * 1.5), 30);
+        errorMsg = `⚠️ Slippage too low (currently ${bot.slippage}%) - Try increasing to ${suggestedSlippage}%`;
       } else if (errorMessage.includes('tecUNFUNDED')) {
         errorMsg = '⚠️ Insufficient funds';
       } else if (errorMessage.includes('tefPAST_SEQ')) {
@@ -1292,7 +1293,7 @@ export default function BotTrader() {
       };
     });
     return handlers;
-  }, [bots.map(b => b.id).join(',')]);
+  }, [bots]);
 
   const filteredBots = bots.filter(bot => {
     const token = tokensMap[bot.token_id];
@@ -1495,11 +1496,13 @@ export default function BotTrader() {
                           </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              bot.is_active
+                              bot.status === 'running'
                                 ? 'bg-green-500/20 text-green-300'
+                                : bot.status === 'paused'
+                                ? 'bg-yellow-500/20 text-yellow-300'
                                 : 'bg-gray-500/20 text-gray-400'
                             }`}>
-                              {bot.is_active ? '🟢 Active' : '⚫ Paused'}
+                              {bot.status === 'running' ? '🟢 Running' : bot.status === 'paused' ? '⏸ Paused' : '⭕ Stopped'}
                             </span>
                           </td>
                           <td className="px-4 py-3">
@@ -1521,7 +1524,7 @@ export default function BotTrader() {
                             <span className="text-sm text-blue-300">{bot.total_trades || 0}</span>
                           </td>
                           <td className="px-4 py-3">
-                            {bot.is_active ? (
+                            {bot.status === 'running' ? (
                               <span className="text-sm text-blue-300">
                                 {minutes}m {seconds}s
                               </span>
@@ -1531,7 +1534,7 @@ export default function BotTrader() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex gap-2 justify-end">
-                              {bot.is_active ? (
+                              {bot.status === 'running' ? (
                                 <>
                                   <button
                                     onClick={() => pauseBot(bot)}
@@ -1539,6 +1542,23 @@ export default function BotTrader() {
                                     title="Pause Bot"
                                   >
                                     ⏸ Pause
+                                  </button>
+                                  <button
+                                    onClick={() => stopBot(bot)}
+                                    className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                                    title="Stop Bot"
+                                  >
+                                    ⏹ Stop
+                                  </button>
+                                </>
+                              ) : bot.status === 'paused' ? (
+                                <>
+                                  <button
+                                    onClick={() => startBot(bot)}
+                                    className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                                    title="Resume Bot"
+                                  >
+                                    ▶ Resume
                                   </button>
                                   <button
                                     onClick={() => stopBot(bot)}
