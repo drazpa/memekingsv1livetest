@@ -551,11 +551,10 @@ export default function MyTokens() {
                           🔗 Trust
                         </a>
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             localStorage.setItem('selectedTradeToken', JSON.stringify(holding.token));
-                            window.dispatchEvent(new CustomEvent('navigateToTrade', {
-                              detail: holding.token
-                            }));
+                            window.dispatchEvent(new CustomEvent('navigateToTrade', { detail: holding.token }));
                           }}
                           className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold px-3 py-1.5 text-xs rounded-lg shadow-lg transition-all"
                           title="Trade on AMM"
