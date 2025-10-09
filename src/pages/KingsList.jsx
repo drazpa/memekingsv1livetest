@@ -21,7 +21,8 @@ export default function KingsList() {
     giniCoefficient: 0,
     concentrationRatio: 0,
     totalTrustlines: 0,
-    developerBalance: 0
+    developerBalance: 0,
+    totalSupplyIssued: 0
   });
   const [network] = useState('testnet');
 
@@ -40,7 +41,7 @@ export default function KingsList() {
     try {
       const { data, error } = await supabase
         .from('meme_tokens')
-        .select('id, token_name, currency_code, issuer_address, image_url, supply, status')
+        .select('id, token_name, currency_code, issuer_address, image_url, supply, initial_supply, status')
         .order('token_name', { ascending: true });
 
       if (error) throw error;
@@ -52,6 +53,7 @@ export default function KingsList() {
         issuer_address: token.issuer_address,
         image_url: token.image_url,
         supply: token.supply,
+        initial_supply: parseFloat(token.initial_supply) || parseFloat(token.supply) || 0,
         status: token.status
       }));
 
@@ -84,18 +86,23 @@ export default function KingsList() {
       const holders = allLines
         .map(line => ({
           address: line.account,
-          balance: parseFloat(line.balance) || 0,
+          balance: Math.abs(parseFloat(line.balance)) || 0,
           limit: parseFloat(line.limit) || 0
         }))
         .filter(holder => holder.balance > 0)
         .sort((a, b) => b.balance - a.balance);
 
-      const totalSupplyIssued = selectedToken.initial_supply || 0;
       const totalHeld = holders.reduce((sum, h) => sum + h.balance, 0);
-      const developerBalance = totalSupplyIssued - totalHeld;
+      const totalSupplyIssued = selectedToken.initial_supply || totalHeld;
+      const developerBalance = Math.max(0, totalSupplyIssued - totalHeld);
+
+      console.log('Token:', selectedToken.name);
+      console.log('Total Supply:', totalSupplyIssued);
+      console.log('Total Held by users:', totalHeld);
+      console.log('Developer Balance:', developerBalance);
 
       setRichList(holders);
-      calculateStats(holders, totalTrustlines, developerBalance);
+      calculateStats(holders, totalTrustlines, developerBalance, totalSupplyIssued);
 
       await client.disconnect();
     } catch (error) {
@@ -106,7 +113,7 @@ export default function KingsList() {
     }
   };
 
-  const calculateStats = (holders, totalTrustlines, developerBalance) => {
+  const calculateStats = (holders, totalTrustlines, developerBalance, totalSupplyIssued) => {
     if (holders.length === 0) {
       setStats({
         totalHolders: 0,
@@ -117,7 +124,8 @@ export default function KingsList() {
         giniCoefficient: 0,
         concentrationRatio: 0,
         totalTrustlines: totalTrustlines || 0,
-        developerBalance: developerBalance || 0
+        developerBalance: developerBalance || 0,
+        totalSupplyIssued: totalSupplyIssued || 0
       });
       return;
     }
@@ -149,7 +157,8 @@ export default function KingsList() {
       giniCoefficient,
       concentrationRatio,
       totalTrustlines: totalTrustlines || 0,
-      developerBalance: developerBalance || 0
+      developerBalance: developerBalance || 0,
+      totalSupplyIssued: totalSupplyIssued || totalSupplyHeld
     });
   };
 
@@ -372,8 +381,8 @@ export default function KingsList() {
                   {selectedToken.currency_code}
                 </div>
                 <div className="text-sm font-semibold text-purple-300 mb-2">
-                  {(selectedToken.initial_supply || 0) > 0
-                    ? ((stats.developerBalance / selectedToken.initial_supply) * 100).toFixed(2)
+                  {(stats.totalSupplyIssued || 0) > 0
+                    ? ((stats.developerBalance / stats.totalSupplyIssued) * 100).toFixed(2)
                     : '0.00'}% of supply
                 </div>
                 <div className="text-xs font-mono text-purple-400/60 break-all">
