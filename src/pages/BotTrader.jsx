@@ -199,7 +199,6 @@ export default function BotTrader() {
       const { data, error } = await supabase
         .from('meme_tokens')
         .select('*')
-        .eq('amm_pool_created', true)
         .order('created_at', { ascending: false});
       if (error) throw error;
       setTokens(data || []);
@@ -252,6 +251,10 @@ export default function BotTrader() {
         });
 
         balances[token.id] = tokenLine ? parseFloat(tokenLine.balance) : 0;
+
+        if (tokenLine) {
+          console.log(`Balance for ${token.token_name}: ${tokenLine.balance}`);
+        }
       });
 
       setTokenBalances(balances);
@@ -1217,12 +1220,30 @@ export default function BotTrader() {
 
       setBotAnnouncements(prev => ({ ...prev, [bot.id]: errorMsg }));
 
+      console.log(`❌ Trade failed for ${bot.name}: ${errorMsg}`);
+      console.log(`   Error details: ${errorMessage}`);
+      console.log(`   Continuing to next trade cycle...`);
+
       try {
         await supabase.from('trading_bots').update({
-          failed_trades: (bot.failed_trades || 0) + 1
+          failed_trades: (bot.failed_trades || 0) + 1,
+          last_error: errorMsg,
+          last_error_at: new Date().toISOString()
         }).eq('id', bot.id);
+
+        await logActivity({
+          wallet_address: connectedWallet.address,
+          action_type: ACTION_TYPES.FAILED_TRADE,
+          description: `Bot trade failed: ${errorMsg}`,
+          details: {
+            bot_name: bot.name,
+            token_name: token.token_name,
+            error_message: errorMessage,
+            suggested_action: errorMsg
+          }
+        });
       } catch (dbError) {
-        console.error('Error logging to database:', dbError);
+        console.error('Error logging failed trade:', dbError);
       }
 
       if (client && client.isConnected()) {
@@ -1238,6 +1259,168 @@ export default function BotTrader() {
     });
     return map;
   }, [tokens]);
+
+  const BotTableRow = memo(({ bot, token, nextTradeTime, onToggleFavorite, isFavorite, tokenBalance }) => {
+    const [currentTime, setCurrentTime] = useState(Date.now());
+
+    useEffect(() => {
+      const timer = setInterval(() => {
+        setCurrentTime(Date.now());
+      }, 1000);
+      return () => clearInterval(timer);
+    }, []);
+
+    const timeUntil = nextTradeTime ? Math.max(0, Math.floor((nextTradeTime - currentTime) / 1000)) : 0;
+    const minutes = Math.floor(timeUntil / 60);
+    const seconds = timeUntil % 60;
+
+    return (
+      <tr className="hover:bg-blue-500/10 transition-colors">
+        <td className="px-4 py-3">
+          <button
+            onClick={() => onToggleFavorite(bot.id)}
+            className="text-2xl hover:scale-110 transition-transform"
+          >
+            {isFavorite ? '⭐' : '☆'}
+          </button>
+        </td>
+        <td className="px-4 py-3">
+          <div className="font-medium text-blue-200">{bot.name}</div>
+        </td>
+        <td className="px-4 py-3">
+          {token && (
+            <div className="flex items-center gap-2">
+              <TokenIcon token={token} size="sm" />
+              <div>
+                <div className="text-sm font-medium text-blue-200">{token.token_name}</div>
+                <div className="text-xs text-blue-400">{token.currency_code}</div>
+              </div>
+            </div>
+          )}
+        </td>
+        <td className="px-4 py-3">
+          {token && (
+            <span className="text-sm text-green-400 font-medium">
+              {tokenBalance !== undefined ? formatToken(tokenBalance) : '0.00'}
+            </span>
+          )}
+        </td>
+        <td className="px-4 py-3">
+          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+            bot.status === 'running'
+              ? 'bg-green-500/20 text-green-300'
+              : bot.status === 'paused'
+              ? 'bg-yellow-500/20 text-yellow-300'
+              : 'bg-gray-500/20 text-gray-400'
+          }`}>
+            {bot.status === 'running' ? '🟢 Running' : bot.status === 'paused' ? '⏸ Paused' : '⭕ Stopped'}
+          </span>
+        </td>
+        <td className="px-4 py-3">
+          <span className="text-sm text-blue-300">
+            {bot.strategy === BOT_STRATEGIES.BALANCED && '⚖️ Balanced'}
+            {bot.strategy === BOT_STRATEGIES.ACCUMULATE && '📈 Accumulate'}
+            {bot.strategy === BOT_STRATEGIES.DISTRIBUTE && '📉 Distribute'}
+          </span>
+        </td>
+        <td className="px-4 py-3">
+          <span className="text-sm text-blue-300">{bot.trade_interval}m</span>
+        </td>
+        <td className="px-4 py-3">
+          <span className="text-sm text-blue-300">{bot.min_trade_amount}-{bot.max_trade_amount} XRP</span>
+        </td>
+        <td className="px-4 py-3">
+          <span className="text-sm text-blue-300">{bot.total_trades || 0}</span>
+        </td>
+        <td className="px-4 py-3">
+          <span className="text-sm text-green-400 font-medium">
+            +{(bot.total_xrp_received || 0).toFixed(4)}
+          </span>
+        </td>
+        <td className="px-4 py-3">
+          <span className="text-sm text-red-400 font-medium">
+            {(bot.total_xrp_spent || 0).toFixed(4)}
+          </span>
+        </td>
+        <td className="px-4 py-3">
+          {bot.status === 'running' && nextTradeTime ? (
+            <span className="text-sm text-blue-300">
+              {minutes}m {seconds}s
+            </span>
+          ) : (
+            <span className="text-sm text-gray-500">-</span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-right">
+          <div className="flex gap-1 justify-end">
+            {bot.status === 'running' ? (
+              <button
+                onClick={() => pauseBot(bot.id)}
+                className="px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded hover:bg-yellow-500/30 text-xs"
+              >
+                ⏸ Pause
+              </button>
+            ) : bot.status === 'paused' ? (
+              <button
+                onClick={() => resumeBot(bot.id)}
+                className="px-3 py-1 bg-green-500/20 text-green-300 rounded hover:bg-green-500/30 text-xs"
+              >
+                ▶ Resume
+              </button>
+            ) : (
+              <button
+                onClick={() => startBot(bot)}
+                className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded hover:bg-blue-500/30 text-xs"
+              >
+                ▶ Start
+              </button>
+            )}
+            <button
+              onClick={() => stopBot(bot.id)}
+              className="px-3 py-1 bg-red-500/20 text-red-300 rounded hover:bg-red-500/30 text-xs"
+            >
+              ⏹ Stop
+            </button>
+            <button
+              onClick={() => {
+                setEditingBot(bot);
+                setShowEditBot(true);
+              }}
+              className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded hover:bg-purple-500/30 text-xs"
+            >
+              ✏️
+            </button>
+            <button
+              onClick={() => {
+                setSelectedBot(bot);
+              }}
+              className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded hover:bg-blue-500/30 text-xs"
+            >
+              📊
+            </button>
+            <button
+              onClick={() => deleteBot(bot)}
+              className="px-3 py-1 bg-red-500/20 text-red-300 rounded hover:bg-red-500/30 text-xs"
+            >
+              🗑️
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  }, (prevProps, nextProps) => {
+    return (
+      prevProps.bot.id === nextProps.bot.id &&
+      prevProps.bot.status === nextProps.bot.status &&
+      prevProps.bot.total_trades === nextProps.bot.total_trades &&
+      prevProps.bot.total_xrp_received === nextProps.bot.total_xrp_received &&
+      prevProps.bot.total_xrp_spent === nextProps.bot.total_xrp_spent &&
+      prevProps.token?.id === nextProps.token?.id &&
+      prevProps.nextTradeTime === nextProps.nextTradeTime &&
+      prevProps.isFavorite === nextProps.isFavorite &&
+      prevProps.tokenBalance === nextProps.tokenBalance
+    );
+  });
 
   const BotCard = memo(({ bot, token, poolData, nextTradeTime, nextAction, announcement, tokenBalance, onPause, onStop, onStart, onEdit, onViewActivity, onDelete }) => {
     const [currentTime, setCurrentTime] = useState(Date.now());
@@ -1701,155 +1884,16 @@ export default function BotTrader() {
                   <tbody className="divide-y divide-blue-500/20">
                     {sortedBots.map(bot => {
                       const token = tokensMap[bot.token_id];
-                      const nextTime = nextTradeTimes[bot.id];
-                      const timeUntil = nextTime ? Math.max(0, Math.floor((nextTime - Date.now()) / 1000)) : 0;
-                      const minutes = Math.floor(timeUntil / 60);
-                      const seconds = timeUntil % 60;
-
                       return (
-                        <tr key={bot.id} className="hover:bg-blue-500/10 transition-colors">
-                          <td className="px-4 py-3">
-                            <button
-                              onClick={() => toggleBotFavorite(bot.id)}
-                              className="text-2xl hover:scale-110 transition-transform"
-                            >
-                              {favoriteBots.includes(bot.id) ? '⭐' : '☆'}
-                            </button>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="font-medium text-blue-200">{bot.name}</div>
-                          </td>
-                          <td className="px-4 py-3">
-                            {token && (
-                              <div className="flex items-center gap-2">
-                                <TokenIcon token={token} size="sm" />
-                                <div>
-                                  <div className="text-sm font-medium text-blue-200">{token.token_name}</div>
-                                  <div className="text-xs text-blue-400">{token.currency_code}</div>
-                                </div>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            {token && (
-                              <span className="text-sm text-green-400 font-medium">
-                                {tokenBalances[token.id] !== undefined ? formatToken(tokenBalances[token.id]) : '0.00'}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              bot.status === 'running'
-                                ? 'bg-green-500/20 text-green-300'
-                                : bot.status === 'paused'
-                                ? 'bg-yellow-500/20 text-yellow-300'
-                                : 'bg-gray-500/20 text-gray-400'
-                            }`}>
-                              {bot.status === 'running' ? '🟢 Running' : bot.status === 'paused' ? '⏸ Paused' : '⭕ Stopped'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm text-blue-300">
-                              {bot.strategy === BOT_STRATEGIES.BALANCED && '⚖️ Balanced'}
-                              {bot.strategy === BOT_STRATEGIES.ACCUMULATE && '📈 Accumulate'}
-                              {bot.strategy === BOT_STRATEGIES.DISTRIBUTE && '📉 Distribute'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm text-blue-300">{bot.trade_interval}m</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm text-blue-300">
-                              {bot.min_amount} - {bot.max_amount} XRP
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm text-blue-300">{bot.total_trades || 0}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm text-green-400 font-medium">
-                              {(bot.total_xrp_received || 0).toFixed(4)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm text-red-400 font-medium">
-                              {(bot.total_xrp_spent || 0).toFixed(4)}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            {bot.status === 'running' ? (
-                              <span className="text-sm text-blue-300">
-                                {minutes}m {seconds}s
-                              </span>
-                            ) : (
-                              <span className="text-sm text-gray-500">-</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex gap-2 justify-end">
-                              {bot.status === 'running' ? (
-                                <>
-                                  <button
-                                    onClick={() => pauseBot(bot.id)}
-                                    className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
-                                    title="Pause Bot"
-                                  >
-                                    ⏸ Pause
-                                  </button>
-                                  <button
-                                    onClick={() => stopBot(bot.id)}
-                                    className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-                                    title="Stop Bot"
-                                  >
-                                    ⏹ Stop
-                                  </button>
-                                </>
-                              ) : bot.status === 'paused' ? (
-                                <>
-                                  <button
-                                    onClick={() => startBot(bot.id)}
-                                    className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                                    title="Resume Bot"
-                                  >
-                                    ▶ Resume
-                                  </button>
-                                  <button
-                                    onClick={() => stopBot(bot.id)}
-                                    className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-                                    title="Stop Bot"
-                                  >
-                                    ⏹ Stop
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  onClick={() => startBot(bot.id)}
-                                  className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                                  title="Start Bot"
-                                >
-                                  ▶ Start
-                                </button>
-                              )}
-                              <button
-                                onClick={() => setSelectedBot(bot)}
-                                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                                title="View Details"
-                              >
-                                👁 View
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditingBot(bot);
-                                  setShowEditBot(true);
-                                }}
-                                className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
-                                title="Edit Bot"
-                              >
-                                ✏️ Edit
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+                        <BotTableRow
+                          key={bot.id}
+                          bot={bot}
+                          token={token}
+                          nextTradeTime={nextTradeTimes[bot.id]}
+                          onToggleFavorite={toggleBotFavorite}
+                          isFavorite={favoriteBots.includes(bot.id)}
+                          tokenBalance={token ? tokenBalances[token.id] : undefined}
+                        />
                       );
                     })}
                   </tbody>
@@ -1857,8 +1901,23 @@ export default function BotTrader() {
               </div>
             </div>
           )}
+
+          {connectedWallet && bots.length === 0 && !loading && (
+            <div className="glass rounded-lg p-12 text-center">
+              <div className="text-6xl mb-4">🤖</div>
+              <h3 className="text-xl font-bold text-blue-200 mb-2">No Bots Yet</h3>
+              <p className="text-blue-400 mb-6">Create your first trading bot to get started</p>
+              <button
+                onClick={() => setShowCreateBot(true)}
+                className="btn-primary text-white px-6 py-3 rounded-lg font-medium"
+              >
+                + Create Bot
+              </button>
+            </div>
+          )}
         </div>
       )}
+
 
       {!loading && bots.length === 0 && connectedWallet && (
         <div className="glass rounded-lg p-12 text-center">

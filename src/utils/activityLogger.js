@@ -38,6 +38,8 @@ export const ACTION_TYPES = {
   WALLET_CONNECTED: 'wallet_connected',
   WALLET_DISCONNECTED: 'wallet_disconnected',
   BOT_CREATED: 'bot_created',
+  BOT_TRADE: 'bot_trade',
+  FAILED_TRADE: 'failed_trade',
   START_EARNING: 'start_earning',
   STOP_EARNING: 'stop_earning',
   CLAIM_EARNINGS: 'claim_earnings'
