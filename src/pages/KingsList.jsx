@@ -260,8 +260,11 @@ export default function KingsList() {
               <div className="flex flex-col md:flex-row md:items-center gap-6">
                 <div className="flex items-center gap-4 flex-1">
                   <TokenIcon
-                    name={selectedToken.name}
-                    imageUrl={selectedToken.image_url}
+                    token={{
+                      id: selectedToken.id,
+                      token_name: selectedToken.name,
+                      image_url: selectedToken.image_url
+                    }}
                     size="lg"
                   />
                   <div>
