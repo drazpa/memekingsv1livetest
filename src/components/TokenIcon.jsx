@@ -1,8 +1,17 @@
 import { useState, useEffect } from 'react';
 
+const IPFS_GATEWAYS = [
+  'https://gateway.pinata.cloud/ipfs/',
+  'https://ipfs.io/ipfs/',
+  'https://cloudflare-ipfs.com/ipfs/',
+  'https://dweb.link/ipfs/'
+];
+
 export default function TokenIcon({ token, size = 'md', className = '' }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [currentGatewayIndex, setCurrentGatewayIndex] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
 
   const sizeClasses = {
     sm: 'w-8 h-8 text-sm',
@@ -16,26 +25,55 @@ export default function TokenIcon({ token, size = 'md', className = '' }) {
   useEffect(() => {
     setImageError(false);
     setImageLoaded(false);
+    setCurrentGatewayIndex(0);
+    setRetryCount(0);
   }, [token.image_url, token.updated_at, token.id]);
 
-  if (token.image_url && !imageError) {
-    const timestamp = token.updated_at
-      ? new Date(token.updated_at).getTime()
-      : token.created_at
-        ? new Date(token.created_at).getTime()
-        : Date.now();
+  const extractIpfsHash = (url) => {
+    if (!url) return null;
 
-    let imageUrl = token.image_url;
-
-    if (imageUrl.startsWith('ipfs://')) {
-      imageUrl = imageUrl.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/');
-    } else if (!imageUrl.startsWith('http')) {
-      imageUrl = `https://gateway.pinata.cloud/ipfs/${imageUrl}`;
+    if (url.startsWith('ipfs://')) {
+      return url.replace('ipfs://', '');
     }
 
-    const finalUrl = imageUrl.includes('?')
-      ? `${imageUrl}&t=${timestamp}`
-      : `${imageUrl}?t=${timestamp}`;
+    const ipfsMatch = url.match(/\/ipfs\/([a-zA-Z0-9]+)/);
+    if (ipfsMatch) {
+      return ipfsMatch[1];
+    }
+
+    if (!url.startsWith('http')) {
+      return url;
+    }
+
+    return null;
+  };
+
+  const handleImageError = () => {
+    console.error('Image load error for token:', token.token_name, 'Gateway:', currentGatewayIndex, 'Retry:', retryCount);
+
+    if (currentGatewayIndex < IPFS_GATEWAYS.length - 1) {
+      console.log('Trying next gateway...');
+      setCurrentGatewayIndex(prev => prev + 1);
+      setRetryCount(0);
+    } else if (retryCount < 2) {
+      console.log('Retrying current gateway...');
+      setRetryCount(prev => prev + 1);
+      setCurrentGatewayIndex(0);
+    } else {
+      console.error('All gateways failed for:', token.token_name);
+      setImageError(true);
+    }
+  };
+
+  if (token.image_url && !imageError) {
+    let imageUrl = token.image_url;
+    const ipfsHash = extractIpfsHash(token.image_url);
+
+    if (ipfsHash) {
+      imageUrl = `${IPFS_GATEWAYS[currentGatewayIndex]}${ipfsHash}`;
+    }
+
+    const finalUrl = imageUrl;
 
     return (
       <div className="relative inline-block">
@@ -45,18 +83,15 @@ export default function TokenIcon({ token, size = 'md', className = '' }) {
           </div>
         )}
         <img
+          key={`${token.id}-${currentGatewayIndex}-${retryCount}`}
           src={finalUrl}
           alt={token.token_name}
           className={`${sizeClass} rounded-full object-cover border-2 border-purple-500 ${className} ${!imageLoaded ? 'absolute inset-0 opacity-0' : ''}`}
           onLoad={() => {
-            console.log('Image loaded successfully:', token.token_name, finalUrl);
+            console.log('Image loaded successfully:', token.token_name, 'Gateway:', IPFS_GATEWAYS[currentGatewayIndex]);
             setImageLoaded(true);
           }}
-          onError={(e) => {
-            console.error('Image load error for token:', token.token_name, 'URL:', finalUrl, 'Original:', token.image_url);
-            setImageError(true);
-          }}
-          crossOrigin="anonymous"
+          onError={handleImageError}
         />
       </div>
     );

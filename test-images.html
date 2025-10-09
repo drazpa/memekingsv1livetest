@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Token Images</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #1a1a2e;
+            color: white;
+        }
+        .token {
+            margin: 20px 0;
+            padding: 20px;
+            background: #16213e;
+            border-radius: 8px;
+        }
+        img {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 2px solid #a855f7;
+            object-fit: cover;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-left: 10px;
+            font-size: 12px;
+        }
+        .success { background: #10b981; }
+        .error { background: #ef4444; }
+        .info { color: #94a3b8; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Token Image Loading Test</h1>
+    <p>Testing IPFS gateway image loading for FROG, OZZY, and DIAMOND tokens</p>
+
+    <div class="token">
+        <h2>FROG <span class="status" id="frog-status">Loading...</span></h2>
+        <img
+            id="frog-img"
+            src="https://gateway.pinata.cloud/ipfs/bafybeidv6qcgjlx3374x4eg22wfu4i3k7anlqn6owcsxuj3rrfwyfhwtbu"
+            alt="FROG"
+            onload="handleImageLoad('frog')"
+            onerror="handleImageError('frog')"
+        />
+        <div class="info" id="frog-info"></div>
+    </div>
+
+    <div class="token">
+        <h2>OZZY <span class="status" id="ozzy-status">Loading...</span></h2>
+        <img
+            id="ozzy-img"
+            src="https://gateway.pinata.cloud/ipfs/bafybeibwf2ji5o2qpnedbhwgwe5qch4ygltsfqbu6mlsjihrp3kwcosfxm"
+            alt="OZZY"
+            onload="handleImageLoad('ozzy')"
+            onerror="handleImageError('ozzy')"
+        />
+        <div class="info" id="ozzy-info"></div>
+    </div>
+
+    <div class="token">
+        <h2>DIAMOND <span class="status" id="diamond-status">Loading...</span></h2>
+        <img
+            id="diamond-img"
+            src="https://gateway.pinata.cloud/ipfs/bafybeibiakns5vnkbgd2oj26ihy6z2fdynzteobvjhcmqayy3uralmpsre"
+            alt="DIAMOND"
+            onload="handleImageLoad('diamond')"
+            onerror="handleImageError('diamond')"
+        />
+        <div class="info" id="diamond-info"></div>
+    </div>
+
+    <div class="token">
+        <h2>Alternative Gateways Test</h2>
+        <p>Testing with Cloudflare IPFS gateway:</p>
+        <img
+            src="https://cloudflare-ipfs.com/ipfs/bafybeidv6qcgjlx3374x4eg22wfu4i3k7anlqn6owcsxuj3rrfwyfhwtbu"
+            alt="FROG (Cloudflare)"
+        />
+        <p>Testing with ipfs.io gateway:</p>
+        <img
+            src="https://ipfs.io/ipfs/bafybeidv6qcgjlx3374x4eg22wfu4i3k7anlqn6owcsxuj3rrfwyfhwtbu"
+            alt="FROG (ipfs.io)"
+        />
+    </div>
+
+    <script>
+        const startTime = Date.now();
+
+        function handleImageLoad(token) {
+            const elapsed = Date.now() - startTime;
+            const statusEl = document.getElementById(`${token}-status`);
+            const infoEl = document.getElementById(`${token}-info`);
+            const imgEl = document.getElementById(`${token}-img`);
+
+            statusEl.textContent = '✓ Loaded';
+            statusEl.className = 'status success';
+            infoEl.textContent = `Loaded in ${elapsed}ms - Dimensions: ${imgEl.naturalWidth}x${imgEl.naturalHeight}`;
+
+            console.log(`${token.toUpperCase()} image loaded successfully`, {
+                time: elapsed,
+                dimensions: `${imgEl.naturalWidth}x${imgEl.naturalHeight}`,
+                src: imgEl.src
+            });
+        }
+
+        function handleImageError(token) {
+            const statusEl = document.getElementById(`${token}-status`);
+            const infoEl = document.getElementById(`${token}-info`);
+            const imgEl = document.getElementById(`${token}-img`);
+
+            statusEl.textContent = '✗ Failed';
+            statusEl.className = 'status error';
+            infoEl.textContent = `Failed to load from gateway`;
+
+            console.error(`${token.toUpperCase()} image failed to load`, {
+                src: imgEl.src
+            });
+
+            // Try alternative gateway
+            const ipfsHash = imgEl.src.split('/ipfs/')[1];
+            console.log(`Trying alternative gateway for ${token}...`);
+            imgEl.src = `https://cloudflare-ipfs.com/ipfs/${ipfsHash}`;
+        }
+
+        // Log all image attempts
+        console.log('Starting image load tests at', new Date().toISOString());
+    </script>
+</body>
+</html>
