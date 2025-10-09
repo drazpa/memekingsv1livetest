@@ -10,6 +10,7 @@ import TokenCreationProgressModal from '../components/TokenCreationProgressModal
 import SlippageRetryModal from '../components/SlippageRetryModal';
 import PoolHistoryModal from '../components/PoolHistoryModal';
 import { onTokenUpdate } from '../utils/tokenEvents';
+import { XRPScanLink } from '../components/XRPScanLink';
 
 const RECEIVER_ADDRESS = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
 const TRADING_FEE = 0.01;
@@ -73,6 +74,10 @@ export default function Trade({ preselectedToken = null }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [xrpUsdPrice, setXrpUsdPrice] = useState(0.50);
   const [marketCapUSD, setMarketCapUSD] = useState(0);
+  const [lastTxHash, setLastTxHash] = useState(null);
+  const [lastTxDetails, setLastTxDetails] = useState(null);
+  const [autoRetrying, setAutoRetrying] = useState(false);
+  const [retryAttempt, setRetryAttempt] = useState(0);
   const priceChartContainerRef = useRef(null);
   const volumeChartContainerRef = useRef(null);
   const priceChartInstanceRef = useRef(null);
@@ -1056,6 +1061,11 @@ export default function Trade({ preselectedToken = null }) {
       return;
     }
 
+    if (trading && !autoRetrying) {
+      toast.error('Trade already in progress');
+      return;
+    }
+
     const estimate = calculateEstimate();
     const tradeAction = tradeType === 'buy' ? 'Buying' : 'Selling';
 
@@ -1138,9 +1148,24 @@ export default function Trade({ preselectedToken = null }) {
           ? parseFloat(result.result.meta.delivered_amount?.value || estimate.tokenAmount)
           : estimate.tokenAmount;
 
+        const txHash = result.result.hash;
+        setLastTxHash(txHash);
+        setRetryAttempt(0);
+
+        const txDetails = {
+          hash: txHash,
+          type: tradeType,
+          tokenAmount: actualAmount.toFixed(4),
+          xrpAmount: estimate.xrpAmount,
+          tokenName: selectedToken.token_name,
+          timestamp: new Date().toISOString(),
+          fee: (parseFloat(result.result.Fee) / 1000000).toFixed(6)
+        };
+        setLastTxDetails(txDetails);
+
         updateTradeStep(1, 'success', {
           description: `${tradeType === 'buy' ? 'Bought' : 'Sold'} ${actualAmount.toFixed(4)} ${selectedToken.token_name}`,
-          txHash: result.result.hash
+          txHash: txHash
         });
 
         await logActivity({
@@ -1150,9 +1175,10 @@ export default function Trade({ preselectedToken = null }) {
           details: {
             tradeType,
             tokenAmount: actualAmount.toFixed(4),
-            xrpAmount: estimate.xrpAmount
+            xrpAmount: estimate.xrpAmount,
+            txDetails
           },
-          txHash: result.result.hash,
+          txHash: txHash,
           tokenId: selectedToken.id
         });
 
@@ -1163,9 +1189,26 @@ export default function Trade({ preselectedToken = null }) {
           setShowTradeProgress(false);
           setAmount('');
           setXrpAmount('');
-        }, 2000);
+        }, 3000);
 
-        toast.success(`Successfully ${tradeType === 'buy' ? 'bought' : 'sold'} ${estimate.tokenAmount} ${selectedToken.token_name}!`);
+        toast.success((t) => (
+          <div className="flex flex-col gap-2">
+            <div className="font-semibold">Trade Successful!</div>
+            <div className="text-sm">
+              {tradeType === 'buy' ? 'Bought' : 'Sold'} {actualAmount.toFixed(4)} {selectedToken.token_name}
+            </div>
+            <div className="text-xs">
+              <XRPScanLink type="tx" value={txHash} network="mainnet" />
+            </div>
+          </div>
+        ), {
+          duration: 8000,
+          style: {
+            background: '#065f46',
+            color: '#d1fae5',
+            border: '1px solid #10b981',
+          },
+        });
       } else {
         throw new Error(`Transaction failed: ${result.result.meta.TransactionResult}`);
       }
@@ -1194,21 +1237,59 @@ export default function Trade({ preselectedToken = null }) {
         errorMessage = 'Trustline not found. Please set up trustline first.';
       } else if (errorMessage.includes('tecPATH_PARTIAL')) {
         const currentSlippage = parseFloat(slippage);
-        const suggestedSlippage = Math.min(currentSlippage * 2, 50);
+        const estimate = calculateEstimate();
+        const priceImpact = parseFloat(estimate.priceImpact);
 
-        setSlippageRetryData({
-          currentSlippage,
-          suggestedSlippage,
-          tradeType: tradeType.charAt(0).toUpperCase() + tradeType.slice(1),
-          amount,
-          tokenName: selectedToken.token_name
-        });
-        setShowSlippageRetry(true);
-        setRetryComplete(false);
-        setRetrySuccess(false);
-        setRetryError(null);
-        setIsRetrying(false);
-        return;
+        let suggestedSlippage = Math.min(currentSlippage * 2.5, 50);
+
+        if (priceImpact > 10) {
+          suggestedSlippage = Math.min(Math.max(20, priceImpact * 2), 50);
+        } else if (priceImpact > 5) {
+          suggestedSlippage = Math.min(Math.max(15, priceImpact * 1.8), 50);
+        } else if (priceImpact > 2) {
+          suggestedSlippage = Math.min(Math.max(10, priceImpact * 1.5), 50);
+        }
+
+        if (retryAttempt < 2) {
+          setAutoRetrying(true);
+          setRetryAttempt(prev => prev + 1);
+          setSlippage(suggestedSlippage.toFixed(1));
+
+          toast.info((t) => (
+            <div className="flex flex-col gap-2">
+              <div className="font-semibold">Slippage Too Low</div>
+              <div className="text-sm">
+                Automatically retrying with {suggestedSlippage.toFixed(1)}% slippage...
+              </div>
+              <div className="text-xs opacity-75">
+                Attempt {retryAttempt + 1} of 2
+              </div>
+            </div>
+          ), {
+            duration: 3000,
+          });
+
+          setTimeout(() => {
+            setAutoRetrying(false);
+            executeTrade();
+          }, 1500);
+          return;
+        } else {
+          setSlippageRetryData({
+            currentSlippage,
+            suggestedSlippage,
+            tradeType: tradeType.charAt(0).toUpperCase() + tradeType.slice(1),
+            amount,
+            tokenName: selectedToken.token_name
+          });
+          setShowSlippageRetry(true);
+          setRetryComplete(false);
+          setRetrySuccess(false);
+          setRetryError(null);
+          setIsRetrying(false);
+          setRetryAttempt(0);
+          errorMessage = `Slippage too low. Suggested: ${suggestedSlippage.toFixed(1)}%. Click retry to try again.`;
+        }
       } else if (errorMessage.includes('tecNO_AUTH')) {
         errorMessage = 'Token issuer requires authorization. Cannot trade this token.';
       } else if (errorMessage.includes('temREDUNDANT')) {
@@ -1226,28 +1307,38 @@ export default function Trade({ preselectedToken = null }) {
       const currentStep = Math.min(currentTradeStep, tradeSteps.length - 1);
       updateTradeStep(currentStep, 'error', { error: errorMessage });
 
-      toast.error((t) => (
-        <div className="flex items-start gap-3 max-w-md">
-          <div className="flex-1">
-            <div className="font-semibold mb-1">Trade failed</div>
-            <div className="text-sm opacity-90">{errorMessage}</div>
+      if (!autoRetrying) {
+        console.error('❌ Trade Failed:', errorMessage);
+        console.error('   Full error:', error);
+
+        toast.error((t) => (
+          <div className="flex items-start gap-3 max-w-md">
+            <div className="flex-1">
+              <div className="font-semibold mb-1">Trade Failed</div>
+              <div className="text-sm opacity-90">{errorMessage}</div>
+              {error.stack && (
+                <div className="text-xs opacity-70 mt-2 font-mono">
+                  {error.message}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              className="flex-shrink-0 ml-2 text-white/70 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
           </div>
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            className="flex-shrink-0 ml-2 text-white/70 hover:text-white transition-colors"
-          >
-            ✕
-          </button>
-        </div>
-      ), {
-        duration: 10000,
-        style: {
-          background: '#991b1b',
-          color: '#fef2f2',
-          border: '1px solid #dc2626',
-          maxWidth: '500px',
-        },
-      });
+        ), {
+          duration: 10000,
+          style: {
+            background: '#991b1b',
+            color: '#fef2f2',
+            border: '1px solid #dc2626',
+            maxWidth: '500px',
+          },
+        });
+      }
     } finally {
       setTrading(false);
       if (client && client.isConnected()) {
@@ -1801,6 +1892,54 @@ export default function Trade({ preselectedToken = null }) {
                   `${tradeType === 'buy' ? '💚 Buy' : '❤️ Sell'} ${selectedToken?.currency_code || 'Token'}`
                 )}
               </button>
+
+              {lastTxDetails && (
+                <div className="glass rounded-lg p-4 space-y-3 mt-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-purple-200">Last Transaction</h4>
+                    <span className="text-xs text-purple-400">
+                      {new Date(lastTxDetails.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-purple-400">Type</span>
+                      <span className={`font-medium ${lastTxDetails.type === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
+                        {lastTxDetails.type === 'buy' ? '📈 Buy' : '📉 Sell'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-purple-400">Amount</span>
+                      <span className="text-purple-200 font-medium">
+                        {lastTxDetails.tokenAmount} {lastTxDetails.tokenName}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-purple-400">Cost</span>
+                      <span className="text-purple-200 font-medium">
+                        {lastTxDetails.xrpAmount} XRP
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <span className="text-purple-400">Network Fee</span>
+                      <span className="text-purple-200 font-medium">
+                        {lastTxDetails.fee} XRP
+                      </span>
+                    </div>
+
+                    <div className="pt-2 border-t border-purple-500/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-purple-400">Transaction</span>
+                        <XRPScanLink type="tx" value={lastTxDetails.hash} network="mainnet" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
