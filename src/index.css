@@ -246,6 +246,19 @@
       background-position: 200% 0;
     }
   }
+
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite;
+  }
+
+  @keyframes glow {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(29, 161, 242, 0.3), 0 0 30px rgba(29, 161, 242, 0.2);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(29, 161, 242, 0.6), 0 0 40px rgba(29, 161, 242, 0.4);
+    }
+  }
 }
 
 /* Custom scrollbar */
