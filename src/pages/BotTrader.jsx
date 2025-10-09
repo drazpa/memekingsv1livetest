@@ -547,8 +547,16 @@ export default function BotTrader() {
     };
   };
 
-  const startBot = async (bot) => {
-    if (botIntervals.current[bot.id]) {
+  const startBot = async (botOrId) => {
+    const botId = typeof botOrId === 'string' ? botOrId : botOrId.id;
+    const bot = typeof botOrId === 'string' ? bots.find(b => b.id === botOrId) : botOrId;
+
+    if (!bot) {
+      toast.error('Bot not found');
+      return;
+    }
+
+    if (botIntervals.current[botId]) {
       return;
     }
 
@@ -626,50 +634,66 @@ export default function BotTrader() {
       .then(() => {});
   };
 
-  const pauseBot = async (bot) => {
-    if (botIntervals.current[bot.id]) {
-      clearInterval(botIntervals.current[bot.id]);
-      delete botIntervals.current[bot.id];
+  const pauseBot = async (botOrId) => {
+    const botId = typeof botOrId === 'string' ? botOrId : botOrId.id;
+    const bot = typeof botOrId === 'string' ? bots.find(b => b.id === botOrId) : botOrId;
+
+    if (!bot) {
+      toast.error('Bot not found');
+      return;
+    }
+
+    if (botIntervals.current[botId]) {
+      clearInterval(botIntervals.current[botId]);
+      delete botIntervals.current[botId];
     }
 
     const runningBotIds = JSON.parse(localStorage.getItem('runningBots') || '[]');
-    const filteredIds = runningBotIds.filter(id => id !== bot.id);
+    const filteredIds = runningBotIds.filter(id => id !== botId);
     localStorage.setItem('runningBots', JSON.stringify(filteredIds));
 
     try {
       await supabase
         .from('trading_bots')
         .update({ status: 'paused' })
-        .eq('id', bot.id);
+        .eq('id', botId);
 
-      setBots(prev => prev.map(b => b.id === bot.id ? { ...b, status: 'paused' } : b));
+      setBots(prev => prev.map(b => b.id === botId ? { ...b, status: 'paused' } : b));
       toast.success(`Bot ${bot.name} paused`);
     } catch (error) {
       console.error('Error pausing bot:', error);
     }
   };
 
-  const stopBot = async (bot) => {
-    if (botIntervals.current[bot.id]) {
-      clearInterval(botIntervals.current[bot.id]);
-      delete botIntervals.current[bot.id];
+  const stopBot = async (botOrId) => {
+    const botId = typeof botOrId === 'string' ? botOrId : botOrId.id;
+    const bot = typeof botOrId === 'string' ? bots.find(b => b.id === botOrId) : botOrId;
+
+    if (!bot) {
+      toast.error('Bot not found');
+      return;
+    }
+
+    if (botIntervals.current[botId]) {
+      clearInterval(botIntervals.current[botId]);
+      delete botIntervals.current[botId];
     }
 
     setNextTradeTimes(prev => {
       const newTimes = { ...prev };
-      delete newTimes[bot.id];
+      delete newTimes[botId];
       return newTimes;
     });
 
     setNextTradeActions(prev => {
       const newActions = { ...prev };
-      delete newActions[bot.id];
+      delete newActions[botId];
       return newActions;
     });
 
     setBotAnnouncements(prev => {
       const newAnn = { ...prev };
-      delete newAnn[bot.id];
+      delete newAnn[botId];
       return newAnn;
     });
 
@@ -682,19 +706,19 @@ export default function BotTrader() {
         next_xrp_amount: null,
         next_price: null
       })
-      .eq('id', bot.id);
+      .eq('id', botId);
 
     const runningBotIds = JSON.parse(localStorage.getItem('runningBots') || '[]');
-    const filteredIds = runningBotIds.filter(id => id !== bot.id);
+    const filteredIds = runningBotIds.filter(id => id !== botId);
     localStorage.setItem('runningBots', JSON.stringify(filteredIds));
 
     try {
       await supabase
         .from('trading_bots')
         .update({ status: 'stopped' })
-        .eq('id', bot.id);
+        .eq('id', botId);
 
-      setBots(prev => prev.map(b => b.id === bot.id ? { ...b, status: 'stopped' } : b));
+      setBots(prev => prev.map(b => b.id === botId ? { ...b, status: 'stopped' } : b));
       toast.success(`Bot ${bot.name} stopped`);
     } catch (error) {
       console.error('Error stopping bot:', error);
@@ -1312,16 +1336,16 @@ export default function BotTrader() {
     const handlers = {};
     bots.forEach(bot => {
       handlers[bot.id] = {
-        onPause: () => pauseBot(bot),
-        onStop: () => stopBot(bot),
-        onStart: () => startBot(bot),
+        onPause: () => pauseBot(bot.id),
+        onStop: () => stopBot(bot.id),
+        onStart: () => startBot(bot.id),
         onEdit: () => openEditBot(bot),
         onViewActivity: () => setSelectedBot(bot),
         onDelete: () => deleteBot(bot)
       };
     });
     return handlers;
-  }, [bots]);
+  }, [bots.map(b => `${b.id}-${b.status}`).join(',')]);
 
   const filteredBots = bots.filter(bot => {
     const token = tokensMap[bot.token_id];
@@ -1565,14 +1589,14 @@ export default function BotTrader() {
                               {bot.status === 'running' ? (
                                 <>
                                   <button
-                                    onClick={() => pauseBot(bot)}
+                                    onClick={() => pauseBot(bot.id)}
                                     className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
                                     title="Pause Bot"
                                   >
                                     ⏸ Pause
                                   </button>
                                   <button
-                                    onClick={() => stopBot(bot)}
+                                    onClick={() => stopBot(bot.id)}
                                     className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
                                     title="Stop Bot"
                                   >
@@ -1582,14 +1606,14 @@ export default function BotTrader() {
                               ) : bot.status === 'paused' ? (
                                 <>
                                   <button
-                                    onClick={() => startBot(bot)}
+                                    onClick={() => startBot(bot.id)}
                                     className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
                                     title="Resume Bot"
                                   >
                                     ▶ Resume
                                   </button>
                                   <button
-                                    onClick={() => stopBot(bot)}
+                                    onClick={() => stopBot(bot.id)}
                                     className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
                                     title="Stop Bot"
                                   >
@@ -1598,7 +1622,7 @@ export default function BotTrader() {
                                 </>
                               ) : (
                                 <button
-                                  onClick={() => startBot(bot)}
+                                  onClick={() => startBot(bot.id)}
                                   className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
                                   title="Start Bot"
                                 >
