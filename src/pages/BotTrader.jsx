@@ -59,7 +59,6 @@ export default function BotTrader() {
     show: false,
     message: ''
   });
-  const [ticker, setTicker] = useState(0);
   const [tokenBalances, setTokenBalances] = useState({});
   const botIntervals = useRef({});
   const fetchingPools = useRef(new Set());
@@ -70,13 +69,6 @@ export default function BotTrader() {
     loadFavorites();
   }, []);
 
-  useEffect(() => {
-    const tickInterval = setInterval(() => {
-      setTicker(prev => prev + 1);
-    }, 1000);
-
-    return () => clearInterval(tickInterval);
-  }, []);
 
   useEffect(() => {
     if (tokens.length > 0) {
@@ -1248,7 +1240,16 @@ export default function BotTrader() {
   }, [tokens]);
 
   const BotCard = memo(({ bot, token, poolData, nextTradeTime, nextAction, announcement, tokenBalance, onPause, onStop, onStart, onEdit, onViewActivity, onDelete }) => {
-    const timeUntilNext = nextTradeTime ? Math.max(0, nextTradeTime - Date.now()) : 0;
+    const [currentTime, setCurrentTime] = useState(Date.now());
+
+    useEffect(() => {
+      const timer = setInterval(() => {
+        setCurrentTime(Date.now());
+      }, 1000);
+      return () => clearInterval(timer);
+    }, []);
+
+    const timeUntilNext = nextTradeTime ? Math.max(0, nextTradeTime - currentTime) : 0;
     const minutesUntil = Math.floor(timeUntilNext / 60000);
     const secondsUntil = Math.floor((timeUntilNext % 60000) / 1000);
 
