@@ -19,7 +19,9 @@ export default function KingsList() {
     avgHolding: 0,
     medianHolding: 0,
     giniCoefficient: 0,
-    concentrationRatio: 0
+    concentrationRatio: 0,
+    totalTrustlines: 0,
+    developerBalance: 0
   });
   const [network] = useState('testnet');
 
@@ -76,8 +78,10 @@ export default function KingsList() {
         ledger_index: 'validated'
       });
 
-      const holders = accountLines.result.lines
-        .filter(line => line.currency === selectedToken.currency_code)
+      const allLines = accountLines.result.lines.filter(line => line.currency === selectedToken.currency_code);
+      const totalTrustlines = allLines.length;
+
+      const holders = allLines
         .map(line => ({
           address: line.account,
           balance: parseFloat(line.balance) || 0,
@@ -86,8 +90,21 @@ export default function KingsList() {
         .filter(holder => holder.balance > 0)
         .sort((a, b) => b.balance - a.balance);
 
+      let developerBalance = 0;
+      try {
+        const accountInfo = await client.request({
+          command: 'account_info',
+          account: selectedToken.issuer_address,
+          ledger_index: 'validated'
+        });
+        const xrpBalance = parseFloat(accountInfo.result.account_data.Balance) / 1000000;
+        developerBalance = xrpBalance;
+      } catch (error) {
+        console.error('Error fetching developer balance:', error);
+      }
+
       setRichList(holders);
-      calculateStats(holders);
+      calculateStats(holders, totalTrustlines, developerBalance);
 
       await client.disconnect();
     } catch (error) {
@@ -98,7 +115,7 @@ export default function KingsList() {
     }
   };
 
-  const calculateStats = (holders) => {
+  const calculateStats = (holders, totalTrustlines, developerBalance) => {
     if (holders.length === 0) {
       setStats({
         totalHolders: 0,
@@ -107,7 +124,9 @@ export default function KingsList() {
         avgHolding: 0,
         medianHolding: 0,
         giniCoefficient: 0,
-        concentrationRatio: 0
+        concentrationRatio: 0,
+        totalTrustlines: totalTrustlines || 0,
+        developerBalance: developerBalance || 0
       });
       return;
     }
@@ -137,7 +156,9 @@ export default function KingsList() {
       avgHolding,
       medianHolding,
       giniCoefficient,
-      concentrationRatio
+      concentrationRatio,
+      totalTrustlines: totalTrustlines || 0,
+      developerBalance: developerBalance || 0
     });
   };
 
@@ -312,10 +333,14 @@ export default function KingsList() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6 bg-slate-900/20">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 p-6 bg-slate-900/20">
               <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-600/40 hover:border-slate-500/60 transition-all hover:shadow-lg">
                 <div className="text-slate-400 text-sm mb-2 font-medium">Total Holders</div>
                 <div className="text-3xl font-bold text-white">{stats.totalHolders}</div>
+              </div>
+              <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-600/40 hover:border-slate-500/60 transition-all hover:shadow-lg">
+                <div className="text-slate-400 text-sm mb-2 font-medium">Total Trustlines</div>
+                <div className="text-3xl font-bold text-white">{stats.totalTrustlines}</div>
               </div>
               <div className="bg-slate-800/50 rounded-xl p-5 border border-slate-600/40 hover:border-slate-500/60 transition-all hover:shadow-lg">
                 <div className="text-slate-400 text-sm mb-2 font-medium">Total Supply Held</div>
@@ -331,7 +356,7 @@ export default function KingsList() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6 pt-0 bg-slate-900/20">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-6 pt-0 bg-slate-900/20">
               <div className="bg-gradient-to-br from-yellow-900/40 to-orange-900/40 rounded-xl p-5 border border-yellow-500/40 hover:shadow-xl transition-all">
                 <div className="text-yellow-300/90 text-sm mb-2 font-medium">Top Holder Share</div>
                 <div className="text-4xl font-extrabold text-yellow-200">
@@ -354,6 +379,21 @@ export default function KingsList() {
                 </div>
                 <div className={`text-sm font-semibold ${giniLevel.color}`}>
                   {giniLevel.label}
+                </div>
+              </div>
+              <div className="bg-gradient-to-br from-green-900/40 to-emerald-900/40 rounded-xl p-5 border border-green-500/40 hover:shadow-xl transition-all">
+                <div className="text-green-300/90 text-sm mb-2 font-medium flex items-center gap-2">
+                  <span>🏗️</span>
+                  <span>Developer Wallet</span>
+                </div>
+                <div className="text-3xl font-bold text-white mb-1">
+                  {formatNumber(stats.developerBalance)}
+                </div>
+                <div className="text-xs text-green-300/80 mb-2">
+                  XRP Balance
+                </div>
+                <div className="text-xs font-mono text-green-400/70 break-all">
+                  {selectedToken.issuer_address}
                 </div>
               </div>
             </div>
