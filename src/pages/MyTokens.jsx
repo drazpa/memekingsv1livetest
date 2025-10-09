@@ -561,6 +561,15 @@ export default function MyTokens() {
                         >
                           💱 Swap
                         </button>
+                        <a
+                          href={`https://xmagnetic.org/dex/${holding.token.currency_code}+${holding.token.issuer_address}_XRP+XRP?network=mainnet`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white font-bold px-3 py-1.5 text-xs rounded-lg shadow-lg transition-all"
+                          title="Trade on Magnetic DEX"
+                        >
+                          🧲 Magnetic
+                        </a>
                         <button
                           onClick={() => {
                             setSelectedHolding(holding);
