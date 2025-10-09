@@ -18,14 +18,21 @@ import AIChat from './pages/AIChat';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [selectedTradeToken, setSelectedTradeToken] = useState(null);
 
   useEffect(() => {
-    const handleNavigateToTrade = () => {
+    const handleNavigateToTrade = (event) => {
       setCurrentPage('trade');
+      if (event.detail && event.detail.token) {
+        setSelectedTradeToken(event.detail.token);
+      }
     };
 
     const handleNavigateToPage = (event) => {
       setCurrentPage(event.detail);
+      if (event.detail !== 'trade') {
+        setSelectedTradeToken(null);
+      }
     };
 
     window.addEventListener('navigateToTrade', handleNavigateToTrade);
@@ -46,7 +53,7 @@ export default function App() {
       case 'pools':
         return <Pools />;
       case 'trade':
-        return <Trade />;
+        return <Trade preselectedToken={selectedTradeToken} />;
       case 'bottrader':
         return <BotTrader />;
       case 'vault':

@@ -37,7 +37,7 @@ const sanitizeToken = (amount) => {
   return num.toFixed(6);
 };
 
-export default function Trade() {
+export default function Trade({ preselectedToken = null }) {
   const [tokens, setTokens] = useState([]);
   const [selectedToken, setSelectedToken] = useState(null);
   const [tradeType, setTradeType] = useState('buy');
@@ -103,6 +103,15 @@ export default function Trade() {
       window.removeEventListener('walletDisconnected', handleWalletChange);
     };
   }, []);
+
+  useEffect(() => {
+    if (preselectedToken && tokens.length > 0 && !selectedToken) {
+      const tokenToSelect = tokens.find(t => t.id === preselectedToken.id);
+      if (tokenToSelect) {
+        setSelectedToken(tokenToSelect);
+      }
+    }
+  }, [preselectedToken, tokens, selectedToken]);
 
   useEffect(() => {
     if (selectedToken) {
