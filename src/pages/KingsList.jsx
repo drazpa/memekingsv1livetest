@@ -41,10 +41,6 @@ export default function KingsList() {
 
       if (error) throw error;
       setTokens(data || []);
-
-      if (data && data.length > 0) {
-        setSelectedToken(data[0]);
-      }
     } catch (error) {
       console.error('Error loading tokens:', error);
     }
@@ -201,10 +197,11 @@ export default function KingsList() {
                 const token = tokens.find(t => t.id === e.target.value);
                 setSelectedToken(token);
               }}
-              className="w-full bg-purple-950/60 border border-purple-500/40 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-400/60 focus:ring-2 focus:ring-purple-500/30"
+              className="w-full bg-purple-950/60 border border-purple-500/40 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-400/60 focus:ring-2 focus:ring-purple-500/30 cursor-pointer"
             >
+              {!selectedToken && <option value="">Choose a token...</option>}
               {tokens.map(token => (
-                <option key={token.id} value={token.id}>
+                <option key={token.id} value={token.id} className="bg-purple-950 text-white">
                   {token.name} ({token.currency_code})
                 </option>
               ))}
@@ -220,16 +217,55 @@ export default function KingsList() {
             }}
           >
             <div className="p-6 border-b border-purple-500/30">
-              <div className="flex items-center gap-4">
-                <TokenIcon
-                  name={selectedToken.name}
-                  imageUrl={selectedToken.image_url}
-                  size="lg"
-                />
-                <div>
-                  <h2 className="text-2xl font-bold text-white">{selectedToken.name}</h2>
-                  <p className="text-purple-300/80">{selectedToken.currency_code}</p>
+              <div className="flex flex-col md:flex-row md:items-center gap-6">
+                <div className="flex items-center gap-4 flex-1">
+                  <TokenIcon
+                    name={selectedToken.name}
+                    imageUrl={selectedToken.image_url}
+                    size="lg"
+                  />
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">{selectedToken.name}</h2>
+                    <p className="text-purple-300/80">{selectedToken.currency_code}</p>
+                  </div>
                 </div>
+                {richList.length > 0 && (
+                  <div className="relative rounded-xl overflow-hidden border-2 border-yellow-500/60"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(217, 119, 6, 0.3), rgba(251, 191, 36, 0.3))',
+                      backdropFilter: 'blur(10px)',
+                      boxShadow: '0 0 30px rgba(251, 191, 36, 0.4)'
+                    }}
+                  >
+                    <div className="absolute top-2 right-2 text-3xl">
+                      👑
+                    </div>
+                    <div className="p-6 pr-14">
+                      <div className="text-yellow-400/80 text-xs font-medium mb-1">MemeKing</div>
+                      <div className="text-yellow-200 font-bold text-lg mb-2">#{1} Holder</div>
+                      <div className="font-mono text-yellow-300 text-sm mb-2">
+                        {richList[0].address.slice(0, 8)}...{richList[0].address.slice(-6)}
+                      </div>
+                      <div className="text-2xl font-bold text-yellow-100 mb-1">
+                        {formatNumber(richList[0].balance)}
+                      </div>
+                      <div className="text-xs text-yellow-400/80 mb-3">
+                        {selectedToken.currency_code}
+                      </div>
+                      <div className="text-yellow-300 font-bold text-sm mb-3">
+                        {((richList[0].balance / stats.totalSupplyHeld) * 100).toFixed(2)}% of supply
+                      </div>
+                      <a
+                        href={`https://${network === 'mainnet' ? '' : 'test.'}xrpscan.com/account/${richList[0].address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block px-3 py-1.5 bg-yellow-600/40 hover:bg-yellow-600/60 text-yellow-100 rounded text-xs font-medium transition-all duration-200 border border-yellow-500/50"
+                      >
+                        View Wallet
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -288,7 +324,14 @@ export default function KingsList() {
           }}
         >
           <div className="p-6 border-b border-purple-500/30">
-            <h3 className="text-xl font-bold text-white">Rich List Rankings</h3>
+            <h3 className="text-xl font-bold text-white">
+              {richList.length > 0 ? 'All Holders' : 'Rich List Rankings'}
+            </h3>
+            {richList.length > 0 && (
+              <p className="text-purple-300/60 text-sm mt-1">
+                Showing all {richList.length} token holders
+              </p>
+            )}
           </div>
 
           {loading ? (
@@ -300,7 +343,7 @@ export default function KingsList() {
             </div>
           ) : richList.length === 0 ? (
             <div className="text-center py-20 text-purple-300/60">
-              No holders found for this token
+              {selectedToken ? 'No holders found for this token' : 'Please select a token to view the rich list'}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -318,7 +361,7 @@ export default function KingsList() {
                   {richList.map((holder, index) => {
                     const percentage = (holder.balance / stats.totalSupplyHeld) * 100;
                     const isTopHolder = index === 0;
-                    const isTopTen = index < 10;
+                    const isTopTen = index < 10 && index > 0;
 
                     return (
                       <tr
