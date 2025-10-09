@@ -202,9 +202,23 @@ export default function BotTrader() {
         .from('meme_tokens')
         .select('*')
         .eq('amm_pool_created', true)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false});
       if (error) throw error;
       setTokens(data || []);
+
+      const cachedPools = {};
+      (data || []).forEach(token => {
+        if (token.current_price && token.current_price > 0) {
+          cachedPools[token.id] = {
+            amm_xrp_amount: token.amm_xrp_amount || 0,
+            amm_asset_amount: token.amm_asset_amount || 0,
+            price: token.current_price
+          };
+        }
+      });
+      if (Object.keys(cachedPools).length > 0) {
+        setPoolsData(cachedPools);
+      }
     } catch (error) {
       console.error('Error loading tokens:', error);
     }
@@ -227,9 +241,18 @@ export default function BotTrader() {
 
       const balances = {};
       tokens.forEach(token => {
-        const tokenLine = accountLines.result.lines.find(
-          line => line.currency === token.currency_code && line.account === token.issuer_address
-        );
+        const currencyHex = token.currency_code.length > 3
+          ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+          : token.currency_code;
+
+        const tokenLine = accountLines.result.lines.find(line => {
+          const lineCurrency = line.currency.length > 3 && line.currency !== token.currency_code
+            ? line.currency
+            : line.currency;
+          return (lineCurrency === currencyHex || lineCurrency === token.currency_code) &&
+                 line.account === token.issuer_address;
+        });
+
         balances[token.id] = tokenLine ? parseFloat(tokenLine.balance) : 0;
       });
 
@@ -248,28 +271,75 @@ export default function BotTrader() {
 
     tokensToFetch.forEach(token => fetchingPools.current.add(token.id));
 
-    const poolPromises = tokensToFetch.map(async (token) => {
-      try {
-        const poolData = await fetchPoolData(token);
-        return { tokenId: token.id, poolData };
-      } catch (error) {
-        console.error(`Error fetching pool data for ${token.token_name}:`, error);
-        return { tokenId: token.id, poolData: null };
-      } finally {
-        fetchingPools.current.delete(token.id);
-      }
-    });
+    try {
+      const client = new xrpl.Client('wss://xrplcluster.com');
+      await client.connect();
 
-    const results = await Promise.all(poolPromises);
-    setPoolsData(prev => {
-      const updated = { ...prev };
-      results.forEach(({ tokenId, poolData }) => {
-        if (poolData) {
-          updated[tokenId] = poolData;
+      const poolPromises = tokensToFetch.map(async (token) => {
+        try {
+          const currencyHex = token.currency_code.length > 3
+            ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+            : token.currency_code;
+
+          const ammInfo = await client.request({
+            command: 'amm_info',
+            asset: { currency: 'XRP' },
+            asset2: { currency: currencyHex, issuer: token.issuer_address },
+            ledger_index: 'validated'
+          });
+
+          if (ammInfo?.result?.amm) {
+            const amm = ammInfo.result.amm;
+            const amm_xrp_amount = parseFloat(amm.amount) / 1000000;
+            const amm_asset_amount = parseFloat(amm.amount2.value);
+            const price = amm_xrp_amount / amm_asset_amount;
+
+            return {
+              tokenId: token.id,
+              poolData: { amm_xrp_amount, amm_asset_amount, price }
+            };
+          }
+          return { tokenId: token.id, poolData: null };
+        } catch (error) {
+          console.error(`Error fetching pool data for ${token.token_name}:`, error);
+          return { tokenId: token.id, poolData: null };
+        } finally {
+          fetchingPools.current.delete(token.id);
         }
       });
-      return updated;
-    });
+
+      const results = await Promise.all(poolPromises);
+      await client.disconnect();
+
+      const updatePromises = results
+        .filter(({ poolData }) => poolData)
+        .map(({ tokenId, poolData }) =>
+          supabase
+            .from('meme_tokens')
+            .update({
+              current_price: poolData.price,
+              amm_xrp_amount: poolData.amm_xrp_amount,
+              amm_asset_amount: poolData.amm_asset_amount,
+              price_updated_at: new Date().toISOString()
+            })
+            .eq('id', tokenId)
+        );
+
+      await Promise.all(updatePromises);
+
+      setPoolsData(prev => {
+        const updated = { ...prev };
+        results.forEach(({ tokenId, poolData }) => {
+          if (poolData) {
+            updated[tokenId] = poolData;
+          }
+        });
+        return updated;
+      });
+    } catch (error) {
+      console.error('Error in fetchAllPoolsData:', error);
+      tokensToFetch.forEach(token => fetchingPools.current.delete(token.id));
+    }
   };
 
   const fetchPoolData = async (token) => {
