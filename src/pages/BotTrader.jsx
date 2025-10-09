@@ -1431,11 +1431,38 @@ export default function BotTrader() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex gap-2 justify-end">
+                              {bot.is_active ? (
+                                <>
+                                  <button
+                                    onClick={() => pauseBot(bot)}
+                                    className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
+                                    title="Pause Bot"
+                                  >
+                                    ⏸ Pause
+                                  </button>
+                                  <button
+                                    onClick={() => stopBot(bot)}
+                                    className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                                    title="Stop Bot"
+                                  >
+                                    ⏹ Stop
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => startBot(bot)}
+                                  className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                                  title="Start Bot"
+                                >
+                                  ▶ Start
+                                </button>
+                              )}
                               <button
                                 onClick={() => setSelectedBot(bot)}
                                 className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                                title="View Details"
                               >
-                                View
+                                👁 View
                               </button>
                               <button
                                 onClick={() => {
@@ -1443,8 +1470,9 @@ export default function BotTrader() {
                                   setShowEditBot(true);
                                 }}
                                 className="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+                                title="Edit Bot"
                               >
-                                Edit
+                                ✏️ Edit
                               </button>
                             </div>
                           </td>
