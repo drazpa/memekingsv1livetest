@@ -23,7 +23,9 @@ class AIAssistant {
   async processMessage(message) {
     const lowerMessage = message.toLowerCase();
 
-    if (this.isBuyTokenQuery(lowerMessage)) {
+    if (this.isAddressBookQuery(lowerMessage)) {
+      return await this.handleAddressBook();
+    } else if (this.isBuyTokenQuery(lowerMessage)) {
       return await this.handleBuyToken();
     } else if (this.isSellTokenQuery(lowerMessage)) {
       return await this.handleSellToken();
@@ -122,6 +124,10 @@ class AIAssistant {
 
   isCreateBotQuery(msg) {
     return (msg.includes('create') && msg.includes('bot')) || msg.includes('new bot') || msg.includes('setup bot');
+  }
+
+  isAddressBookQuery(msg) {
+    return msg.includes('address book') || msg.includes('contacts') || msg.includes('saved addresses');
   }
 
   async handleBalanceQuery() {
@@ -403,6 +409,10 @@ class AIAssistant {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'active');
 
+      const totalSupply = tokens?.reduce((sum, t) => sum + parseFloat(t.total_supply || 0), 0) || 0;
+      const totalVolume = tokens?.reduce((sum, t) => sum + (t.volume_24h || 0), 0) || 0;
+      const avgMarketCap = tokens?.length > 0 ? (totalSupply / tokens.length) : 0;
+
       const topGainer = tokens && tokens.length > 0 ? tokens[0] : null;
       const recentTokens = tokens?.filter(t => {
         const created = new Date(t.created_at);
@@ -411,26 +421,30 @@ class AIAssistant {
       }).length || 0;
 
       return {
-        content: 'Here is the current market overview with real-time data from the platform:',
+        content: 'Here is comprehensive market analytics with data from the Analytics page:',
         data: {
           card: {
             icon: '📊',
-            title: 'Market Overview',
+            title: 'Market Analytics',
             badge: 'Live Data',
             items: [
               { label: 'Total Tokens', value: `${totalTokens || 0}` },
               { label: 'Active Pools', value: `${totalPools || 0}` },
               { label: 'Active Bots', value: `${activeBots || 0}` },
               { label: '24h New Tokens', value: `${recentTokens}` },
+              { label: 'Total Supply', value: `${totalSupply.toFixed(0)}` },
+              { label: '24h Volume', value: `${totalVolume.toFixed(2)}` },
+              { label: 'Avg Market Cap', value: `${avgMarketCap.toFixed(2)}` },
               { label: 'Top Gainer', value: topGainer ? `${topGainer.name}` : 'N/A' }
             ]
           },
           table: {
-            headers: ['Token', 'Symbol', '24h Change', 'Created'],
+            headers: ['Token', 'Symbol', '24h Change', '24h Volume', 'Created'],
             rows: tokens?.slice(0, 5).map(token => [
               token.name || 'Unknown',
               token.currency_code || 'N/A',
               token.price_change_24h ? `${token.price_change_24h > 0 ? '+' : ''}${token.price_change_24h.toFixed(2)}%` : 'N/A',
+              token.volume_24h ? token.volume_24h.toFixed(2) : 'N/A',
               new Date(token.created_at).toLocaleDateString()
             ]) || []
           },
@@ -442,7 +456,7 @@ class AIAssistant {
               onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'top10' }))
             },
             {
-              label: 'View Analytics',
+              label: 'Full Analytics',
               icon: '📈',
               style: 'secondary',
               onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'analytics' }))
@@ -591,13 +605,13 @@ class AIAssistant {
       .limit(20);
 
     return {
-      content: 'I can help you send XRP or tokens directly from the chat! Choose what you want to send:',
+      content: 'I can help you send XRP or tokens directly from the chat! Use the Address Book button to select saved contacts.',
       data: {
         execution: {
           type: 'send_xrp',
           icon: '📤',
           title: 'Send XRP',
-          description: 'Send XRP to any XRPL address',
+          description: 'Send XRP to any XRPL address or saved contact',
           badge: 'Connected',
           fields: [
             {
@@ -606,7 +620,7 @@ class AIAssistant {
               type: 'text',
               placeholder: 'rXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
               required: true,
-              hint: 'Enter the recipient XRPL address'
+              hint: 'Enter recipient address or use Address Book'
             },
             {
               name: 'amount',
@@ -640,6 +654,12 @@ class AIAssistant {
             label: 'Send Token Instead',
             onClick: () => {
               window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'I want to send a specific token' }));
+            }
+          },
+          {
+            label: 'Manage Address Book',
+            onClick: () => {
+              window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'Show my address book' }));
             }
           }
         ]
@@ -1115,6 +1135,71 @@ class AIAssistant {
     };
   }
 
+  async handleAddressBook() {
+    if (!this.context.connectedWallet) {
+      return {
+        content: 'Please connect a wallet to view your address book.',
+        data: {
+          actions: [{
+            label: 'Connect Wallet',
+            icon: '🔗',
+            style: 'primary',
+            onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+          }]
+        }
+      };
+    }
+
+    try {
+      const { data: contacts, error } = await supabase
+        .from('address_book')
+        .select('*')
+        .eq('wallet_address', this.context.connectedWallet.address)
+        .order('is_favorite', { ascending: false })
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+
+      const favoriteCount = contacts?.filter(c => c.is_favorite).length || 0;
+
+      return {
+        content: `Here is your address book with ${contacts?.length || 0} saved contacts:`,
+        data: {
+          card: {
+            icon: '📇',
+            title: 'Address Book',
+            badge: `${contacts?.length || 0} Contacts`,
+            items: [
+              { label: 'Total Contacts', value: `${contacts?.length || 0}` },
+              { label: 'Favorites', value: `${favoriteCount}` }
+            ]
+          },
+          table: {
+            headers: ['Name', 'Address', 'Notes'],
+            rows: contacts?.slice(0, 10).map(contact => [
+              contact.is_favorite ? `⭐ ${contact.name}` : contact.name,
+              `${contact.address.slice(0, 20)}...`,
+              contact.notes || 'No notes'
+            ]) || []
+          },
+          actions: [
+            {
+              label: 'Send to Contact',
+              icon: '📤',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'send tokens' }))
+            }
+          ]
+        }
+      };
+    } catch (error) {
+      return {
+        content: 'I had trouble loading your address book. You can add contacts when sending tokens!',
+        data: null
+      };
+    }
+  }
+
   handleGeneral(message) {
     const suggestions = [
       'Check my balance',
@@ -1122,11 +1207,11 @@ class AIAssistant {
       'Buy token',
       'Sell token',
       'Create trading bot',
-      'Show me the top tokens'
+      'Show address book'
     ];
 
     return {
-      content: 'I understand you\'re asking about XRPL and the platform. I can help you with:\n\n• Checking wallet balances\n• Sending and receiving tokens\n• Buying and selling tokens\n• Creating trading bots\n• Getting token information\n• Viewing trade history\n• Market overviews\n• And much more!\n\nTry asking one of these:',
+      content: 'I understand you\'re asking about XRPL and the platform. I can help you with:\n\n• Checking wallet balances\n• Sending and receiving tokens\n• Managing address book contacts\n• Buying and selling tokens\n• Creating trading bots\n• Getting token information\n• Viewing trade history\n• Market analytics\n• And much more!\n\nTry asking one of these:',
       data: {
         quickActions: suggestions.map(label => ({
           label,

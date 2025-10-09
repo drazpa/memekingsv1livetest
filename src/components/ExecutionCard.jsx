@@ -1,9 +1,18 @@
 import { useState } from 'react';
+import AddressBookModal from './AddressBookModal';
 
 export default function ExecutionCard({ execution, onExecute, onCancel }) {
   const [formData, setFormData] = useState(execution.defaultValues || {});
   const [isExecuting, setIsExecuting] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [showAddressBook, setShowAddressBook] = useState(false);
+
+  const walletAddress = JSON.parse(localStorage.getItem('connectedWallet') || '{}').address;
+
+  const handleSelectAddress = (contact) => {
+    handleInputChange('destinationAddress', contact.address);
+    setShowAddressBook(false);
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -81,14 +90,25 @@ export default function ExecutionCard({ execution, onExecute, onCancel }) {
                   disabled={isExecuting}
                 />
               ) : (
-                <input
-                  type={field.type || 'text'}
-                  value={formData[field.name] || ''}
-                  onChange={(e) => handleInputChange(field.name, e.target.value)}
-                  placeholder={field.placeholder}
-                  className="w-full bg-purple-950/60 border border-purple-500/40 rounded-lg px-3 py-2 text-white placeholder-purple-400/50 focus:outline-none focus:border-purple-400/60 focus:ring-2 focus:ring-purple-500/30"
-                  disabled={isExecuting}
-                />
+                <div className="relative">
+                  <input
+                    type={field.type || 'text'}
+                    value={formData[field.name] || ''}
+                    onChange={(e) => handleInputChange(field.name, e.target.value)}
+                    placeholder={field.placeholder}
+                    className="w-full bg-purple-950/60 border border-purple-500/40 rounded-lg px-3 py-2 text-white placeholder-purple-400/50 focus:outline-none focus:border-purple-400/60 focus:ring-2 focus:ring-purple-500/30"
+                    disabled={isExecuting}
+                  />
+                  {field.name === 'destinationAddress' && !isExecuting && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddressBook(true)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 bg-purple-700/40 hover:bg-purple-700/60 text-purple-200 rounded text-xs font-medium transition-all duration-200 border border-purple-500/30"
+                    >
+                      📇 Address Book
+                    </button>
+                  )}
+                </div>
               )}
               {field.hint && (
                 <p className="text-xs text-purple-400/60 mt-1">{field.hint}</p>
@@ -171,6 +191,13 @@ export default function ExecutionCard({ execution, onExecute, onCancel }) {
           </button>
         )}
       </div>
+
+      <AddressBookModal
+        isOpen={showAddressBook}
+        onClose={() => setShowAddressBook(false)}
+        onSelectAddress={handleSelectAddress}
+        walletAddress={walletAddress}
+      />
     </div>
   );
 }
