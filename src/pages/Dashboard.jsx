@@ -501,7 +501,7 @@ export default function Dashboard() {
       { title: 'Connecting to XRPL', status: 'pending' },
       { title: 'Validating Wallets', status: 'pending' },
       { title: 'Creating Trust Line', status: 'pending' },
-      { title: 'Issuing Coins', status: 'pending' },
+      { title: 'Issuing Tokens', status: 'pending' },
       { title: 'Saving to Database', status: 'pending' },
       { title: 'Creating AMM Pool', status: 'pending' },
       { title: 'Complete', status: 'pending' }
@@ -1210,7 +1210,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Total Coins</div>
+          <div className="text-purple-400 text-sm mb-2">Total Tokens</div>
           <div className="text-3xl font-bold text-green-400">{analytics.totalTokens}</div>
           {tokens24h > 0 && (
             <div className="text-green-300 text-sm mt-1">
@@ -1264,7 +1264,7 @@ export default function Dashboard() {
       {topTokens.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-2xl font-bold text-purple-200">🔥 Top 3 Featured Coins</h3>
+            <h3 className="text-2xl font-bold text-purple-200">🔥 Top 3 Featured Tokens</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => setTopViewMode('grid')}
@@ -1327,7 +1327,7 @@ export default function Dashboard() {
             mainTokenTab === 'all' ? 'bg-purple-600 text-white shadow-lg' : 'glass text-purple-300 hover:bg-purple-900/30'
           }`}
         >
-          All Coins
+          All Tokens
         </button>
         <button
           onClick={() => setMainTokenTab('user')}
@@ -1335,14 +1335,14 @@ export default function Dashboard() {
             mainTokenTab === 'user' ? 'bg-purple-600 text-white shadow-lg' : 'glass text-purple-300 hover:bg-purple-900/30'
           }`}
         >
-          User Coins
+          User Tokens
         </button>
       </div>
 
       {mainTokenTab === 'all' && (
         <div className="glass rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-purple-200">All Coins</h3>
+            <h3 className="text-xl font-bold text-purple-200">All Tokens</h3>
           <div className="flex gap-2">
             <button
               onClick={() => setViewMode('list')}
@@ -1366,7 +1366,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
           <input
             type="text"
-            placeholder="🔍 Search coins..."
+            placeholder="🔍 Search tokens..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="input text-purple-200 md:col-span-2"
@@ -1394,7 +1394,7 @@ export default function Dashboard() {
 
         <div className="flex items-center justify-between mb-3">
           <div className="text-purple-400 text-sm">
-            Showing {((currentPage - 1) * TOKENS_PER_PAGE) + 1}-{Math.min(currentPage * TOKENS_PER_PAGE, filteredTokens.length)} of {filteredTokens.length} coins
+            Showing {((currentPage - 1) * TOKENS_PER_PAGE) + 1}-{Math.min(currentPage * TOKENS_PER_PAGE, filteredTokens.length)} of {filteredTokens.length} tokens
           </div>
           {totalPages > 1 && (
             <div className="flex items-center gap-2">
@@ -1458,7 +1458,7 @@ export default function Dashboard() {
       {mainTokenTab === 'memeking_disabled' && (
         <div className="glass rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-purple-200">MemeKing Coins</h3>
+            <h3 className="text-xl font-bold text-purple-200">MemeKing Tokens</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => setViewMode('list')}
@@ -1482,7 +1482,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
             <input
               type="text"
-              placeholder="🔍 Search coins..."
+              placeholder="🔍 Search tokens..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="input text-purple-200 md:col-span-2"
@@ -1517,7 +1517,7 @@ export default function Dashboard() {
                                     (filterStatus === 'active' && t.amm_pool_created) ||
                                     (filterStatus === 'pending' && !t.amm_pool_created);
                 return matchesSearch && matchesFilter;
-              }).length} of {memeKingTokens.length} MemeKing coins
+              }).length} of {memeKingTokens.length} MemeKing tokens
             </div>
           </div>
 
@@ -1581,7 +1581,7 @@ export default function Dashboard() {
       {mainTokenTab === 'user' && (
         <div className="glass rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-purple-200">User Created Coins</h3>
+            <h3 className="text-xl font-bold text-purple-200">User Created Tokens</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => setViewMode('list')}
@@ -1605,7 +1605,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
             <input
               type="text"
-              placeholder="🔍 Search coins..."
+              placeholder="🔍 Search tokens..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="input text-purple-200 md:col-span-2"
@@ -1640,7 +1640,7 @@ export default function Dashboard() {
                                     (filterStatus === 'active' && t.amm_pool_created) ||
                                     (filterStatus === 'pending' && !t.amm_pool_created);
                 return matchesSearch && matchesFilter;
-              }).length} of {userTokens.length} user coins
+              }).length} of {userTokens.length} user tokens
             </div>
           </div>
 
@@ -1913,7 +1913,7 @@ export default function Dashboard() {
       {showCreateTokenModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="glass rounded-lg p-8 max-w-md w-full">
-            <h3 className="text-2xl font-bold text-purple-200 mb-4">Create Random Meme Coin</h3>
+            <h3 className="text-2xl font-bold text-purple-200 mb-4">Create Random Meme Token</h3>
             <p className="text-purple-300 mb-6">
               This will generate a random meme token with a 3-5 letter name, issue 1M tokens, and create an AMM pool with 1 XRP.
             </p>
@@ -2207,7 +2207,7 @@ export default function Dashboard() {
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
           <div className="glass rounded-lg max-w-2xl w-full p-8">
             <h3 className="text-2xl font-bold text-purple-200 mb-6">
-              {creationComplete ? '✅ Token Created Successfully!' : '🚀 Creating Random Meme Coin'}
+              {creationComplete ? '✅ Token Created Successfully!' : '🚀 Creating Random Meme Token'}
             </h3>
 
             <div className="space-y-4 mb-6">

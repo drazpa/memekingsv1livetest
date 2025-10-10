@@ -422,7 +422,7 @@ export default function Analytics() {
           <div className="text-3xl font-bold text-purple-200">
             {(stats.avgTokensPerPool / 1000).toFixed(0)}K
           </div>
-          <div className="text-purple-500 text-xs mt-2">Coins per AMM</div>
+          <div className="text-purple-500 text-xs mt-2">Tokens per AMM</div>
         </div>
 
         <div className="glass rounded-lg p-6">
@@ -535,7 +535,7 @@ export default function Analytics() {
                 <span className="text-purple-300">Last 24 Hours</span>
                 <span className="text-2xl font-bold text-purple-200">{stats.volumeMetrics.last24h}</span>
               </div>
-              <div className="text-sm text-purple-400">Coins created</div>
+              <div className="text-sm text-purple-400">Tokens created</div>
             </div>
 
             <div className="p-4 bg-purple-900/20 rounded-lg">
@@ -543,7 +543,7 @@ export default function Analytics() {
                 <span className="text-purple-300">Last 7 Days</span>
                 <span className="text-2xl font-bold text-purple-200">{stats.volumeMetrics.last7d}</span>
               </div>
-              <div className="text-sm text-purple-400">Coins created</div>
+              <div className="text-sm text-purple-400">Tokens created</div>
             </div>
 
             <div className="p-4 bg-purple-900/20 rounded-lg">

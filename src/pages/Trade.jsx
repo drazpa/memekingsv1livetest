@@ -2241,7 +2241,7 @@ export default function Trade({ preselectedToken = null }) {
                             className="input w-full text-purple-200 text-lg"
                           />
                           <div className="flex justify-between text-xs text-purple-400 mt-1">
-                            <span>LP Coins to withdraw</span>
+                            <span>LP Tokens to withdraw</span>
                             <button
                               onClick={() => setWithdrawAmount(lpPosition.lpTokens)}
                               className="text-purple-300 hover:text-purple-200 font-medium"

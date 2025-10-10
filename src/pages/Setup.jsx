@@ -131,7 +131,7 @@ export default function Setup() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success('Coins exported to CSV!');
+      toast.success('Tokens exported to CSV!');
     } catch (error) {
       console.error('Error exporting CSV:', error);
       toast.error('Failed to export CSV');
@@ -246,7 +246,7 @@ export default function Setup() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-purple-300 mb-2">Issuer Wallet (Creates Coins)</label>
+              <label className="block text-purple-300 mb-2">Issuer Wallet (Creates Tokens)</label>
               <div className="input w-full text-purple-400 bg-purple-900/20 cursor-not-allowed">
                 {issuerWallet ? `${issuerWallet.address}` : 'No issuer wallet set'}
               </div>
@@ -258,7 +258,7 @@ export default function Setup() {
             </div>
 
             <div>
-              <label className="block text-purple-300 mb-2">Receiver Wallet (Receives Coins)</label>
+              <label className="block text-purple-300 mb-2">Receiver Wallet (Receives Tokens)</label>
               <div className="input w-full text-purple-400 bg-purple-900/20 cursor-not-allowed">
                 {receiverWallet ? `${receiverWallet.address}` : 'No receiver wallet set'}
               </div>
@@ -287,7 +287,7 @@ export default function Setup() {
           <div className="space-y-4">
             <div className="p-4 bg-purple-900/20 rounded-lg">
               <div className="flex justify-between items-center">
-                <span className="text-purple-300">Total Coins</span>
+                <span className="text-purple-300">Total Tokens</span>
                 <span className="text-2xl font-bold text-purple-200">{tokens.length}</span>
               </div>
             </div>
@@ -340,7 +340,7 @@ export default function Setup() {
             onClick={exportTokensCSV}
             className="btn text-purple-300 px-6 py-3 rounded-lg font-medium"
           >
-            📊 Export Coins (CSV)
+            📊 Export Tokens (CSV)
           </button>
           <button
             onClick={() => {

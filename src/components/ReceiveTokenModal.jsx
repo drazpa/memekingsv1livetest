@@ -18,7 +18,7 @@ export default function ReceiveTokenModal({ token, wallet, onClose }) {
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl shadow-2xl max-w-md w-full border border-slate-700">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white">Receive Coins</h2>
+            <h2 className="text-2xl font-bold text-white">Receive Tokens</h2>
             <button
               onClick={onClose}
               className="text-slate-400 hover:text-white text-2xl"

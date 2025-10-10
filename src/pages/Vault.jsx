@@ -845,7 +845,7 @@ export default function Vault() {
         <div className="glass rounded-lg p-6">
           <div className="text-purple-400 text-sm mb-2">Total Balance</div>
           <div className="text-3xl font-bold text-purple-200">{stats.totalBalance.toFixed(2)}</div>
-          <div className="text-purple-400 text-xs mt-1">Coins in wallet</div>
+          <div className="text-purple-400 text-xs mt-1">Tokens in wallet</div>
         </div>
 
         <div className="glass rounded-lg p-6">
@@ -855,7 +855,7 @@ export default function Vault() {
         </div>
 
         <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Active Coins</div>
+          <div className="text-purple-400 text-sm mb-2">Active Tokens</div>
           <div className="text-3xl font-bold text-blue-400">{stats.activeTokens}</div>
           <div className="text-purple-400 text-xs mt-1">Currently earning</div>
         </div>
@@ -866,7 +866,7 @@ export default function Vault() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search coins..."
+          placeholder="Search tokens..."
           className="input w-full"
         />
       </div>
@@ -879,7 +879,7 @@ export default function Vault() {
       ) : sortedTokens.length === 0 ? (
         <div className="glass rounded-lg p-12 text-center">
           <div className="text-6xl mb-4">💰</div>
-          <h3 className="text-2xl font-bold text-purple-200 mb-2">No Coins Found</h3>
+          <h3 className="text-2xl font-bold text-purple-200 mb-2">No Tokens Found</h3>
           <p className="text-purple-400">
             {searchQuery ? 'No tokens match your search.' : 'You need tokens in your wallet to start earning.'}
           </p>

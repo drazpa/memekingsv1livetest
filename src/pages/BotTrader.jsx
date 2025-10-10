@@ -1942,7 +1942,7 @@ export default function BotTrader() {
       {connectedWallet && tokens.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-2xl font-bold text-blue-200">Available Coins</h3>
+            <h3 className="text-2xl font-bold text-blue-200">Available Tokens</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => setViewMode('list')}
@@ -1966,7 +1966,7 @@ export default function BotTrader() {
           <div className="glass rounded-lg p-4">
             <input
               type="text"
-              placeholder="Search coins by name or code..."
+              placeholder="Search tokens by name or code..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="input w-full"
