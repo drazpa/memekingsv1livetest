@@ -98,7 +98,6 @@ export default function Sidebar({ currentPage, onNavigate }) {
     { id: 'vault', label: 'Vault', icon: '🏦' },
     { id: 'mytokens', label: 'My Tokens', icon: '💎' },
     { id: 'analytics', label: 'Analytics', icon: '📈' },
-    { id: 'social', label: 'Social', icon: '💭' },
     { id: 'aichat', label: 'AI Chat', icon: '💬' },
     { id: 'about', label: 'About', icon: 'ℹ️' },
     { id: 'wallets', label: 'Wallets', icon: '💼' },
