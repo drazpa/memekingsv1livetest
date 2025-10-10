@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import TokenIcon from '../components/TokenIcon';
 import SendTokenModal from '../components/SendTokenModal';
 import ReceiveTokenModal from '../components/ReceiveTokenModal';
+import { TokenTrustButton } from '../components/TokenTrustButton';
 import { onTokenUpdate } from '../utils/tokenEvents';
 import { CategoryBadge, calculateDaysOnMarket } from '../utils/categoryUtils';
 
@@ -574,15 +575,15 @@ export default function MyTokens() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center justify-center gap-2 flex-wrap">
-                        <a
-                          href={`https://xrpl.services/?issuer=${holding.token.issuer_address}&currency=${holding.token.currency_code}&limit=1000000000`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-bold px-3 py-1.5 text-xs rounded-lg shadow-lg transition-all"
-                          title="Setup Trustline"
-                        >
-                          🔗 Trust
-                        </a>
+                        <TokenTrustButton
+                          token={holding.token}
+                          connectedWallet={connectedWallet}
+                          tokenBalance={parseFloat(holding.balance)}
+                          onTrustlineUpdate={() => {
+                            loadHoldings();
+                          }}
+                          size="sm"
+                        />
                         <button
                           onClick={(e) => {
                             e.stopPropagation();

@@ -6,6 +6,7 @@ import { Buffer } from 'buffer';
 import { uploadImageToPinata } from '../utils/pinata';
 import TokenDetailModal from '../components/TokenDetailModal';
 import TokenIcon from '../components/TokenIcon';
+import { TokenTrustButton } from '../components/TokenTrustButton';
 import { logActivity, ACTION_TYPES } from '../utils/activityLogger';
 import { getRandomWord } from '../utils/dictionary';
 import { emitTokenUpdate } from '../utils/tokenEvents';
@@ -1056,15 +1057,18 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-2 gap-2 pt-3 border-t border-purple-500/20">
-        <a
-          href={`https://xrpl.services/?issuer=${token.issuer_address}&currency=${token.currency_code}&limit=1000000000`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-bold text-xs px-3 py-2 rounded text-center shadow-lg"
-          onClick={(e) => { e.stopPropagation(); }}
-        >
-          🔗 Trust
-        </a>
+        <div onClick={(e) => { e.stopPropagation(); }}>
+          <TokenTrustButton
+            token={token}
+            connectedWallet={connectedWallet}
+            tokenBalance={0}
+            onTrustlineUpdate={() => {
+              fetchTrustlineStats();
+            }}
+            size="sm"
+            className="w-full"
+          />
+        </div>
         <button
           className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold text-xs px-3 py-2 rounded text-center shadow-lg"
           onClick={(e) => {
@@ -1141,16 +1145,17 @@ export default function Dashboard() {
       </td>
       <td className="px-4 py-3">
         <div className="flex gap-1 flex-wrap">
-          <a
-            href={`https://xrpl.services/?issuer=${token.issuer_address}&currency=${token.currency_code}&limit=1000000000`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-bold text-xs px-2 py-1 rounded shadow-md"
-            onClick={(e) => { e.stopPropagation(); }}
-            title="Setup Trustline"
-          >
-            🔗 Trust
-          </a>
+          <div onClick={(e) => { e.stopPropagation(); }}>
+            <TokenTrustButton
+              token={token}
+              connectedWallet={connectedWallet}
+              tokenBalance={0}
+              onTrustlineUpdate={() => {
+                fetchTrustlineStats();
+              }}
+              size="sm"
+            />
+          </div>
           <button
             className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold text-xs px-2 py-1 rounded shadow-md"
             onClick={(e) => {
