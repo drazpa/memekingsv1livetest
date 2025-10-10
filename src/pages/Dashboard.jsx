@@ -1067,6 +1067,7 @@ export default function Dashboard() {
             }}
             size="sm"
             className="w-full"
+            showDropdown={true}
           />
         </div>
         <button
@@ -1154,6 +1155,7 @@ export default function Dashboard() {
                 fetchTrustlineStats();
               }}
               size="sm"
+              showDropdown={true}
             />
           </div>
           <button

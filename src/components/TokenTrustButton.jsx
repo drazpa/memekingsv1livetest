@@ -10,11 +10,13 @@ export function TokenTrustButton({
   tokenBalance = 0,
   onTrustlineUpdate,
   className = '',
-  size = 'md'
+  size = 'md',
+  showDropdown = false
 }) {
   const [loading, setLoading] = useState(false);
   const [hasTrustline, setHasTrustline] = useState(false);
   const [checkingTrustline, setCheckingTrustline] = useState(true);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const getCurrencyHex = (token) => {
     if (token.currency_hex) return token.currency_hex;
@@ -37,6 +39,17 @@ export function TokenTrustButton({
       setCheckingTrustline(false);
     }
   }, [connectedWallet, token]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownOpen && !event.target.closest('.trust-dropdown')) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [dropdownOpen]);
 
   const checkTrustlineStatus = async () => {
     if (!connectedWallet || !token) {
@@ -460,25 +473,44 @@ export function TokenTrustButton({
     );
   }
 
-  if (hasTrustline) {
-    if (tokenBalance > 0) {
+  if (!showDropdown) {
+    if (hasTrustline) {
+      if (tokenBalance > 0) {
+        return (
+          <button
+            disabled
+            className={`bg-gray-700 text-gray-400 rounded-lg disabled:opacity-50 cursor-not-allowed ${getSizeClasses()} ${className}`}
+            title="Trustline active with balance"
+          >
+            ✓ Trusted
+          </button>
+        );
+      }
+
       return (
         <button
-          disabled
-          className={`bg-gray-700 text-gray-400 rounded-lg disabled:opacity-50 cursor-not-allowed ${getSizeClasses()} ${className}`}
-          title="Trustline active with balance"
+          onClick={handleRemoveTrustline}
+          disabled={loading}
+          className={`bg-gradient-to-r from-red-600 to-red-500 text-white rounded-lg hover:from-red-500 hover:to-red-400 disabled:opacity-50 shadow-lg shadow-red-500/20 transition-all duration-300 ${getSizeClasses()} ${className}`}
+          title="Remove trustline (balance is 0)"
         >
-          ✓ Trusted
+          {loading ? (
+            <svg className="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          ) : (
+            'Remove Trust'
+          )}
         </button>
       );
     }
 
     return (
       <button
-        onClick={handleRemoveTrustline}
+        onClick={handleSetupTrustline}
         disabled={loading}
-        className={`bg-gradient-to-r from-red-600 to-red-500 text-white rounded-lg hover:from-red-500 hover:to-red-400 disabled:opacity-50 shadow-lg shadow-red-500/20 transition-all duration-300 ${getSizeClasses()} ${className}`}
-        title="Remove trustline (balance is 0)"
+        className={`bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300 ${getSizeClasses()} ${className}`}
       >
         {loading ? (
           <svg className="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -486,26 +518,95 @@ export function TokenTrustButton({
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
         ) : (
-          'Remove Trust'
+          'Trust'
         )}
       </button>
     );
   }
 
   return (
-    <button
-      onClick={handleSetupTrustline}
-      disabled={loading}
-      className={`bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300 ${getSizeClasses()} ${className}`}
-    >
-      {loading ? (
-        <svg className="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-      ) : (
-        'Trust'
+    <div className={`relative trust-dropdown ${className}`}>
+      <button
+        onClick={() => setDropdownOpen(!dropdownOpen)}
+        disabled={loading || checkingTrustline}
+        className={`bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300 flex items-center gap-2 ${getSizeClasses()}`}
+      >
+        {loading ? (
+          <svg className="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        ) : (
+          <>
+            <span>{hasTrustline ? '✓ Trusted' : 'Trust'}</span>
+            <svg className={`w-4 h-4 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </>
+        )}
+      </button>
+
+      {dropdownOpen && (
+        <div className="absolute top-full left-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+          <button
+            onClick={() => {
+              setDropdownOpen(false);
+              handleSetupTrustline();
+            }}
+            disabled={loading || hasTrustline}
+            className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-3 border-b border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="w-8 h-8 rounded-lg bg-green-600/20 flex items-center justify-center text-green-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="text-white font-medium">Setup {token.symbol || token.name}</div>
+              <div className="text-gray-400 text-xs">Add this token trustline</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => {
+              setDropdownOpen(false);
+              handleRemoveTrustline();
+            }}
+            disabled={loading || !hasTrustline || tokenBalance > 0}
+            className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-3 border-b border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="w-8 h-8 rounded-lg bg-red-600/20 flex items-center justify-center text-red-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="text-white font-medium">Remove {token.symbol || token.name}</div>
+              <div className="text-gray-400 text-xs">
+                {tokenBalance > 0 ? 'Balance must be 0' : 'Remove empty trustline'}
+              </div>
+            </div>
+          </button>
+
+          <a
+            href={`https://xrpscan.com/account/${getIssuerAddress(token)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-3"
+            onClick={() => setDropdownOpen(false)}
+          >
+            <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="text-white font-medium">XRPScan Link</div>
+              <div className="text-gray-400 text-xs">View issuer details</div>
+            </div>
+          </a>
+        </div>
       )}
-    </button>
+    </div>
   );
 }

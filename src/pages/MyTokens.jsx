@@ -585,6 +585,7 @@ export default function MyTokens() {
                             loadHoldings();
                           }}
                           size="sm"
+                          showDropdown={true}
                         />
                         <button
                           onClick={(e) => {
