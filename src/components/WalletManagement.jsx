@@ -686,7 +686,15 @@ export default function WalletManagement() {
                           {showSeedFor === wallet.id ? wallet.encrypted_seed.slice(0, 15) + '...' : '••••••••'}
                         </span>
                         <button
-                          onClick={() => setShowSeedFor(showSeedFor === wallet.id ? null : wallet.id)}
+                          onClick={() => {
+                            const isVisible = showSeedFor === wallet.id;
+                            if (isVisible) {
+                              setShowSeedFor(null);
+                            } else {
+                              setPendingSeedView(wallet);
+                              setShowPinModal(true);
+                            }
+                          }}
                           className="text-purple-400 hover:text-purple-300"
                         >
                           {showSeedFor === wallet.id ? '🙈' : '👁️'}

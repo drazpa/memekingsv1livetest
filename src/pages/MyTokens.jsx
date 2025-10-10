@@ -411,6 +411,7 @@ export default function MyTokens() {
             >
               <option value="value">Sort by Value</option>
               <option value="balance">Sort by Balance</option>
+              <option value="supplyPercent">Sort by % of Supply</option>
               <option value="name">Sort by Name</option>
               <option value="price">Sort by Price</option>
               <option value="token">Sort by Token</option>
@@ -464,6 +465,7 @@ export default function MyTokens() {
                       let compareValue = 0;
                       if (sortBy === 'value') compareValue = b.value - a.value;
                       else if (sortBy === 'balance') compareValue = b.balance - a.balance;
+                      else if (sortBy === 'supplyPercent') compareValue = (b.supplyPercentage || 0) - (a.supplyPercentage || 0);
                       else if (sortBy === 'price') compareValue = b.price - a.price;
                       else if (sortBy === 'name') compareValue = a.token.token_name.localeCompare(b.token.token_name);
                       else if (sortBy === 'token') {
