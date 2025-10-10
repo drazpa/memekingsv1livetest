@@ -1356,7 +1356,6 @@ export default function BotTrader() {
 
       const errorMessage = error.message || error.toString();
       let errorMsg = '❌ Trade failed';
-      let shouldPauseBot = false;
 
       if (errorMessage.includes('tecPATH_DRY')) {
         errorMsg = '⚠️ No liquidity path found - Pool may be empty or token pairing issue';
@@ -1364,7 +1363,6 @@ export default function BotTrader() {
       } else if (errorMessage.includes('tecPATH_PARTIAL')) {
         if (bot.slippage >= 25) {
           errorMsg = `⚠️ Max slippage reached (${bot.slippage}%) - Market too volatile or liquidity too low`;
-          shouldPauseBot = true;
         } else {
           const suggestedSlippage = Math.min(Math.max(Math.ceil(bot.slippage * 1.5), bot.slippage + 5), 30);
           errorMsg = `💡 Try increasing slippage from ${bot.slippage}% to ${suggestedSlippage}% (Edit bot to adjust)`;
@@ -1392,7 +1390,6 @@ export default function BotTrader() {
             errorMsg = `⚠️ Insufficient ${token.token_name} tokens - Check wallet balance`;
           }
         }
-        shouldPauseBot = true;
         console.log(`💰 Balance issue detected - Action: ${isBuy ? 'BUY' : 'SELL'}`);
       } else if (errorMessage.includes('tefPAST_SEQ')) {
         errorMsg = '⏱️ Transaction timing issue - Will retry next cycle';
@@ -1406,15 +1403,9 @@ export default function BotTrader() {
 
       setBotAnnouncements(prev => ({ ...prev, [bot.id]: errorMsg }));
 
-      if (shouldPauseBot) {
-        console.log(`⏸️ Auto-pausing bot ${bot.name} due to: ${errorMsg}`);
-        await pauseBot(bot.id);
-        toast.error(`Bot "${bot.name}" paused: ${errorMsg}`);
-      }
-
       console.log(`❌ Trade failed for ${bot.name}: ${errorMsg}`);
       console.log(`   Error details: ${errorMessage}`);
-      console.log(`   Continuing to next trade cycle...`);
+      console.log(`   Bot will continue running and retry on next cycle...`);
 
       try {
         await supabase.from('trading_bots').update({
