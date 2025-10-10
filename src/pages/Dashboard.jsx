@@ -33,6 +33,10 @@ export default function Dashboard() {
     totalXrpLocked: 0,
     totalMarketCap: 0
   });
+  const [poolStats24hAgo, setPoolStats24hAgo] = useState({
+    totalXrpLocked: 0,
+    totalMarketCap: 0
+  });
   const [trustlineStats, setTrustlineStats] = useState({
     totalTrustlines: 0,
     totalHolders: 0,
@@ -158,6 +162,10 @@ export default function Dashboard() {
   const calculateLivePoolStats = () => {
     let totalXrp = 0;
     let totalMarketCap = 0;
+    let totalXrp24hAgo = 0;
+    let totalMarketCap24hAgo = 0;
+
+    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
 
     tokens.forEach(token => {
       const poolData = poolsData[token.id];
@@ -166,12 +174,23 @@ export default function Dashboard() {
         const price = poolData.price;
         const supply = token.supply || 0;
         totalMarketCap += (price * supply);
+
+        const isRecentToken = new Date(token.created_at).getTime() > twentyFourHoursAgo;
+        if (!isRecentToken) {
+          totalXrp24hAgo += poolData.xrpAmount;
+          totalMarketCap24hAgo += (price * supply);
+        }
       }
     });
 
     setLivePoolStats({
       totalXrpLocked: totalXrp,
       totalMarketCap: totalMarketCap
+    });
+
+    setPoolStats24hAgo({
+      totalXrpLocked: totalXrp24hAgo,
+      totalMarketCap: totalMarketCap24hAgo
     });
   };
 
@@ -1242,7 +1261,20 @@ export default function Dashboard() {
           <div className="text-green-300 text-xs sm:text-sm mt-1">
             ${(livePoolStats.totalXrpLocked * xrpUsdPrice).toFixed(2)} USD
           </div>
-          <div className="text-purple-500 text-xs mt-1">In AMM pools</div>
+          {poolStats24hAgo.totalXrpLocked > 0 && (
+            <div className={`text-xs sm:text-sm mt-1 ${
+              livePoolStats.totalXrpLocked > poolStats24hAgo.totalXrpLocked
+                ? 'text-green-300'
+                : livePoolStats.totalXrpLocked < poolStats24hAgo.totalXrpLocked
+                ? 'text-red-300'
+                : 'text-purple-400'
+            }`}>
+              {livePoolStats.totalXrpLocked > poolStats24hAgo.totalXrpLocked ? '+' : ''}
+              {(livePoolStats.totalXrpLocked - poolStats24hAgo.totalXrpLocked).toFixed(2)}
+              ({((livePoolStats.totalXrpLocked - poolStats24hAgo.totalXrpLocked) / poolStats24hAgo.totalXrpLocked * 100).toFixed(1)}%)
+            </div>
+          )}
+          <div className="text-purple-500 text-xs mt-1">Last 24h</div>
         </div>
 
         <div className="glass rounded-lg p-4 sm:p-6">
@@ -1253,13 +1285,29 @@ export default function Dashboard() {
           <div className="text-green-300 text-xs sm:text-sm mt-1">
             ${(livePoolStats.totalMarketCap * xrpUsdPrice).toFixed(2)} USD
           </div>
-          <div className="text-purple-500 text-xs mt-1">XRP value</div>
+          {poolStats24hAgo.totalMarketCap > 0 && (
+            <div className={`text-xs sm:text-sm mt-1 ${
+              livePoolStats.totalMarketCap > poolStats24hAgo.totalMarketCap
+                ? 'text-green-300'
+                : livePoolStats.totalMarketCap < poolStats24hAgo.totalMarketCap
+                ? 'text-red-300'
+                : 'text-purple-400'
+            }`}>
+              {livePoolStats.totalMarketCap > poolStats24hAgo.totalMarketCap ? '+' : ''}
+              {(livePoolStats.totalMarketCap - poolStats24hAgo.totalMarketCap).toFixed(2)}
+              ({((livePoolStats.totalMarketCap - poolStats24hAgo.totalMarketCap) / poolStats24hAgo.totalMarketCap * 100).toFixed(1)}%)
+            </div>
+          )}
+          <div className="text-purple-500 text-xs mt-1">Last 24h</div>
         </div>
 
         <div className="glass rounded-lg p-4 sm:p-6">
           <div className="text-purple-400 text-xs sm:text-sm mb-2">Total Holders</div>
           <div className="text-2xl sm:text-3xl font-bold text-green-400">
-            {trustlineStats.totalTrustlines.toLocaleString()}
+            {trustlineStats.totalHolders.toLocaleString()}
+          </div>
+          <div className="text-green-300 text-xs sm:text-sm mt-1">
+            {trustlineStats.totalTrustlines.toLocaleString()} trustlines
           </div>
           {trustlineStats.holders24hAgo > 0 && (
             <div className={`text-xs sm:text-sm mt-1 ${
@@ -1270,7 +1318,8 @@ export default function Dashboard() {
                 : 'text-purple-400'
             }`}>
               {trustlineStats.totalHolders > trustlineStats.holders24hAgo ? '+' : ''}
-              {(((trustlineStats.totalHolders - trustlineStats.holders24hAgo) / trustlineStats.holders24hAgo) * 100).toFixed(1)}% holders
+              {(trustlineStats.totalHolders - trustlineStats.holders24hAgo).toLocaleString()}
+              ({((trustlineStats.totalHolders - trustlineStats.holders24hAgo) / trustlineStats.holders24hAgo * 100).toFixed(1)}%)
             </div>
           )}
           <div className="text-purple-500 text-xs mt-1">Last 24h</div>
