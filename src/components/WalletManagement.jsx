@@ -18,7 +18,7 @@ export default function WalletManagement() {
   const [editingWallet, setEditingWallet] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [generatedWallet, setGeneratedWallet] = useState(null);
-  const [selectedNetwork, setSelectedNetwork] = useState('testnet');
+  const [selectedNetwork, setSelectedNetwork] = useState('mainnet');
   const [importingSeed, setImportingSeed] = useState(false);
   const [importedWalletData, setImportedWalletData] = useState(null);
   const [importSeedInput, setImportSeedInput] = useState('');
