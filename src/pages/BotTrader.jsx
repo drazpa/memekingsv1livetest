@@ -825,6 +825,32 @@ export default function BotTrader() {
     }
   };
 
+  const resumeBot = async (botOrId) => {
+    const botId = typeof botOrId === 'string' ? botOrId : botOrId.id;
+    const bot = typeof botOrId === 'string' ? bots.find(b => b.id === botOrId) : botOrId;
+
+    if (!bot) {
+      toast.error('Bot not found');
+      return;
+    }
+
+    try {
+      await supabase
+        .from('trading_bots')
+        .update({ status: 'running' })
+        .eq('id', botId);
+
+      setBots(prev => prev.map(b => b.id === botId ? { ...b, status: 'running' } : b));
+
+      await startBot(bot);
+
+      toast.success(`Bot ${bot.name} resumed`);
+    } catch (error) {
+      console.error('Error resuming bot:', error);
+      toast.error('Failed to resume bot');
+    }
+  };
+
   const stopBot = async (botOrId) => {
     const botId = typeof botOrId === 'string' ? botOrId : botOrId.id;
     const bot = typeof botOrId === 'string' ? bots.find(b => b.id === botOrId) : botOrId;
@@ -883,6 +909,66 @@ export default function BotTrader() {
     } catch (error) {
       console.error('Error stopping bot:', error);
     }
+  };
+
+  const pauseAll = async () => {
+    const runningBots = bots.filter(b => b.status === 'running');
+    if (runningBots.length === 0) {
+      toast.error('No running bots to pause');
+      return;
+    }
+
+    toast.loading(`Pausing ${runningBots.length} bots...`);
+
+    for (let i = 0; i < runningBots.length; i++) {
+      await pauseBot(runningBots[i]);
+      if (i < runningBots.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+
+    toast.dismiss();
+    toast.success(`Paused ${runningBots.length} bots`);
+  };
+
+  const resumeAll = async () => {
+    const pausedBots = bots.filter(b => b.status === 'paused');
+    if (pausedBots.length === 0) {
+      toast.error('No paused bots to resume');
+      return;
+    }
+
+    toast.loading(`Resuming ${pausedBots.length} bots...`);
+
+    for (let i = 0; i < pausedBots.length; i++) {
+      await resumeBot(pausedBots[i]);
+      if (i < pausedBots.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+
+    toast.dismiss();
+    toast.success(`Resumed ${pausedBots.length} bots`);
+  };
+
+  const stopAll = async () => {
+    const activeBots = bots.filter(b => b.status === 'running' || b.status === 'paused');
+    if (activeBots.length === 0) {
+      toast.error('No active bots to stop');
+      return;
+    }
+
+    toast.loading(`Stopping ${activeBots.length} bots...`);
+
+    for (let i = 0; i < activeBots.length; i++) {
+      await stopBot(activeBots[i]);
+      if (i < activeBots.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+
+    toast.dismiss();
+    toast.success(`Stopped ${activeBots.length} bots`);
   };
 
   const openEditBot = (bot) => {
@@ -1277,7 +1363,7 @@ export default function BotTrader() {
     return map;
   }, [tokens]);
 
-  const BotTableRow = memo(({ bot, token, nextTradeTime, onToggleFavorite, isFavorite, tokenBalance }) => {
+  const BotTableRow = memo(({ bot, botNumber, token, nextTradeTime, onToggleFavorite, isFavorite, tokenBalance }) => {
     const [currentTime, setCurrentTime] = useState(Date.now());
 
     useEffect(() => {
@@ -1293,6 +1379,9 @@ export default function BotTrader() {
 
     return (
       <tr className="hover:bg-blue-500/10 transition-colors">
+        <td className="px-4 py-3">
+          <span className="text-sm font-bold text-blue-300">#{botNumber}</span>
+        </td>
         <td className="px-4 py-3">
           <button
             onClick={() => onToggleFavorite(bot.id)}
@@ -1718,7 +1807,7 @@ export default function BotTrader() {
       handlers[bot.id] = {
         onPause: () => pauseBot(bot.id),
         onStop: () => stopBot(bot.id),
-        onStart: () => startBot(bot.id),
+        onStart: () => bot.status === 'paused' ? resumeBot(bot.id) : startBot(bot.id),
         onEdit: () => openEditBot(bot),
         onViewActivity: () => setSelectedBot(bot),
         onDelete: () => deleteBot(bot)
@@ -1810,6 +1899,32 @@ export default function BotTrader() {
             <h3 className="text-2xl font-bold text-blue-200">My Bots ({sortedBots.length})</h3>
             <div className="flex gap-2">
               <button
+                onClick={pauseAll}
+                className="px-4 py-2 bg-yellow-500/20 text-yellow-300 rounded-lg hover:bg-yellow-500/30 font-medium transition-colors"
+                title="Pause all running bots"
+              >
+                ⏸ Pause All
+              </button>
+              <button
+                onClick={resumeAll}
+                className="px-4 py-2 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 font-medium transition-colors"
+                title="Resume all paused bots"
+              >
+                ▶ Resume All
+              </button>
+              <button
+                onClick={stopAll}
+                className="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 font-medium transition-colors"
+                title="Stop all active bots"
+              >
+                ⏹ Stop All
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div></div>
+            <div className="flex gap-2">
+              <button
                 onClick={() => setBotViewMode('list')}
                 className={`px-4 py-2 rounded-lg transition-colors ${
                   botViewMode === 'list' ? 'bg-blue-600 text-white' : 'glass text-blue-300'
@@ -1851,12 +1966,15 @@ export default function BotTrader() {
 
           {botViewMode === 'grid' ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {sortedBots.map(bot => {
+              {sortedBots.map((bot, index) => {
                 const token = tokensMap[bot.token_id];
                 const poolData = token ? poolsData[token.id] : null;
                 const handlers = botHandlers[bot.id] || {};
                 return (
                   <div key={bot.id} className="relative">
+                    <div className="absolute top-2 left-2 z-10 bg-blue-600/80 text-white font-bold px-2 py-1 rounded text-xs">
+                      #{index + 1}
+                    </div>
                     <button
                       onClick={() => toggleBotFavorite(bot.id)}
                       className="absolute top-2 right-2 z-10 text-2xl hover:scale-110 transition-transform bg-black/50 rounded-full w-8 h-8 flex items-center justify-center"
@@ -1883,6 +2001,7 @@ export default function BotTrader() {
                 <table className="w-full">
                   <thead className="bg-blue-500/20 border-b border-blue-500/30">
                     <tr>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">#</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Fav</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Bot Name</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Token</th>
@@ -1899,12 +2018,13 @@ export default function BotTrader() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-blue-500/20">
-                    {sortedBots.map(bot => {
+                    {sortedBots.map((bot, index) => {
                       const token = tokensMap[bot.token_id];
                       return (
                         <BotTableRow
                           key={bot.id}
                           bot={bot}
+                          botNumber={index + 1}
                           token={token}
                           nextTradeTime={nextTradeTimes[bot.id]}
                           onToggleFavorite={toggleBotFavorite}
