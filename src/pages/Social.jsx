@@ -157,8 +157,7 @@ export default function Social() {
       .from('chat_messages')
       .select('*')
       .eq('room_id', selectedRoom.id)
-      .order('created_at', { ascending: true })
-      .limit(100);
+      .order('created_at', { ascending: true });
 
     if (error) {
       console.error('Error loading messages:', error);
