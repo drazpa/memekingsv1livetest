@@ -1211,17 +1211,59 @@ export default function Dashboard() {
               showDropdown={true}
             />
           </div>
-          <button
-            className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold text-xs px-2 py-1 rounded shadow-md"
-            onClick={(e) => {
-              e.stopPropagation();
-              localStorage.setItem('selectedTradeToken', JSON.stringify(token));
-              window.dispatchEvent(new CustomEvent('navigateToTrade', { detail: token }));
-            }}
-            title="Trade on AMM"
-          >
-            💱 Swap
-          </button>
+          <div className="relative swap-dropdown" onClick={(e) => { e.stopPropagation(); }}>
+            <button
+              onClick={() => setSwapDropdownOpen(swapDropdownOpen === token.id ? null : token.id)}
+              className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold text-xs px-2 py-1 rounded shadow-md transition-all duration-300 flex items-center gap-1"
+              title="Swap options"
+            >
+              <span>💱 Swap</span>
+              <svg className={`w-3 h-3 transition-transform ${swapDropdownOpen === token.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {swapDropdownOpen === token.id && (
+              <div className="absolute top-full left-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-[9999] overflow-hidden">
+                <button
+                  onClick={() => {
+                    setSwapDropdownOpen(null);
+                    localStorage.setItem('selectedTradeToken', JSON.stringify(token));
+                    window.dispatchEvent(new CustomEvent('navigateToTrade', { detail: token }));
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-3 border-b border-slate-700"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-white font-medium">Trade Page</div>
+                    <div className="text-gray-400 text-xs">Swap on MEMEKINGS</div>
+                  </div>
+                </button>
+
+                <a
+                  href={`https://magnetic.exchange/?issue=${encodeURIComponent(token.currency_code || token.currency_hex)}&issuer=${encodeURIComponent(token.issuer_address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-3"
+                  onClick={() => setSwapDropdownOpen(null)}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-cyan-600/20 flex items-center justify-center text-cyan-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-white font-medium">Magnetic Link</div>
+                    <div className="text-gray-400 text-xs">Different wallet required</div>
+                  </div>
+                </a>
+              </div>
+            )}
+          </div>
           <button
             className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold text-xs px-2 py-1 rounded shadow-md shadow-purple-500/50 hover:shadow-purple-500/70"
             onClick={(e) => { e.stopPropagation(); tweetToken(token); }}

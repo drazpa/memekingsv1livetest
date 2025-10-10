@@ -529,7 +529,7 @@ export function TokenTrustButton({
       <button
         onClick={() => setDropdownOpen(!dropdownOpen)}
         disabled={loading || checkingTrustline}
-        className={`bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300 flex items-center gap-2 ${getSizeClasses()}`}
+        className={`w-full bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300 flex items-center justify-center gap-2 ${getSizeClasses()}`}
       >
         {loading ? (
           <svg className="animate-spin h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
