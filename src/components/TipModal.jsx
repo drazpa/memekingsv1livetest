@@ -115,7 +115,7 @@ export default function TipModal({
           Destination: recipient.wallet_address,
           Amount: {
             currency: selectedToken.currency,
-            issuer: selectedToken.issuer,
+            issuer: selectedToken.account || selectedToken.issuer,
             value: amount
           },
           Fee: '12'
@@ -147,7 +147,7 @@ export default function TipModal({
             .from('live_streams')
             .select('total_tips')
             .eq('id', currentStream.id)
-            .single();
+            .maybeSingle();
 
           const currentTotal = parseFloat(streamData?.total_tips || 0);
           const newTotal = currentTotal + parseFloat(amount);
@@ -156,6 +156,32 @@ export default function TipModal({
             .from('live_streams')
             .update({ total_tips: newTotal })
             .eq('id', currentStream.id);
+
+          const { data: rooms } = await supabase
+            .from('chat_rooms')
+            .select('id')
+            .eq('type', 'general')
+            .maybeSingle();
+
+          if (rooms) {
+            await supabase
+              .from('chat_messages')
+              .insert([{
+                room_id: rooms.id,
+                wallet_address: connectedWallet.address,
+                nickname: nickname,
+                message_type: 'tip',
+                content: `sent ${amount} ${selectedToken.currency} to ${recipient.nickname}! 💸`,
+                tip_data: {
+                  type: 'tip',
+                  amount: parseFloat(amount),
+                  currency: selectedToken.currency,
+                  to_nickname: recipient.nickname,
+                  to_wallet: recipient.wallet_address,
+                  tx_hash: result.result.hash
+                }
+              }]);
+          }
         }
 
         onClose();
@@ -180,15 +206,18 @@ export default function TipModal({
     ...walletAssets.map(a => ({
       currency: a.currency,
       balance: a.balance,
-      issuer: a.account
+      account: a.account
     }))
   ];
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-purple-900 to-slate-900 rounded-2xl p-8 max-w-md w-full border border-purple-500/30 shadow-2xl">
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-gradient-to-br from-purple-900 via-slate-900 to-purple-900 rounded-2xl p-8 max-w-lg w-full border-2 border-yellow-500/30 shadow-2xl">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-bold text-white">Send Tip</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-3xl">💸</span>
+            <h3 className="text-2xl font-bold text-white">Send Tip</h3>
+          </div>
           <button
             onClick={onClose}
             className="text-purple-400 hover:text-purple-200 transition-colors text-3xl leading-none"
@@ -197,27 +226,47 @@ export default function TipModal({
           </button>
         </div>
 
-        <div className="text-center mb-8 p-6 bg-purple-800/30 rounded-xl border border-purple-500/20">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4">
-            {recipient.nickname.charAt(0).toUpperCase()}
+        <div className="mb-6 p-5 bg-gradient-to-r from-purple-800/40 to-slate-800/40 rounded-xl border border-yellow-500/20">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white font-bold text-lg">
+                {nickname?.charAt(0).toUpperCase() || 'Y'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs text-purple-400 font-semibold mb-1">FROM</div>
+                <div className="text-white font-bold">{nickname || 'You'}</div>
+                <div className="text-purple-300 text-xs truncate font-mono">{connectedWallet?.address}</div>
+              </div>
+            </div>
+
+            <div className="text-yellow-400 text-2xl mx-4">→</div>
+
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
+                {recipient.nickname.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs text-purple-400 font-semibold mb-1">TO</div>
+                <div className="text-white font-bold">{recipient.nickname}</div>
+                <div className="text-purple-300 text-xs truncate font-mono">{recipient.wallet_address}</div>
+              </div>
+            </div>
           </div>
-          <div className="text-white font-bold text-xl mb-2">{recipient.nickname}</div>
-          <div className="text-purple-400 text-xs break-all font-mono">{recipient.wallet_address}</div>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div>
-            <label className="block text-white font-bold mb-3">Select Token</label>
+            <label className="block text-white font-bold mb-3 text-sm">SELECT TOKEN</label>
             <div className="relative">
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
-                className="w-full bg-purple-800/50 text-white px-4 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-500/30 flex items-center justify-between"
+                className="w-full bg-slate-800/70 text-white px-4 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 border border-purple-500/30 flex items-center justify-between hover:border-yellow-500/50 transition-all"
               >
                 <div className="flex items-center gap-3">
-                  <div className="text-2xl">💎</div>
+                  <div className="text-2xl">{selectedToken?.currency === 'XRP' ? '💎' : '🪙'}</div>
                   <div className="text-left">
                     <div className="font-bold">{selectedToken?.currency || 'Select Token'}</div>
-                    <div className="text-purple-300 text-sm">{selectedToken ? `${parseFloat(selectedToken.balance).toFixed(4)} Available` : ''}</div>
+                    <div className="text-green-400 text-sm">{selectedToken ? `${parseFloat(selectedToken.balance).toFixed(4)} available` : ''}</div>
                   </div>
                 </div>
                 <svg className="w-5 h-5 text-purple-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -243,9 +292,9 @@ export default function TipModal({
                         <div className="text-2xl">{token.currency === 'XRP' ? '💎' : '🪙'}</div>
                         <div className="text-left">
                           <div className="text-white font-bold">{token.currency}</div>
-                          {token.currency !== 'XRP' && (
+                          {token.currency !== 'XRP' && token.account && (
                             <div className="text-purple-400 text-xs truncate max-w-[200px]">
-                              {token.issuer.slice(0, 12)}...
+                              {token.account.slice(0, 12)}...
                             </div>
                           )}
                         </div>
@@ -259,20 +308,35 @@ export default function TipModal({
           </div>
 
           <div>
-            <label className="block text-white font-bold mb-3">Amount</label>
-            <input
-              type="number"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-              step="0.01"
-              min="0"
-              max={selectedToken?.balance}
-              className="w-full bg-purple-800/50 text-white text-2xl px-4 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-500/30 text-center font-bold"
-            />
+            <label className="block text-white font-bold mb-3 text-sm">AMOUNT</label>
+            <div className="relative">
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                step="0.01"
+                min="0"
+                max={selectedToken?.balance}
+                className="w-full bg-slate-800/70 text-white text-3xl px-6 py-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 border border-purple-500/30 text-center font-bold"
+              />
+              {selectedToken && (
+                <div className="absolute right-6 top-1/2 -translate-y-1/2 text-purple-400 font-bold text-lg">
+                  {selectedToken.currency}
+                </div>
+              )}
+            </div>
             {selectedToken && (
-              <div className="text-purple-400 text-sm mt-2 text-center">
-                Available: {parseFloat(selectedToken.balance).toFixed(4)} {selectedToken.currency}
+              <div className="flex justify-between items-center mt-3 text-sm">
+                <div className="text-purple-400">
+                  Available: <span className="text-green-400 font-bold">{parseFloat(selectedToken.balance).toFixed(4)}</span>
+                </div>
+                <button
+                  onClick={() => setAmount(selectedToken.balance)}
+                  className="text-yellow-400 hover:text-yellow-300 font-bold"
+                >
+                  Max
+                </button>
               </div>
             )}
           </div>
@@ -287,9 +351,9 @@ export default function TipModal({
             <button
               onClick={sendTip}
               disabled={!selectedToken || !amount || parseFloat(amount) <= 0 || isSending}
-              className="flex-1 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold transition-all"
+              className="flex-1 bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white py-4 rounded-xl font-bold transition-all shadow-lg"
             >
-              {isSending ? 'Sending...' : `Send ${amount || '0'}`}
+              {isSending ? '💸 Sending...' : `💸 Send ${amount || '0'} ${selectedToken?.currency || ''}`}
             </button>
           </div>
         </div>

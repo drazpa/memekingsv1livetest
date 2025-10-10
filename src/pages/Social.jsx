@@ -561,7 +561,7 @@ export default function Social() {
         .from('live_streams')
         .select('crown_count')
         .eq('id', streamId)
-        .single();
+        .maybeSingle();
 
       await supabase
         .from('live_streams')
@@ -569,6 +569,29 @@ export default function Social() {
           crown_count: (stream?.crown_count || 0) + 1
         })
         .eq('id', streamId);
+
+      const { data: rooms } = await supabase
+        .from('chat_rooms')
+        .select('id')
+        .eq('type', 'general')
+        .maybeSingle();
+
+      if (rooms) {
+        await supabase
+          .from('chat_messages')
+          .insert([{
+            room_id: rooms.id,
+            wallet_address: connectedWallet.address,
+            nickname: nickname,
+            message_type: 'crown',
+            content: `sent a crown to ${recipient.nickname || 'streamer'}! 👑`,
+            tip_data: {
+              type: 'crown',
+              to_nickname: recipient.nickname || 'streamer',
+              to_wallet: recipient.wallet_address
+            }
+          }]);
+      }
 
       toast.success('Crown sent! 👑');
       if (viewingStream) {
@@ -1297,40 +1320,86 @@ export default function Social() {
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex gap-3 group ${msg.wallet_address === connectedWallet?.address ? 'flex-row-reverse' : ''}`}
-                >
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold flex-shrink-0">
-                    {msg.nickname.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 max-w-2xl">
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <span className="text-purple-200 font-bold">{msg.nickname}</span>
-                      {msg.wallet_address === DEV_WALLET && (
-                        <span className="text-yellow-400 text-sm" title="Developer">👑</span>
-                      )}
-                      <span className="text-purple-400 text-xs">{formatTimestamp(msg.created_at)}</span>
-                      {isDevWallet && (
-                        <button
-                          onClick={() => deleteMessage(msg.id)}
-                          className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 text-xs font-medium transition-all"
-                        >
-                          Delete
-                        </button>
-                      )}
+              {messages.map((msg) => {
+                const isTip = msg.message_type === 'tip';
+                const isCrown = msg.message_type === 'crown';
+                const isSpecial = isTip || isCrown;
+
+                if (isSpecial) {
+                  return (
+                    <div
+                      key={msg.id}
+                      className="flex justify-center"
+                    >
+                      <div className={`px-6 py-3 rounded-xl border-2 ${
+                        isTip
+                          ? 'bg-gradient-to-r from-yellow-900/50 to-orange-900/50 border-yellow-500/50'
+                          : 'bg-gradient-to-r from-purple-900/50 to-pink-900/50 border-purple-500/50'
+                      } max-w-md`}>
+                        <div className="flex items-center gap-3">
+                          <div className="text-3xl">
+                            {isTip ? '💸' : '👑'}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-white font-bold">{msg.nickname}</span>
+                              {isTip && msg.tip_data && (
+                                <>
+                                  <span className="text-yellow-300">sent</span>
+                                  <span className="text-green-400 font-bold text-lg">
+                                    {msg.tip_data.amount} {msg.tip_data.currency}
+                                  </span>
+                                  <span className="text-yellow-300">to</span>
+                                  <span className="text-white font-bold">{msg.tip_data.to_nickname}</span>
+                                </>
+                              )}
+                              {isCrown && (
+                                <span className="text-purple-200">{msg.content}</span>
+                              )}
+                            </div>
+                            <div className="text-purple-400 text-xs mt-1">{formatTimestamp(msg.created_at)}</div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className={`p-3 rounded-lg ${
-                      msg.wallet_address === connectedWallet?.address
-                        ? 'bg-purple-600/30 border border-purple-500/50'
-                        : 'bg-purple-800/30 border border-purple-500/20'
-                    }`}>
-                      <p className="text-purple-100">{msg.content}</p>
+                  );
+                }
+
+                return (
+                  <div
+                    key={msg.id}
+                    className={`flex gap-3 group ${msg.wallet_address === connectedWallet?.address ? 'flex-row-reverse' : ''}`}
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold flex-shrink-0">
+                      {msg.nickname.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 max-w-2xl">
+                      <div className="flex items-baseline gap-2 mb-1">
+                        <span className="text-purple-200 font-bold">{msg.nickname}</span>
+                        {msg.wallet_address === DEV_WALLET && (
+                          <span className="text-yellow-400 text-sm" title="Developer">👑</span>
+                        )}
+                        <span className="text-purple-400 text-xs">{formatTimestamp(msg.created_at)}</span>
+                        {isDevWallet && (
+                          <button
+                            onClick={() => deleteMessage(msg.id)}
+                            className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 text-xs font-medium transition-all"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                      <div className={`p-3 rounded-lg ${
+                        msg.wallet_address === connectedWallet?.address
+                          ? 'bg-purple-600/30 border border-purple-500/50'
+                          : 'bg-purple-800/30 border border-purple-500/20'
+                      }`}>
+                        <p className="text-purple-100">{msg.content}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
 
@@ -1674,27 +1743,65 @@ export default function Social() {
                     <div className="text-purple-500 text-sm mt-1">Start the conversation!</div>
                   </div>
                 ) : (
-                  messages.map((msg) => (
-                    <div key={msg.id} className="bg-purple-800/30 rounded-lg p-3 border border-purple-500/20">
-                      <div className="flex items-start gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                          {msg.nickname.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-purple-200 font-bold text-sm">{msg.nickname}</span>
-                            {msg.wallet_address === DEV_WALLET && (
-                              <span className="text-yellow-400 text-xs">👑</span>
-                            )}
+                  messages.map((msg) => {
+                    const isTip = msg.message_type === 'tip';
+                    const isCrown = msg.message_type === 'crown';
+
+                    if (isTip || isCrown) {
+                      return (
+                        <div key={msg.id} className={`px-4 py-3 rounded-lg border ${
+                          isTip
+                            ? 'bg-gradient-to-r from-yellow-900/40 to-orange-900/40 border-yellow-500/40'
+                            : 'bg-gradient-to-r from-purple-900/40 to-pink-900/40 border-purple-500/40'
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl">{isTip ? '💸' : '👑'}</span>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-1.5 flex-wrap text-sm">
+                                <span className="text-white font-bold">{msg.nickname}</span>
+                                {isTip && msg.tip_data && (
+                                  <>
+                                    <span className="text-yellow-300">sent</span>
+                                    <span className="text-green-400 font-bold">
+                                      {msg.tip_data.amount} {msg.tip_data.currency}
+                                    </span>
+                                    <span className="text-yellow-300">to</span>
+                                    <span className="text-white font-bold">{msg.tip_data.to_nickname}</span>
+                                  </>
+                                )}
+                                {isCrown && (
+                                  <span className="text-purple-200">{msg.content}</span>
+                                )}
+                              </div>
+                              <div className="text-purple-400 text-xs mt-0.5">{formatTimestamp(msg.created_at)}</div>
+                            </div>
                           </div>
-                          <div className="text-purple-100 text-sm break-words">{msg.content || msg.message}</div>
-                          <div className="text-purple-400 text-xs mt-1">
-                            {formatTimestamp(msg.created_at)}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={msg.id} className="bg-purple-800/30 rounded-lg p-3 border border-purple-500/20">
+                        <div className="flex items-start gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                            {msg.nickname.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-purple-200 font-bold text-sm">{msg.nickname}</span>
+                              {msg.wallet_address === DEV_WALLET && (
+                                <span className="text-yellow-400 text-xs">👑</span>
+                              )}
+                            </div>
+                            <div className="text-purple-100 text-sm break-words">{msg.content || msg.message}</div>
+                            <div className="text-purple-400 text-xs mt-1">
+                              {formatTimestamp(msg.created_at)}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
                 <div ref={messagesEndRef} />
               </div>
