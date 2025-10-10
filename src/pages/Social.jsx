@@ -1458,7 +1458,7 @@ export default function Social() {
                               <span className="text-yellow-400 text-xs">👑</span>
                             )}
                           </div>
-                          <div className="text-purple-100 text-sm break-words">{msg.message}</div>
+                          <div className="text-purple-100 text-sm break-words">{msg.content || msg.message}</div>
                           <div className="text-purple-400 text-xs mt-1">
                             {formatTimestamp(msg.created_at)}
                           </div>

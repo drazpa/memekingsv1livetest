@@ -25,11 +25,15 @@ export default function TipModal({
   }, [isOpen, connectedWallet]);
 
   const loadWalletAssets = async () => {
-    if (!connectedWallet?.address) return;
+    if (!connectedWallet?.address) {
+      toast.error('No wallet connected');
+      return;
+    }
 
     try {
+      const network = connectedWallet.network || 'testnet';
       const client = new Client(
-        connectedWallet.network === 'mainnet'
+        network === 'mainnet'
           ? 'wss://xrplcluster.com'
           : 'wss://s.altnet.rippletest.net:51233'
       );
@@ -62,7 +66,7 @@ export default function TipModal({
       await client.disconnect();
     } catch (error) {
       console.error('Error loading wallet assets:', error);
-      toast.error('Failed to load wallet assets');
+      toast.error('Failed to load wallet assets: ' + error.message);
     }
   };
 
@@ -77,11 +81,17 @@ export default function TipModal({
       return;
     }
 
+    if (!connectedWallet?.seed) {
+      toast.error('Wallet seed not available. Please reconnect your wallet.');
+      return;
+    }
+
     setIsSending(true);
 
     try {
+      const network = connectedWallet.network || 'testnet';
       const client = new Client(
-        connectedWallet.network === 'mainnet'
+        network === 'mainnet'
           ? 'wss://xrplcluster.com'
           : 'wss://s.altnet.rippletest.net:51233'
       );
