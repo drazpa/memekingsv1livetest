@@ -42,6 +42,16 @@ export default function Social() {
   const [notifications, setNotifications] = useState([]);
   const [streamCategory, setStreamCategory] = useState('Just Chatting');
   const [streamDuration, setStreamDuration] = useState(0);
+  const [scheduledStreams, setScheduledStreams] = useState([]);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    title: '',
+    description: '',
+    category: 'Just Chatting',
+    date: '',
+    time: '',
+    duration: 60
+  });
 
   const messagesEndRef = useRef(null);
   const dmMessagesEndRef = useRef(null);
@@ -61,6 +71,7 @@ export default function Social() {
     loadOnlineUsers();
     loadBannedWallets();
     loadLiveStreams();
+    loadScheduledStreams();
     subscribeToPresence();
     subscribeToStreams();
     subscribeToTipsAndCrowns();
@@ -332,6 +343,97 @@ export default function Social() {
 
     if (!error && data) {
       setLiveStreams(data);
+    }
+  };
+
+  const loadScheduledStreams = async () => {
+    const now = new Date();
+    const { data, error } = await supabase
+      .from('scheduled_streams')
+      .select('*')
+      .eq('is_active', true)
+      .eq('is_cancelled', false)
+      .gte('scheduled_at', now.toISOString())
+      .order('scheduled_at', { ascending: true });
+
+    if (!error && data) {
+      setScheduledStreams(data);
+    }
+  };
+
+  const createScheduledStream = async () => {
+    if (!connectedWallet || !nickname) {
+      toast.error('Please connect wallet and set nickname');
+      return;
+    }
+
+    if (!scheduleForm.title || !scheduleForm.date || !scheduleForm.time) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    const scheduledAt = new Date(`${scheduleForm.date}T${scheduleForm.time}`);
+    if (scheduledAt <= new Date()) {
+      toast.error('Schedule time must be in the future');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('scheduled_streams')
+      .insert([{
+        wallet_address: connectedWallet.address,
+        nickname: nickname,
+        title: scheduleForm.title,
+        description: scheduleForm.description,
+        category: scheduleForm.category,
+        scheduled_at: scheduledAt.toISOString(),
+        duration_minutes: scheduleForm.duration
+      }]);
+
+    if (error) {
+      toast.error('Failed to schedule stream');
+      return;
+    }
+
+    toast.success('Stream scheduled successfully!');
+    setShowScheduleModal(false);
+    setScheduleForm({
+      title: '',
+      description: '',
+      category: 'Just Chatting',
+      date: '',
+      time: '',
+      duration: 60
+    });
+    loadScheduledStreams();
+  };
+
+  const goToScheduledStream = async (scheduled) => {
+    if (!connectedWallet) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+
+    if (scheduled.wallet_address !== connectedWallet.address) {
+      toast.error('You can only go live for your own scheduled streams');
+      return;
+    }
+
+    setStreamCategory(scheduled.category);
+    setActiveTab('chat');
+    setShowCameraSelect(true);
+    toast.success(`Starting stream: ${scheduled.title}`);
+  };
+
+  const cancelScheduledStream = async (id) => {
+    const { error } = await supabase
+      .from('scheduled_streams')
+      .update({ is_cancelled: true })
+      .eq('id', id);
+
+    if (!error) {
+      toast.success('Stream cancelled');
+      loadScheduledStreams();
     }
   };
 
@@ -985,18 +1087,33 @@ export default function Social() {
           >
             Chat
           </button>
+          {liveStreams.length > 0 && (
+            <button
+              onClick={() => setActiveTab('feeds')}
+              className={`px-6 py-3 rounded-t-lg font-bold transition-all relative ${
+                activeTab === 'feeds'
+                  ? 'bg-purple-800/50 text-purple-200 border-t-2 border-x-2 border-purple-500/50'
+                  : 'text-purple-400 hover:text-purple-200'
+              }`}
+            >
+              Live Feeds
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
+                {liveStreams.length}
+              </span>
+            </button>
+          )}
           <button
-            onClick={() => setActiveTab('feeds')}
+            onClick={() => setActiveTab('upcoming')}
             className={`px-6 py-3 rounded-t-lg font-bold transition-all relative ${
-              activeTab === 'feeds'
+              activeTab === 'upcoming'
                 ? 'bg-purple-800/50 text-purple-200 border-t-2 border-x-2 border-purple-500/50'
                 : 'text-purple-400 hover:text-purple-200'
             }`}
           >
-            Live Feeds
-            {liveStreams.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                {liveStreams.length}
+            Upcoming
+            {scheduledStreams.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                {scheduledStreams.length}
               </span>
             )}
           </button>
@@ -1354,6 +1471,118 @@ export default function Social() {
         <StreamAnalytics />
       )}
 
+      {activeTab === 'upcoming' && (
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-3xl font-bold text-purple-200">Upcoming Streams</h2>
+                <p className="text-purple-400 mt-1">{scheduledStreams.length} scheduled streams</p>
+              </div>
+              {connectedWallet && nickname && (
+                <button
+                  onClick={() => setShowScheduleModal(true)}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-6 py-3 rounded-lg font-bold transition-all flex items-center gap-2"
+                >
+                  <span>📅</span>
+                  Schedule Stream
+                </button>
+              )}
+            </div>
+
+            {scheduledStreams.length === 0 ? (
+              <div className="text-center py-20">
+                <div className="text-6xl mb-4">📅</div>
+                <div className="text-purple-300 text-xl font-bold mb-2">No Upcoming Streams</div>
+                <div className="text-purple-400">Schedule a stream to let your audience know when you'll be live!</div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {scheduledStreams.map((scheduled) => {
+                  const scheduledDate = new Date(scheduled.scheduled_at);
+                  const now = new Date();
+                  const hoursUntil = Math.floor((scheduledDate - now) / (1000 * 60 * 60));
+                  const isMyStream = connectedWallet?.address === scheduled.wallet_address;
+
+                  return (
+                    <div key={scheduled.id} className="bg-purple-800/30 rounded-lg p-5 border border-purple-500/30 hover:border-purple-400/50 transition-all">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
+                            {scheduled.nickname.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="text-purple-200 font-bold">{scheduled.nickname}</div>
+                            {isMyStream && (
+                              <span className="text-xs bg-purple-600 px-2 py-0.5 rounded text-white">Your Stream</span>
+                            )}
+                          </div>
+                        </div>
+                        <span className="bg-blue-600/30 text-blue-300 px-2 py-1 rounded text-xs font-bold">
+                          {scheduled.category}
+                        </span>
+                      </div>
+
+                      <h3 className="text-purple-100 font-bold text-lg mb-2">{scheduled.title}</h3>
+                      {scheduled.description && (
+                        <p className="text-purple-400 text-sm mb-3 line-clamp-2">{scheduled.description}</p>
+                      )}
+
+                      <div className="space-y-2 mb-4">
+                        <div className="flex items-center gap-2 text-purple-300 text-sm">
+                          <span>📅</span>
+                          <span>{scheduledDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-purple-300 text-sm">
+                          <span>🕐</span>
+                          <span>{scheduledDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-purple-300 text-sm">
+                          <span>⏱️</span>
+                          <span>{scheduled.duration_minutes} minutes</span>
+                        </div>
+                        <div className={`flex items-center gap-2 text-sm font-bold ${
+                          hoursUntil < 1 ? 'text-red-400' : hoursUntil < 24 ? 'text-yellow-400' : 'text-purple-400'
+                        }`}>
+                          <span>⏳</span>
+                          <span>
+                            {hoursUntil < 1 ? 'Starting soon!' :
+                             hoursUntil < 24 ? `In ${hoursUntil} hours` :
+                             `In ${Math.floor(hoursUntil / 24)} days`}
+                          </span>
+                        </div>
+                      </div>
+
+                      {isMyStream && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => goToScheduledStream(scheduled)}
+                            className="flex-1 bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white py-2 px-4 rounded-lg font-bold transition-all"
+                          >
+                            🎥 Go Live Now
+                          </button>
+                          <button
+                            onClick={() => cancelScheduledStream(scheduled.id)}
+                            className="bg-red-600/30 hover:bg-red-600/50 text-red-300 py-2 px-4 rounded-lg font-bold transition-all"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                      {!isMyStream && (
+                        <button className="w-full bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 py-2 px-4 rounded-lg font-bold transition-all">
+                          🔔 Remind Me
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'viewing' && viewingStream && (
         <div className="flex-1 flex flex-col">
           <div className="p-4 bg-purple-900/20 backdrop-blur-xl border-b border-purple-500/20 flex items-center justify-between">
@@ -1627,6 +1856,115 @@ export default function Social() {
         nickname={nickname}
         currentStream={viewingStream}
       />
+
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-purple-900 rounded-xl max-w-2xl w-full p-6 border-2 border-purple-500/30">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-bold text-purple-200">📅 Schedule Stream</h3>
+              <button
+                onClick={() => setShowScheduleModal(false)}
+                className="text-purple-400 hover:text-purple-200 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-purple-300 text-sm font-bold mb-2 block">Stream Title *</label>
+                <input
+                  type="text"
+                  value={scheduleForm.title}
+                  onChange={(e) => setScheduleForm({...scheduleForm, title: e.target.value})}
+                  className="w-full bg-purple-800/30 text-purple-100 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-500/20"
+                  placeholder="e.g., Trading Strategy Session"
+                />
+              </div>
+
+              <div>
+                <label className="text-purple-300 text-sm font-bold mb-2 block">Description</label>
+                <textarea
+                  value={scheduleForm.description}
+                  onChange={(e) => setScheduleForm({...scheduleForm, description: e.target.value})}
+                  className="w-full bg-purple-800/30 text-purple-100 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-500/20 h-24 resize-none"
+                  placeholder="Tell viewers what to expect..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-purple-300 text-sm font-bold mb-2 block">Category *</label>
+                  <select
+                    value={scheduleForm.category}
+                    onChange={(e) => setScheduleForm({...scheduleForm, category: e.target.value})}
+                    className="w-full bg-purple-800/30 text-purple-100 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-500/20"
+                  >
+                    <option value="Just Chatting">Just Chatting</option>
+                    <option value="Trading">Trading</option>
+                    <option value="Education">Education</option>
+                    <option value="Gaming">Gaming</option>
+                    <option value="Music">Music</option>
+                    <option value="Art">Art</option>
+                    <option value="Crypto Talk">Crypto Talk</option>
+                    <option value="Entertainment">Entertainment</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-purple-300 text-sm font-bold mb-2 block">Duration (minutes) *</label>
+                  <input
+                    type="number"
+                    value={scheduleForm.duration}
+                    onChange={(e) => setScheduleForm({...scheduleForm, duration: parseInt(e.target.value)})}
+                    className="w-full bg-purple-800/30 text-purple-100 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-500/20"
+                    min="15"
+                    step="15"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-purple-300 text-sm font-bold mb-2 block">Date *</label>
+                  <input
+                    type="date"
+                    value={scheduleForm.date}
+                    onChange={(e) => setScheduleForm({...scheduleForm, date: e.target.value})}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full bg-purple-800/30 text-purple-100 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-500/20"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-purple-300 text-sm font-bold mb-2 block">Time *</label>
+                  <input
+                    type="time"
+                    value={scheduleForm.time}
+                    onChange={(e) => setScheduleForm({...scheduleForm, time: e.target.value})}
+                    className="w-full bg-purple-800/30 text-purple-100 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-500/20"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowScheduleModal(false)}
+                className="flex-1 bg-purple-800/30 hover:bg-purple-800/50 text-purple-200 py-3 rounded-lg font-bold transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createScheduledStream}
+                className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-3 rounded-lg font-bold transition-all"
+              >
+                Schedule Stream
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
