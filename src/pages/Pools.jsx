@@ -169,13 +169,37 @@ export default function Pools() {
             const xrpAmount = parseFloat(amm.amount) / 1000000;
             const tokenAmount = parseFloat(amm.amount2.value);
             const lpTokens = parseFloat(amm.lp_token?.value || 0);
+            const tradingFee = parseFloat(amm.trading_fee || 0) / 1000;
+            const auctionSlot = amm.auction_slot || null;
+
+            const volume24h = token.volume_24h ? parseFloat(token.volume_24h) : 0;
+            const fees24h = volume24h * (tradingFee / 100);
+            const apr = xrpAmount > 0 ? ((fees24h * 365) / xrpAmount) * 100 : 0;
+
+            let contributors = 0;
+            try {
+              const lpHoldersResponse = await client.request({
+                command: 'account_lines',
+                account: amm.account,
+                ledger_index: 'validated'
+              });
+              contributors = lpHoldersResponse.result.lines?.length || 0;
+            } catch (e) {
+              console.log(`Could not fetch LP holders for ${token.token_name}`);
+            }
 
             poolData[token.id] = {
               xrpAmount,
               tokenAmount,
               lpTokens,
               price: xrpAmount / tokenAmount,
-              accountId: amm.account
+              accountId: amm.account,
+              tradingFee,
+              volume24h,
+              fees24h,
+              apr,
+              auctionSlot,
+              contributors
             };
 
             console.log(`Found pool for ${token.token_name}:`, poolData[token.id]);
@@ -425,7 +449,27 @@ export default function Pools() {
           {poolData ? `${poolData.xrpAmount.toFixed(2)} XRP` : 'Loading...'}
         </td>
         <td className="px-4 py-3 text-purple-300">
-          {poolData ? `${(poolData.xrpAmount * 0.15).toFixed(2)} XRP` : '-'}
+          {poolData && poolData.volume24h > 0 ? `${poolData.volume24h.toFixed(2)} XRP` : '0 XRP'}
+        </td>
+        <td className="px-4 py-3">
+          {poolData && poolData.apr > 0 ? (
+            <span className="text-green-400 font-bold">{poolData.apr.toFixed(2)}%</span>
+          ) : (
+            <span className="text-purple-500">0%</span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-purple-300">
+          {poolData && poolData.fees24h > 0 ? `${poolData.fees24h.toFixed(4)} XRP` : '0 XRP'}
+        </td>
+        <td className="px-4 py-3 text-purple-300">
+          {poolData && poolData.lpTokens > 0 ? (
+            <span className="font-medium">{(poolData.lpTokens / 1000).toFixed(0)}K</span>
+          ) : (
+            <span className="text-purple-500">-</span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-purple-200 font-medium">
+          {poolData && poolData.contributors > 0 ? poolData.contributors : '0'}
         </td>
         <td className="px-4 py-3">
           {lpBalance ? (
@@ -580,8 +624,12 @@ export default function Pools() {
                 <tr>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Pool</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Live Price</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Liquidity (XRP)</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Volume 24h</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Liquidity</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">24h Volume</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">APR (1 year)</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">24h Fees</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">LP Tokens</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Contributors</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Your LP</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Actions</th>
                 </tr>
