@@ -10,6 +10,7 @@ import Vault from './pages/Vault';
 import MyTokens from './pages/MyTokens';
 import Analytics from './pages/Analytics';
 import Top10 from './pages/Top10';
+import KingsList from './pages/KingsList';
 import About from './pages/About';
 import WalletManagement from './components/WalletManagement';
 import Setup from './pages/Setup';
@@ -122,6 +123,8 @@ export default function App() {
         return <Analytics />;
       case 'top10':
         return <Top10 />;
+      case 'kingslist':
+        return <KingsList />;
       case 'about':
         return <About />;
       case 'wallets':
