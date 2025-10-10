@@ -11,6 +11,7 @@ import { getXRPBalance, checkWalletFunded } from '../utils/xrplBalance';
 import { logActivity, ACTION_TYPES } from '../utils/activityLogger';
 import { onTokenUpdate } from '../utils/tokenEvents';
 import { promoteToFeatured } from '../utils/featuredTokens';
+import { CategoryBadge, calculateDaysOnMarket } from '../utils/categoryUtils';
 
 const ISSUER_SEED = 'sEd7bAfzqZWKxaatJpoWzTvENyaTg1Y';
 const ISSUER_ADDRESS = 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6';
@@ -1119,7 +1120,13 @@ export default function Memes() {
                   {favorites.includes(token.id) ? '⭐' : '☆'}
                 </button>
               </div>
-              <p className="text-purple-400 text-sm">Meme Token</p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <p className="text-purple-400 text-sm">Meme Token</p>
+                {token.category && <CategoryBadge category={token.category} size="xs" />}
+                <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full font-medium">
+                  📅 {calculateDaysOnMarket(token.created_at)}d
+                </span>
+              </div>
             </div>
           </div>
           <div className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -1271,6 +1278,14 @@ export default function Memes() {
             </button>
           </div>
         </div>
+      </td>
+      <td className="px-4 py-3">
+        {token.category ? <CategoryBadge category={token.category} size="xs" /> : <span className="text-purple-400 text-xs">-</span>}
+      </td>
+      <td className="px-4 py-3">
+        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full font-medium inline-block">
+          📅 {calculateDaysOnMarket(token.created_at)}d
+        </span>
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
@@ -1483,6 +1498,8 @@ export default function Memes() {
               <thead className="bg-purple-900/30">
                 <tr>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Token</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Category</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Days</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Live Price</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Volume 24h</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Your LP</th>

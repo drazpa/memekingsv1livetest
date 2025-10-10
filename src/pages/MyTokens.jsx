@@ -7,6 +7,7 @@ import TokenIcon from '../components/TokenIcon';
 import SendTokenModal from '../components/SendTokenModal';
 import ReceiveTokenModal from '../components/ReceiveTokenModal';
 import { onTokenUpdate } from '../utils/tokenEvents';
+import { CategoryBadge, calculateDaysOnMarket } from '../utils/categoryUtils';
 
 export default function MyTokens() {
   const [connectedWallet, setConnectedWallet] = useState(null);
@@ -432,6 +433,8 @@ export default function MyTokens() {
                   <tr>
                     <th className="text-left p-4 text-purple-300 font-medium">⭐</th>
                     <th className="text-left p-4 text-purple-300 font-medium">Token</th>
+                    <th className="text-left p-4 text-purple-300 font-medium">Category</th>
+                    <th className="text-left p-4 text-purple-300 font-medium">Days</th>
                     <th className="text-right p-4 text-purple-300 font-medium">Balance</th>
                     <th className="text-right p-4 text-purple-300 font-medium">Price</th>
                     <th className="text-right p-4 text-purple-300 font-medium">24H Change</th>
@@ -507,6 +510,14 @@ export default function MyTokens() {
                           )}
                         </div>
                       </div>
+                    </td>
+                    <td className="p-4">
+                      {holding.token.category ? <CategoryBadge category={holding.token.category} size="xs" /> : <span className="text-purple-400 text-xs">-</span>}
+                    </td>
+                    <td className="p-4">
+                      <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full font-medium inline-block">
+                        📅 {calculateDaysOnMarket(holding.token.created_at)}d
+                      </span>
                     </td>
                     <td className="text-right p-4 text-purple-200 font-mono">
                       {holding.balance.toFixed(4)}

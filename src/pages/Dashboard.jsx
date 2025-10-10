@@ -10,6 +10,7 @@ import { logActivity, ACTION_TYPES } from '../utils/activityLogger';
 import { getRandomWord } from '../utils/dictionary';
 import { emitTokenUpdate } from '../utils/tokenEvents';
 import { setFeaturedPosition, promoteToFeatured } from '../utils/featuredTokens';
+import { CategoryBadge, calculateDaysOnMarket } from '../utils/categoryUtils';
 
 const ISSUER_SEED = 'sEd7bAfzqZWKxaatJpoWzTvENyaTg1Y';
 const ISSUER_ADDRESS = 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6';
@@ -963,7 +964,13 @@ export default function Dashboard() {
           <TokenIcon token={token} size={featured ? 'lg' : 'md'} />
           <div>
             <h3 className={`${featured ? 'text-2xl' : 'text-xl'} font-bold text-purple-200`}>{token.token_name}</h3>
-            <p className="text-purple-400 text-sm">{token.currency_code}</p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <p className="text-purple-400 text-sm">{token.currency_code}</p>
+              {token.category && <CategoryBadge category={token.category} size="xs" />}
+              <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full font-medium">
+                📅 {calculateDaysOnMarket(token.created_at)}d
+              </span>
+            </div>
           </div>
         </div>
         {token.amm_pool_created && (
@@ -1056,6 +1063,14 @@ export default function Dashboard() {
             <div className="text-purple-400 text-xs">{token.currency_code}</div>
           </div>
         </div>
+      </td>
+      <td className="px-4 py-3">
+        {token.category ? <CategoryBadge category={token.category} size="xs" /> : <span className="text-purple-400 text-xs">-</span>}
+      </td>
+      <td className="px-4 py-3">
+        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full font-medium inline-block">
+          📅 {calculateDaysOnMarket(token.created_at)}d
+        </span>
       </td>
       <td className="px-4 py-3 text-purple-300 text-xs">{token.supply.toLocaleString()}</td>
       <td className="px-4 py-3">
@@ -1282,6 +1297,8 @@ export default function Dashboard() {
                 <thead className="bg-purple-900/30">
                   <tr>
                     <th className="text-left px-4 py-3 text-purple-300 font-medium">Token</th>
+                    <th className="text-left px-4 py-3 text-purple-300 font-medium">Category</th>
+                    <th className="text-left px-4 py-3 text-purple-300 font-medium">Days</th>
                     <th className="text-left px-4 py-3 text-purple-300 font-medium">Supply</th>
                     <th className="text-left px-4 py-3 text-purple-300 font-medium">Live Price</th>
                     <th className="text-left px-4 py-3 text-purple-300 font-medium">Volume 24h</th>
@@ -1414,6 +1431,8 @@ export default function Dashboard() {
               <thead className="bg-purple-900/30">
                 <tr>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Token</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Category</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Days</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Supply</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Live Price</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Volume 24h</th>
