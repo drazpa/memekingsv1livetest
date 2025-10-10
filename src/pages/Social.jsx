@@ -1085,7 +1085,7 @@ export default function Social() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-purple-900 via-slate-900 to-purple-900">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-purple-900 via-slate-900 to-purple-900 overflow-hidden">
       {/* Notifications */}
       <div className="fixed top-20 right-6 z-50 space-y-2">
         {notifications.map((notif) => (
@@ -1098,7 +1098,7 @@ export default function Social() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="bg-purple-900/20 backdrop-blur-xl border-b border-purple-500/20 px-6 pt-4">
+      <div className="flex-shrink-0 bg-purple-900/20 backdrop-blur-xl border-b border-purple-500/20 px-6 pt-4">
         <div className="flex gap-4">
           <button
             onClick={() => setActiveTab('chat')}
@@ -1154,9 +1154,9 @@ export default function Social() {
       </div>
 
       {activeTab === 'chat' && (
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-h-0">
           {/* Left Sidebar - Online Users */}
-          <div className="w-72 bg-purple-900/20 backdrop-blur-xl flex flex-col border-r border-purple-500/20">
+          <div className="w-72 bg-purple-900/20 backdrop-blur-xl flex flex-col border-r border-purple-500/20 flex-shrink-0">
             <div className="p-6 border-b border-purple-500/20">
               <h2 className="text-2xl font-bold text-purple-200">Online Users</h2>
               <p className="text-purple-400 text-sm mt-1">{onlineUsers.length} online</p>
@@ -1226,7 +1226,7 @@ export default function Social() {
           </div>
 
           {/* Main Chat Area */}
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col min-w-0">
             <div className="p-4 bg-purple-900/20 backdrop-blur-xl border-b border-purple-500/20">
               <h3 className="text-2xl font-bold text-purple-200">General Chat</h3>
               <p className="text-purple-400 text-sm">Public conversation</p>
@@ -1454,7 +1454,7 @@ export default function Social() {
           </div>
 
           {/* Right Sidebar - DMs */}
-          <div className="w-80 bg-purple-900/20 backdrop-blur-xl border-l border-purple-500/20 flex flex-col">
+          <div className="w-80 bg-purple-900/20 backdrop-blur-xl border-l border-purple-500/20 flex flex-col flex-shrink-0">
             <div className="p-4 border-b border-purple-500/20">
               <h3 className="text-xl font-bold text-purple-200">Direct Messages</h3>
             </div>
@@ -1653,8 +1653,8 @@ export default function Social() {
       )}
 
       {activeTab === 'viewing' && viewingStream && (
-        <div className="flex-1 flex flex-col">
-          <div className="p-4 bg-purple-900/20 backdrop-blur-xl border-b border-purple-500/20 flex items-center justify-between">
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+          <div className="flex-shrink-0 p-4 bg-purple-900/20 backdrop-blur-xl border-b border-purple-500/20 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={closeStreamView}
@@ -1691,9 +1691,9 @@ export default function Social() {
               💸 Send Tip
             </button>
           </div>
-          <div className="flex-1 flex overflow-hidden">
-            <div className="flex-1 bg-black flex flex-col">
-              <div className="flex-1 flex items-center justify-center relative">
+          <div className="flex-1 flex overflow-hidden min-h-0">
+            <div className="flex-1 bg-black flex flex-col min-w-0">
+              <div className="flex-1 flex items-center justify-center relative min-h-0">
                 <div className="text-center">
                   <div className="text-8xl mb-4">📹</div>
                   <div className="text-purple-400 text-xl">Stream Preview</div>
@@ -1705,7 +1705,7 @@ export default function Social() {
                 </div>
               </div>
 
-              <div className="p-4 bg-purple-900/20 backdrop-blur-xl border-t border-purple-500/20">
+              <div className="flex-shrink-0 p-4 bg-purple-900/20 backdrop-blur-xl border-t border-purple-500/20">
                 <div className="grid grid-cols-4 gap-4">
                   <div className="bg-purple-800/30 rounded-lg p-4 border border-purple-500/20">
                     <div className="text-purple-400 text-sm mb-1">👥 Viewers</div>
@@ -1729,8 +1729,8 @@ export default function Social() {
               </div>
             </div>
 
-            <div className="w-96 bg-purple-900/20 backdrop-blur-xl border-l border-purple-500/20 flex flex-col">
-              <div className="p-4 border-b border-purple-500/20">
+            <div className="w-96 bg-purple-900/20 backdrop-blur-xl border-l border-purple-500/20 flex flex-col flex-shrink-0">
+              <div className="flex-shrink-0 p-4 border-b border-purple-500/20">
                 <h3 className="text-xl font-bold text-purple-200">Stream Chat 💬</h3>
                 <p className="text-purple-400 text-sm">{messages.length} messages</p>
               </div>

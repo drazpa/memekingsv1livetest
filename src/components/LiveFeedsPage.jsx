@@ -45,7 +45,19 @@ export default function LiveFeedsPage({ onViewStream, connectedWallet }) {
     const { data, error } = await query.order('started_at', { ascending: false });
 
     if (!error && data) {
-      let filtered = data;
+      const uniqueStreams = new Map();
+      data.forEach(stream => {
+        if (!uniqueStreams.has(stream.wallet_address)) {
+          uniqueStreams.set(stream.wallet_address, stream);
+        } else {
+          const existing = uniqueStreams.get(stream.wallet_address);
+          if (new Date(stream.started_at) > new Date(existing.started_at)) {
+            uniqueStreams.set(stream.wallet_address, stream);
+          }
+        }
+      });
+
+      let filtered = Array.from(uniqueStreams.values());
 
       if (searchQuery) {
         filtered = filtered.filter(s =>
