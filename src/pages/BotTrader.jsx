@@ -60,7 +60,6 @@ export default function BotTrader() {
     message: ''
   });
   const [tokenBalances, setTokenBalances] = useState({});
-  const botIntervals = useRef({});
   const fetchingPools = useRef(new Set());
 
   useEffect(() => {
@@ -465,7 +464,6 @@ export default function BotTrader() {
         }
       }
 
-      const runningBotIds = JSON.parse(localStorage.getItem('runningBots') || '[]');
       data?.forEach(bot => {
         if (bot.next_trade_time && bot.next_action) {
           setNextTradeTimes(prev => ({ ...prev, [bot.id]: new Date(bot.next_trade_time).getTime() }));
@@ -478,13 +476,6 @@ export default function BotTrader() {
               estimatedPrice: bot.next_price
             }
           }));
-        }
-
-        if (runningBotIds.includes(bot.id)) {
-          const token = tokens.find(t => t.id === bot.token_id);
-          if (token && poolsData[token.id]) {
-            startBot(bot);
-          }
         }
       });
     } catch (error) {
@@ -678,10 +669,6 @@ export default function BotTrader() {
       return;
     }
 
-    if (botIntervals.current[botId]) {
-      return;
-    }
-
     const token = tokens.find(t => t.id === bot.token_id);
     if (!token) {
       toast.error('Token not found');
@@ -722,76 +709,27 @@ export default function BotTrader() {
       return newAnnouncements;
     });
 
-    await supabase
-      .from('trading_bots')
-      .update({
-        next_trade_time: new Date(nextTime).toISOString(),
-        next_action: nextAction.action,
-        next_token_amount: nextAction.tokenAmount,
-        next_xrp_amount: nextAction.xrpAmount,
-        next_price: nextAction.estimatedPrice
-      })
-      .eq('id', bot.id);
+    try {
+      await supabase
+        .from('trading_bots')
+        .update({
+          status: 'running',
+          next_trade_time: new Date(nextTime).toISOString(),
+          next_action: nextAction.action,
+          next_token_amount: nextAction.tokenAmount,
+          next_xrp_amount: nextAction.xrpAmount,
+          next_price: nextAction.estimatedPrice
+        })
+        .eq('id', bot.id);
 
-    const executeAndSchedule = async () => {
-      try {
-        const { data: freshBot } = await supabase
-          .from('trading_bots')
-          .select('*')
-          .eq('id', bot.id)
-          .maybeSingle();
+      setBots(prev => prev.map(b => b.id === bot.id ? { ...b, status: 'running' } : b));
+      toast.success(`Bot ${bot.name} started - trades will execute automatically`);
 
-        if (!freshBot || freshBot.status !== 'running') {
-          return;
-        }
-
-        setBots(prev => prev.map(b => b.id === bot.id ? { ...b, ...freshBot } : b));
-
-        await executeBotTrade(freshBot);
-
-        const updatedPoolData = poolsData[token.id];
-        if (updatedPoolData) {
-          const newAction = determineNextAction(freshBot, updatedPoolData);
-          setNextTradeActions(prev => ({ ...prev, [freshBot.id]: newAction }));
-
-          const nextTime = Date.now() + (freshBot.interval * 60 * 1000);
-          setNextTradeTimes(prev => ({ ...prev, [freshBot.id]: nextTime }));
-
-          await supabase
-            .from('trading_bots')
-            .update({
-              next_trade_time: new Date(nextTime).toISOString(),
-              next_action: newAction.action,
-              next_token_amount: newAction.tokenAmount,
-              next_xrp_amount: newAction.xrpAmount,
-              next_price: newAction.estimatedPrice
-            })
-            .eq('id', freshBot.id);
-        }
-      } catch (error) {
-        console.error(`Error in bot ${bot.name}:`, error);
-      }
-    };
-
-    const interval = setInterval(() => {
-      executeAndSchedule();
-    }, bot.interval * 60 * 1000);
-
-    botIntervals.current[bot.id] = interval;
-
-    setBots(prev => prev.map(b => b.id === bot.id ? { ...b, status: 'running' } : b));
-
-    const runningBotIds = JSON.parse(localStorage.getItem('runningBots') || '[]');
-    if (!runningBotIds.includes(bot.id)) {
-      runningBotIds.push(bot.id);
-      localStorage.setItem('runningBots', JSON.stringify(runningBotIds));
+      console.log(`✅ Bot ${bot.name} started - edge function will handle execution`);
+    } catch (error) {
+      console.error('Error starting bot:', error);
+      toast.error('Failed to start bot');
     }
-
-    supabase
-      .from('trading_bots')
-      .update({ status: 'running' })
-      .eq('id', bot.id)
-      .then(() => {});
   };
 
   const pauseBot = async (botOrId) => {
@@ -802,15 +740,6 @@ export default function BotTrader() {
       toast.error('Bot not found');
       return;
     }
-
-    if (botIntervals.current[botId]) {
-      clearInterval(botIntervals.current[botId]);
-      delete botIntervals.current[botId];
-    }
-
-    const runningBotIds = JSON.parse(localStorage.getItem('runningBots') || '[]');
-    const filteredIds = runningBotIds.filter(id => id !== botId);
-    localStorage.setItem('runningBots', JSON.stringify(filteredIds));
 
     try {
       await supabase
@@ -860,11 +789,6 @@ export default function BotTrader() {
       return;
     }
 
-    if (botIntervals.current[botId]) {
-      clearInterval(botIntervals.current[botId]);
-      delete botIntervals.current[botId];
-    }
-
     setNextTradeTimes(prev => {
       const newTimes = { ...prev };
       delete newTimes[botId];
@@ -883,25 +807,17 @@ export default function BotTrader() {
       return newAnn;
     });
 
-    await supabase
-      .from('trading_bots')
-      .update({
-        next_trade_time: null,
-        next_action: null,
-        next_token_amount: null,
-        next_xrp_amount: null,
-        next_price: null
-      })
-      .eq('id', botId);
-
-    const runningBotIds = JSON.parse(localStorage.getItem('runningBots') || '[]');
-    const filteredIds = runningBotIds.filter(id => id !== botId);
-    localStorage.setItem('runningBots', JSON.stringify(filteredIds));
-
     try {
       await supabase
         .from('trading_bots')
-        .update({ status: 'stopped' })
+        .update({
+          status: 'stopped',
+          next_trade_time: null,
+          next_action: null,
+          next_token_amount: null,
+          next_xrp_amount: null,
+          next_price: null
+        })
         .eq('id', botId);
 
       setBots(prev => prev.map(b => b.id === botId ? { ...b, status: 'stopped' } : b));
@@ -1107,11 +1023,6 @@ export default function BotTrader() {
   const deleteBot = async (bot) => {
     if (!window.confirm(`Are you sure you want to delete bot "${bot.name}"?`)) {
       return;
-    }
-
-    if (botIntervals.current[bot.id]) {
-      clearInterval(botIntervals.current[bot.id]);
-      delete botIntervals.current[bot.id];
     }
 
     try {
