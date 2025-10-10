@@ -1071,7 +1071,7 @@ export default function Dashboard() {
     >
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
-          <TokenIcon token={token} size="sm" />
+          <TokenIcon token={token} size="3xl" />
           <div>
             <div className="font-bold text-purple-200">{token.token_name}</div>
             <div className="text-purple-400 text-xs">{token.currency_code}</div>
