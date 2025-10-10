@@ -817,7 +817,7 @@ export default function Dashboard() {
       `🔗 Trust Line:\n${trustLineLink}\n\n` +
       `💱 Trade on Magnetic:\n${magneticLink}\n\n` +
       `MORE #MEME COINS @ MEMEKINGS.ONLINE\n\n` +
-      `#XRPL #Crypto`;
+      `#XRPL #Crypto #XRP`;
 
     const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
     window.open(tweetUrl, '_blank', 'width=550,height=420');
