@@ -813,7 +813,6 @@ export default function Dashboard() {
       `💰 Supply: ${token.supply.toLocaleString()}\n` +
       `📊 Price: ${price} XRP\n` +
       `💎 Market Cap: ${marketCap} XRP\n` +
-      `🔒 XRP Locked: ${token.amm_xrp_amount || 0} XRP\n` +
       `✅ Status: ${token.amm_pool_created ? 'AMM Pool Active' : 'Pending'}\n\n` +
       `🔗 Trust Line:\n${trustLineLink}\n\n` +
       `💱 Trade on Magnetic:\n${magneticLink}\n\n` +
