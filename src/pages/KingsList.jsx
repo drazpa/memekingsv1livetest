@@ -183,6 +183,7 @@ export default function KingsList() {
       case 'percentage':
         return parseFloat(holderB.percentage) - parseFloat(holderA.percentage);
       case 'name':
+        if (!a.name || !b.name) return 0;
         return a.name.localeCompare(b.name);
       default:
         return 0;
@@ -190,6 +191,7 @@ export default function KingsList() {
   });
 
   const filteredTokens = sortedTokens.filter(token => {
+    if (!token.name || !token.symbol) return false;
     const matchesSearch = token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          token.symbol.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch && holders[token.id];
