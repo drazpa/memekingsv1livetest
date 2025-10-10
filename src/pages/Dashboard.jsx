@@ -1173,12 +1173,12 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-purple-200">Dashboard</h2>
-          <p className="text-purple-400 mt-1">Meme token factory control center</p>
+          <h2 className="text-2xl sm:text-3xl font-bold text-purple-200">Dashboard</h2>
+          <p className="text-purple-400 mt-1 text-sm sm:text-base">Meme token factory control center</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={async () => {
               if (!connectedWallet) {
@@ -1203,64 +1203,64 @@ export default function Dashboard() {
                 setLoadingActivities(false);
               }
             }}
-            className="btn text-purple-300 px-4 py-3 rounded-lg font-medium flex items-center gap-2"
+            className="btn text-purple-300 px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-medium flex items-center gap-1 sm:gap-2 text-sm sm:text-base flex-1 sm:flex-initial justify-center"
           >
-            <span>📜</span> Activity
+            <span>📜</span> <span className="hidden xs:inline">Activity</span>
           </button>
           <a
             href="https://x.com/MEMEKINGSXRPL"
             target="_blank"
             rel="noopener noreferrer"
-            className="btn text-white px-4 py-3 rounded-lg font-medium flex items-center gap-2 relative overflow-hidden group animate-glow"
+            className="btn text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-medium flex items-center gap-1 sm:gap-2 relative overflow-hidden group animate-glow text-sm sm:text-base flex-1 sm:flex-initial justify-center"
             style={{
               background: 'linear-gradient(135deg, #9333ea 0%, #7e22ce 100%)',
               boxShadow: '0 0 20px rgba(147, 51, 234, 0.5)'
             }}
           >
-            <span className="text-xl">𝕏</span> Twitter
+            <span className="text-xl">𝕏</span> <span className="hidden xs:inline">Twitter</span>
           </a>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Total Tokens</div>
-          <div className="text-3xl font-bold text-green-400">{analytics.totalTokens}</div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="glass rounded-lg p-4 sm:p-6">
+          <div className="text-purple-400 text-xs sm:text-sm mb-2">Total Tokens</div>
+          <div className="text-2xl sm:text-3xl font-bold text-green-400">{analytics.totalTokens}</div>
           {tokens24h > 0 && (
-            <div className="text-green-300 text-sm mt-1">
+            <div className="text-green-300 text-xs sm:text-sm mt-1">
               +{tokens24h} ({tokens24h > 0 ? '+' : ''}{((tokens24h / analytics.totalTokens) * 100).toFixed(1)}%)
             </div>
           )}
           <div className="text-purple-500 text-xs mt-1">Last 24h</div>
         </div>
 
-        <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Total XRP Locked (Live)</div>
-          <div className="text-3xl font-bold text-green-400">{livePoolStats.totalXrpLocked.toFixed(2)}</div>
-          <div className="text-green-300 text-sm mt-1">
+        <div className="glass rounded-lg p-4 sm:p-6">
+          <div className="text-purple-400 text-xs sm:text-sm mb-2">Total XRP Locked</div>
+          <div className="text-2xl sm:text-3xl font-bold text-green-400">{livePoolStats.totalXrpLocked.toFixed(2)}</div>
+          <div className="text-green-300 text-xs sm:text-sm mt-1">
             ${(livePoolStats.totalXrpLocked * xrpUsdPrice).toFixed(2)} USD
           </div>
-          <div className="text-purple-500 text-xs mt-1">In AMM pools from XRPL</div>
+          <div className="text-purple-500 text-xs mt-1">In AMM pools</div>
         </div>
 
-        <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Total Market Cap (Live)</div>
-          <div className="text-3xl font-bold text-green-400">
+        <div className="glass rounded-lg p-4 sm:p-6">
+          <div className="text-purple-400 text-xs sm:text-sm mb-2">Total Market Cap</div>
+          <div className="text-2xl sm:text-3xl font-bold text-green-400">
             {livePoolStats.totalMarketCap.toFixed(2)}
           </div>
-          <div className="text-green-300 text-sm mt-1">
+          <div className="text-green-300 text-xs sm:text-sm mt-1">
             ${(livePoolStats.totalMarketCap * xrpUsdPrice).toFixed(2)} USD
           </div>
-          <div className="text-purple-500 text-xs mt-1">XRP value from XRPL</div>
+          <div className="text-purple-500 text-xs mt-1">XRP value</div>
         </div>
 
-        <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Total Holders (Live)</div>
-          <div className="text-3xl font-bold text-green-400">
+        <div className="glass rounded-lg p-4 sm:p-6">
+          <div className="text-purple-400 text-xs sm:text-sm mb-2">Total Holders</div>
+          <div className="text-2xl sm:text-3xl font-bold text-green-400">
             {trustlineStats.totalTrustlines.toLocaleString()}
           </div>
           {trustlineStats.holders24hAgo > 0 && (
-            <div className={`text-sm mt-1 ${
+            <div className={`text-xs sm:text-sm mt-1 ${
               trustlineStats.totalHolders > trustlineStats.holders24hAgo
                 ? 'text-green-300'
                 : trustlineStats.totalHolders < trustlineStats.holders24hAgo
@@ -1277,8 +1277,8 @@ export default function Dashboard() {
 
       {topTokens.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-2xl font-bold text-purple-200">🔥 Top 3 Featured Tokens</h3>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+            <h3 className="text-xl sm:text-2xl font-bold text-purple-200">🔥 Top 3 Featured</h3>
             <div className="flex gap-2">
               <button
                 onClick={() => setTopViewMode('grid')}
@@ -1334,10 +1334,10 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-2 sm:gap-4 mb-6 overflow-x-auto">
         <button
           onClick={() => setMainTokenTab('all')}
-          className={`px-6 py-3 rounded-lg transition-all font-medium text-lg ${
+          className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition-all font-medium text-sm sm:text-lg whitespace-nowrap ${
             mainTokenTab === 'all' ? 'bg-purple-600 text-white shadow-lg' : 'glass text-purple-300 hover:bg-purple-900/30'
           }`}
         >
@@ -1345,7 +1345,7 @@ export default function Dashboard() {
         </button>
         <button
           onClick={() => setMainTokenTab('user')}
-          className={`px-6 py-3 rounded-lg transition-all font-medium text-lg ${
+          className={`px-4 sm:px-6 py-2 sm:py-3 rounded-lg transition-all font-medium text-sm sm:text-lg whitespace-nowrap ${
             mainTokenTab === 'user' ? 'bg-purple-600 text-white shadow-lg' : 'glass text-purple-300 hover:bg-purple-900/30'
           }`}
         >
@@ -1354,50 +1354,50 @@ export default function Dashboard() {
       </div>
 
       {mainTokenTab === 'all' && (
-        <div className="glass rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-purple-200">All Tokens</h3>
+        <div className="glass rounded-lg p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+            <h3 className="text-lg sm:text-xl font-bold text-purple-200">All Tokens</h3>
           <div className="flex gap-2">
             <button
               onClick={() => setViewMode('list')}
-              className={`px-4 py-2 rounded-lg transition-all ${
+              className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-sm sm:text-base ${
                 viewMode === 'list' ? 'bg-purple-600 text-white' : 'glass text-purple-300'
               }`}
             >
-              ☰ List
+              ☰ <span className="hidden sm:inline">List</span>
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              className={`px-4 py-2 rounded-lg transition-all ${
+              className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-sm sm:text-base ${
                 viewMode === 'grid' ? 'bg-purple-600 text-white' : 'glass text-purple-300'
               }`}
             >
-              ▦ Grid
+              ▦ <span className="hidden sm:inline">Grid</span>
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 mb-6">
           <input
             type="text"
-            placeholder="🔍 Search tokens..."
+            placeholder="🔍 Search..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="input text-purple-200 md:col-span-2"
+            className="input text-purple-200 sm:col-span-2 lg:col-span-2 text-sm sm:text-base"
           />
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="input text-purple-200"
+            className="input text-purple-200 text-sm sm:text-base"
           >
             <option value="all">All Status</option>
-            <option value="active">Active Only</option>
-            <option value="pending">Pending Only</option>
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
           </select>
           <select
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            className="input text-purple-200"
+            className="input text-purple-200 text-sm sm:text-base"
           >
             <option value="all">All Categories</option>
             <option value="Meme">😂 Meme</option>
@@ -1412,22 +1412,22 @@ export default function Dashboard() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="input text-purple-200"
+            className="input text-purple-200 text-sm sm:text-base"
           >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
             <option value="name-asc">Name (A-Z)</option>
             <option value="name-desc">Name (Z-A)</option>
             <option value="marketcap">Market Cap</option>
-            <option value="supply-high">Supply (High-Low)</option>
-            <option value="supply-low">Supply (Low-High)</option>
-            <option value="price-high">Price (High-Low)</option>
-            <option value="price-low">Price (Low-High)</option>
+            <option value="supply-high">Supply ↓</option>
+            <option value="supply-low">Supply ↑</option>
+            <option value="price-high">Price ↓</option>
+            <option value="price-low">Price ↑</option>
           </select>
         </div>
 
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-purple-400 text-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 mb-3">
+          <div className="text-purple-400 text-xs sm:text-sm">
             Showing {((currentPage - 1) * TOKENS_PER_PAGE) + 1}-{Math.min(currentPage * TOKENS_PER_PAGE, filteredTokens.length)} of {filteredTokens.length} tokens
           </div>
           {totalPages > 1 && (
@@ -1435,17 +1435,18 @@ export default function Dashboard() {
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1 btn text-purple-300 rounded disabled:opacity-50"
+                className="px-2 sm:px-3 py-1 btn text-purple-300 rounded disabled:opacity-50 text-xs sm:text-sm"
               >
-                Previous
+                <span className="hidden sm:inline">Previous</span>
+                <span className="sm:hidden">Prev</span>
               </button>
-              <span className="text-purple-300 text-sm">
-                Page {currentPage} of {totalPages}
+              <span className="text-purple-300 text-xs sm:text-sm whitespace-nowrap">
+                {currentPage}/{totalPages}
               </span>
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1 btn text-purple-300 rounded disabled:opacity-50"
+                className="px-2 sm:px-3 py-1 btn text-purple-300 rounded disabled:opacity-50 text-xs sm:text-sm"
               >
                 Next
               </button>
