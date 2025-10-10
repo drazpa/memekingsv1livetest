@@ -41,6 +41,7 @@ export default function Social() {
   const [viewerCount, setViewerCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [streamCategory, setStreamCategory] = useState('Just Chatting');
+  const [streamDuration, setStreamDuration] = useState(0);
 
   const messagesEndRef = useRef(null);
   const dmMessagesEndRef = useRef(null);
@@ -70,8 +71,9 @@ export default function Social() {
       }
       if (isStreaming && currentStream) {
         updateStreamHeartbeat();
+        setStreamDuration(Math.floor((new Date() - new Date(currentStream.started_at)) / 1000));
       }
-    }, 30000);
+    }, 1000);
 
     return () => {
       clearInterval(interval);
@@ -1123,10 +1125,15 @@ export default function Social() {
                     <div className="text-purple-200 font-bold text-sm">💸 Total Tips</div>
                     <div className="text-green-400 font-bold text-xl">{totalTips} XRP</div>
                   </div>
-                  {/* Live Indicator */}
-                  <div className="absolute top-4 right-4 flex items-center gap-2 bg-red-500/90 backdrop-blur-xl px-4 py-2 rounded-lg">
-                    <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
-                    <span className="text-white font-bold text-sm">LIVE</span>
+                  {/* Live Indicator with Timer */}
+                  <div className="absolute top-4 right-4 bg-red-500/90 backdrop-blur-xl px-4 py-2 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                      <span className="text-white font-bold text-sm">LIVE</span>
+                    </div>
+                    <div className="text-white font-mono text-xs text-center">
+                      {Math.floor(streamDuration / 3600)}:{String(Math.floor((streamDuration % 3600) / 60)).padStart(2, '0')}:{String(streamDuration % 60).padStart(2, '0')}
+                    </div>
                   </div>
                   {/* Camera Position Selector */}
                   {isScreenSharing && (
@@ -1378,11 +1385,15 @@ export default function Social() {
           </div>
           <div className="flex-1 flex overflow-hidden">
             <div className="flex-1 bg-black flex flex-col">
-              <div className="flex-1 flex items-center justify-center">
+              <div className="flex-1 flex items-center justify-center relative">
                 <div className="text-center">
                   <div className="text-8xl mb-4">📹</div>
                   <div className="text-purple-400 text-xl">Stream Preview</div>
                   <div className="text-purple-500 text-sm mt-2">Live video streaming coming soon</div>
+                </div>
+                <div className="absolute top-4 right-4 flex items-center gap-2 bg-red-500/90 backdrop-blur-xl px-4 py-2 rounded-lg">
+                  <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                  <span className="text-white font-bold text-sm">LIVE</span>
                 </div>
               </div>
 
@@ -1412,49 +1423,66 @@ export default function Social() {
 
             <div className="w-96 bg-purple-900/20 backdrop-blur-xl border-l border-purple-500/20 flex flex-col">
               <div className="p-4 border-b border-purple-500/20">
-                <h3 className="text-xl font-bold text-purple-200">Live Tips 💸</h3>
-                <p className="text-purple-400 text-sm">{streamTips.length} tips received</p>
+                <h3 className="text-xl font-bold text-purple-200">Stream Chat 💬</h3>
+                <p className="text-purple-400 text-sm">{messages.length} messages</p>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {streamTips.length === 0 ? (
+                {messages.length === 0 ? (
                   <div className="text-center py-12">
-                    <div className="text-5xl mb-3">💰</div>
-                    <div className="text-purple-400">No tips yet</div>
-                    <div className="text-purple-500 text-sm mt-1">Be the first to tip!</div>
+                    <div className="text-5xl mb-3">💬</div>
+                    <div className="text-purple-400">No messages yet</div>
+                    <div className="text-purple-500 text-sm mt-1">Start the conversation!</div>
                   </div>
                 ) : (
-                  streamTips.map((tip) => (
-                    <div key={tip.id} className="bg-purple-800/30 rounded-lg p-4 border border-purple-500/20">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center text-white font-bold flex-shrink-0">
-                          {tip.from_nickname.charAt(0).toUpperCase()}
+                  messages.map((msg) => (
+                    <div key={msg.id} className="bg-purple-800/30 rounded-lg p-3 border border-purple-500/20">
+                      <div className="flex items-start gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                          {msg.nickname.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-purple-200 font-bold">{tip.from_nickname}</span>
-                            <span className="text-yellow-400 text-lg">💸</span>
+                            <span className="text-purple-200 font-bold text-sm">{msg.nickname}</span>
+                            {msg.wallet_address === DEV_WALLET && (
+                              <span className="text-yellow-400 text-xs">👑</span>
+                            )}
                           </div>
-                          <div className="text-green-400 font-bold text-lg mb-1">
-                            {parseFloat(tip.amount).toFixed(4)} {tip.currency}
-                          </div>
-                          <div className="text-purple-400 text-xs">
-                            {formatTimestamp(tip.created_at)}
+                          <div className="text-purple-100 text-sm break-words">{msg.message}</div>
+                          <div className="text-purple-400 text-xs mt-1">
+                            {formatTimestamp(msg.created_at)}
                           </div>
                         </div>
                       </div>
                     </div>
                   ))
                 )}
+                <div ref={messagesEndRef} />
               </div>
 
               <div className="p-4 border-t border-purple-500/20 space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                    placeholder="Type a message..."
+                    className="flex-1 bg-purple-800/30 text-purple-100 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-500/20"
+                  />
+                  <button
+                    onClick={sendMessage}
+                    className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg font-bold transition-all"
+                  >
+                    Send
+                  </button>
+                </div>
                 <button
                   onClick={() => {
                     const user = { wallet_address: viewingStream.wallet_address, nickname: viewingStream.nickname };
                     sendCrown(user);
                   }}
-                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-3 rounded-lg font-bold transition-all"
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-2 rounded-lg font-bold transition-all text-sm"
                 >
                   👑 Send Crown
                 </button>
