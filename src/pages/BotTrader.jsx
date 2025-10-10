@@ -250,17 +250,27 @@ export default function BotTrader() {
           : token.currency_code;
 
         const tokenLine = accountLines.result.lines.find(line => {
-          const lineCurrency = line.currency.length > 3 && line.currency !== token.currency_code
-            ? line.currency
-            : line.currency;
-          return (lineCurrency === currencyHex || lineCurrency === token.currency_code) &&
-                 line.account === token.issuer_address;
+          if (line.account !== token.issuer_address) return false;
+
+          const lineCurrency = line.currency;
+
+          if (token.currency_code.length <= 3) {
+            return lineCurrency === token.currency_code;
+          }
+
+          if (lineCurrency.length === 40) {
+            return lineCurrency === currencyHex;
+          }
+
+          return lineCurrency === token.currency_code;
         });
 
         balances[token.id] = tokenLine ? parseFloat(tokenLine.balance) : 0;
 
         if (tokenLine) {
-          console.log(`Balance for ${token.token_name}: ${tokenLine.balance}`);
+          console.log(`✅ Balance for ${token.token_name}: ${tokenLine.balance}`);
+        } else {
+          console.log(`❌ No balance found for ${token.token_name} (${token.currency_code})`);
         }
       });
 
