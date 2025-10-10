@@ -168,10 +168,19 @@ export default function Trade({ preselectedToken = null }) {
   useEffect(() => {
     if (!selectedToken) return;
 
+    let isMounted = true;
+
     const fetchLivePrice = async () => {
+      if (!isMounted) return;
+
       try {
         const client = new xrpl.Client('wss://xrplcluster.com');
         await client.connect();
+
+        if (!isMounted) {
+          await client.disconnect();
+          return;
+        }
 
         const currencyHex = selectedToken.currency_code.length > 3
           ? Buffer.from(selectedToken.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
@@ -186,7 +195,7 @@ export default function Trade({ preselectedToken = null }) {
 
         await client.disconnect();
 
-        if (ammInfo?.result?.amm) {
+        if (isMounted && ammInfo?.result?.amm) {
           const amm = ammInfo.result.amm;
           const xrpAmount = parseFloat(amm.amount) / 1000000;
           const tokenAmount = parseFloat(amm.amount2.value);
@@ -201,14 +210,23 @@ export default function Trade({ preselectedToken = null }) {
           }
         }
       } catch (error) {
-        console.error('Error fetching live price:', error);
+        if (isMounted) {
+          console.error('Error fetching live price:', error);
+        }
       }
     };
 
     fetchLivePrice();
-    const interval = setInterval(fetchLivePrice, 5000);
+    const interval = setInterval(() => {
+      if (isMounted) {
+        fetchLivePrice();
+      }
+    }, 5000);
 
-    return () => clearInterval(interval);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [selectedToken]);
 
   const loadConnectedWallet = async () => {

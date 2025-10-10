@@ -83,6 +83,8 @@ export default function BotTrader() {
   }, [tokens]);
 
   useEffect(() => {
+    let isMounted = true;
+
     if (connectedWallet) {
       loadBots();
       loadFavorites();
@@ -90,11 +92,16 @@ export default function BotTrader() {
       fetchTokenBalances();
 
       const interval = setInterval(() => {
-        refreshBotsFromDatabase();
-        fetchTokenBalances();
+        if (isMounted) {
+          refreshBotsFromDatabase();
+          fetchTokenBalances();
+        }
       }, 5000);
 
-      return () => clearInterval(interval);
+      return () => {
+        isMounted = false;
+        clearInterval(interval);
+      };
     }
   }, [connectedWallet]);
 
@@ -373,7 +380,10 @@ export default function BotTrader() {
         .eq('wallet_address', connectedWallet.address)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error refreshing bots:', error);
+        return;
+      }
 
       setBots(prev => {
         let hasChanges = false;
