@@ -895,19 +895,36 @@ export default function WalletManagement() {
                   </div>
                 </div>
 
-                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-                  <div className="flex gap-3">
-                    <div className="text-yellow-400 text-xl">⚠️</div>
-                    <div className="flex-1">
-                      <div className="font-medium text-yellow-300 mb-1">Important</div>
-                      <div className="text-yellow-200/80 text-sm">
-                        {selectedNetwork === 'testnet'
-                          ? 'Testnet wallets receive free test XRP automatically. This is for testing only.'
-                          : 'Mainnet wallets require real XRP to activate. Make sure to securely save your seed phrase.'}
+                {selectedNetwork === 'testnet' ? (
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                    <div className="flex gap-3">
+                      <div className="text-yellow-400 text-xl">⚠️</div>
+                      <div className="flex-1">
+                        <div className="font-medium text-yellow-300 mb-1">Important</div>
+                        <div className="text-yellow-200/80 text-sm">
+                          Testnet wallets receive free test XRP automatically. This is for testing only.
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                    <div className="flex gap-3">
+                      <div className="text-yellow-400 text-xl">⚠️</div>
+                      <div className="flex-1">
+                        <div className="font-medium text-yellow-300 mb-2">XRP Requirements for Mainnet</div>
+                        <div className="text-yellow-200/80 text-sm space-y-2">
+                          <div><strong>Wallet Activation:</strong> 2 XRP minimum required to activate your wallet</div>
+                          <div><strong>Token Trading:</strong> 0.01 XRP per buy or sell transaction</div>
+                          <div><strong>Trading Bots:</strong> 5 XRP per bot (unlimited bots supported)</div>
+                          <div className="pt-2 border-t border-yellow-500/30 mt-2">
+                            <strong>Recommendation:</strong> Send at least 10-20 XRP to your wallet for comfortable trading and platform usage.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex gap-3">
                   <button
@@ -1014,7 +1031,10 @@ export default function WalletManagement() {
                       <li>Copy and securely store your seed phrase</li>
                       <li>Save this wallet to your list</li>
                       {generatedWallet.network === 'mainnet' && (
-                        <li>Send at least 10 XRP to activate the wallet</li>
+                        <>
+                          <li>Send at least 2 XRP to activate the wallet (10-20 XRP recommended)</li>
+                          <li>Budget 0.01 XRP per token trade and 5 XRP per trading bot</li>
+                        </>
                       )}
                       <li>Start using your new wallet!</li>
                     </ol>
