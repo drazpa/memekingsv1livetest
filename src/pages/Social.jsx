@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabase';
 import toast from 'react-hot-toast';
 import { Client, Wallet as XrplWallet } from 'xrpl';
+import Peer from 'simple-peer';
 import TipModal from '../components/TipModal';
 import LiveFeedsPage from '../components/LiveFeedsPage';
 import StreamAnalytics from '../components/StreamAnalytics';
@@ -59,6 +60,9 @@ export default function Social() {
   const pipVideoRef = useRef(null);
   const mainStreamRef = useRef(null);
   const pipStreamRef = useRef(null);
+  const broadcasterPeerRef = useRef(null);
+  const viewerPeerRef = useRef(null);
+  const viewerVideoRef = useRef(null);
 
   const emojis = ['😀', '😂', '🤣', '😊', '😍', '🥰', '😎', '🤔', '😭', '😱', '🤯', '😴', '🥳', '🤑', '🤗',
     '👍', '👎', '👏', '🙏', '💪', '🤝', '✌️', '🤞', '👌', '🤘', '🔥', '⭐', '✨', '💎', '💰',
@@ -899,6 +903,24 @@ export default function Social() {
         throw insertError;
       }
 
+      const peer = new Peer({
+        initiator: true,
+        trickle: false,
+        stream: stream
+      });
+
+      peer.on('signal', async (signal) => {
+        await supabase
+          .from('live_streams')
+          .update({ stream_signal: signal })
+          .eq('id', newStream.id);
+      });
+
+      peer.on('error', (err) => {
+        console.error('Broadcaster peer error:', err);
+      });
+
+      broadcasterPeerRef.current = peer;
       setCurrentStream(newStream);
       setIsStreaming(true);
       setShowCameraSelect(false);
@@ -952,6 +974,14 @@ export default function Social() {
   };
 
   const endStream = async () => {
+    if (broadcasterPeerRef.current) {
+      broadcasterPeerRef.current.destroy();
+      broadcasterPeerRef.current = null;
+    }
+    if (viewerPeerRef.current) {
+      viewerPeerRef.current.destroy();
+      viewerPeerRef.current = null;
+    }
     if (mainStreamRef.current) {
       mainStreamRef.current.getTracks().forEach(track => track.stop());
       mainStreamRef.current = null;
@@ -972,7 +1002,8 @@ export default function Social() {
         .from('live_streams')
         .update({
           is_active: false,
-          ended_at: new Date().toISOString()
+          ended_at: new Date().toISOString(),
+          stream_signal: null
         })
         .eq('id', currentStream.id);
     }
@@ -982,6 +1013,7 @@ export default function Social() {
     setCurrentStream(null);
     setStreamTips([]);
     setTotalTips(0);
+    setViewingStream(null);
     toast.success('Stream ended');
     loadLiveStreams();
   };

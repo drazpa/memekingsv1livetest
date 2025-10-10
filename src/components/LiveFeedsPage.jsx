@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabase';
 import toast from 'react-hot-toast';
+import Peer from 'simple-peer';
 
 const DEV_WALLET = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
 
@@ -11,6 +12,9 @@ export default function LiveFeedsPage({ onViewStream, connectedWallet }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('viewers');
   const [viewMode, setViewMode] = useState('grid');
+  const [selectedStream, setSelectedStream] = useState(null);
+  const videoRefs = useRef({});
+  const peerRefs = useRef({});
 
   useEffect(() => {
     loadCategories();
@@ -118,6 +122,76 @@ export default function LiveFeedsPage({ onViewStream, connectedWallet }) {
     return `${hours}h ${mins}m`;
   };
 
+  const connectToStream = async (stream) => {
+    if (!stream.stream_signal) {
+      toast.error('Stream signal not available yet');
+      return;
+    }
+
+    try {
+      const peer = new Peer({
+        initiator: false,
+        trickle: false
+      });
+
+      peer.on('signal', async (signal) => {
+        console.log('Viewer signal generated');
+      });
+
+      peer.on('stream', (remoteStream) => {
+        if (videoRefs.current[stream.id]) {
+          videoRefs.current[stream.id].srcObject = remoteStream;
+          videoRefs.current[stream.id].play().catch(e => console.error('Play error:', e));
+        }
+      });
+
+      peer.on('error', (err) => {
+        console.error('Viewer peer error:', err);
+        toast.error('Failed to connect to stream');
+      });
+
+      peer.signal(stream.stream_signal);
+      peerRefs.current[stream.id] = peer;
+    } catch (error) {
+      console.error('Error connecting to stream:', error);
+      toast.error('Failed to connect to stream');
+    }
+  };
+
+  const endMyStream = async (streamId) => {
+    try {
+      await supabase
+        .from('live_streams')
+        .update({
+          is_active: false,
+          ended_at: new Date().toISOString(),
+          stream_signal: null
+        })
+        .eq('id', streamId);
+
+      toast.success('Stream ended');
+      loadLiveStreams();
+    } catch (error) {
+      console.error('Error ending stream:', error);
+      toast.error('Failed to end stream');
+    }
+  };
+
+  useEffect(() => {
+    liveStreams.forEach(stream => {
+      if (stream.stream_signal && !peerRefs.current[stream.id]) {
+        connectToStream(stream);
+      }
+    });
+
+    return () => {
+      Object.values(peerRefs.current).forEach(peer => {
+        if (peer) peer.destroy();
+      });
+      peerRefs.current = {};
+    };
+  }, [liveStreams]);
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Header with Search and Filters */}
@@ -222,15 +296,23 @@ export default function LiveFeedsPage({ onViewStream, connectedWallet }) {
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {liveStreams.map((stream) => (
-                <button
+                <div
                   key={stream.id}
-                  onClick={() => onViewStream(stream)}
                   className="bg-purple-800/30 rounded-lg overflow-hidden border border-purple-500/20 hover:border-purple-500/50 transition-all group"
                 >
-                  <div className="aspect-video bg-black relative">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-6xl">📹</div>
-                    </div>
+                  <div className="aspect-video bg-black relative cursor-pointer" onClick={() => onViewStream(stream)}>
+                    <video
+                      ref={(el) => videoRefs.current[stream.id] = el}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover"
+                    />
+                    {!stream.stream_signal && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-6xl">📹</div>
+                      </div>
+                    )}
                     <div className="absolute top-2 right-2 flex items-center gap-2 bg-red-500 px-3 py-1 rounded">
                       <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                       <span className="text-white font-bold text-xs">LIVE</span>
@@ -257,7 +339,7 @@ export default function LiveFeedsPage({ onViewStream, connectedWallet }) {
                         <div className="text-purple-400 text-xs truncate">{stream.title}</div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center justify-between text-xs mb-2">
                       <div className="flex items-center gap-3 text-purple-300">
                         <span>👥 {stream.viewer_count}</span>
                         <span>👑 {stream.crown_count}</span>
@@ -266,22 +348,41 @@ export default function LiveFeedsPage({ onViewStream, connectedWallet }) {
                         {stream.category}
                       </div>
                     </div>
+                    {connectedWallet && stream.wallet_address === connectedWallet.address && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          endMyStream(stream.id);
+                        }}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold text-xs transition-all"
+                      >
+                        End Stream
+                      </button>
+                    )}
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           ) : (
             <div className="space-y-3">
               {liveStreams.map((stream) => (
-                <button
+                <div
                   key={stream.id}
-                  onClick={() => onViewStream(stream)}
                   className="w-full bg-purple-800/30 rounded-lg p-4 border border-purple-500/20 hover:border-purple-500/50 transition-all group flex items-center gap-4"
                 >
-                  <div className="w-48 h-28 bg-black rounded-lg flex-shrink-0 relative overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="text-4xl">📹</div>
-                    </div>
+                  <div className="w-48 h-28 bg-black rounded-lg flex-shrink-0 relative overflow-hidden cursor-pointer" onClick={() => onViewStream(stream)}>
+                    <video
+                      ref={(el) => videoRefs.current[stream.id] = el}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full h-full object-cover"
+                    />
+                    {!stream.stream_signal && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-4xl">📹</div>
+                      </div>
+                    )}
                     <div className="absolute top-2 right-2 flex items-center gap-1 bg-red-500 px-2 py-0.5 rounded text-xs">
                       <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
                       <span className="text-white font-bold">LIVE</span>
@@ -310,9 +411,20 @@ export default function LiveFeedsPage({ onViewStream, connectedWallet }) {
                       <div className="text-purple-300 text-sm">👑 {stream.crown_count} crowns</div>
                       <div className="text-green-400 text-sm font-bold">💸 {parseFloat(stream.total_tips).toFixed(2)} XRP</div>
                       <div className="text-purple-400 text-sm ml-auto">Started {formatTimestamp(stream.started_at)}</div>
+                      {connectedWallet && stream.wallet_address === connectedWallet.address && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            endMyStream(stream.id);
+                          }}
+                          className="bg-red-600 hover:bg-red-700 text-white px-4 py-1 rounded-lg font-bold text-xs transition-all ml-2"
+                        >
+                          End Stream
+                        </button>
+                      )}
                     </div>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
