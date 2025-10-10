@@ -1113,7 +1113,7 @@ export default function Memes() {
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <TokenIcon token={token} size="lg" />
+            <TokenIcon token={token} size="3xl" />
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-2xl font-bold text-purple-200">{token.token_name}</h3>
@@ -1268,7 +1268,7 @@ export default function Memes() {
     >
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
-          <TokenIcon token={token} size="sm" />
+          <TokenIcon token={token} size="3xl" />
           <div className="flex items-center gap-2">
             <div>
               <div className="font-bold text-purple-200">{token.token_name}</div>

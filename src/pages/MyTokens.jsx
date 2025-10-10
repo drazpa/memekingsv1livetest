@@ -502,7 +502,7 @@ export default function MyTokens() {
                     </td>
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <TokenIcon token={holding.token} size="sm" />
+                        <TokenIcon token={holding.token} size="3xl" />
                         <div>
                           <div className="text-purple-200 font-medium">{holding.token.token_name}</div>
                           {holding.isLPToken && (

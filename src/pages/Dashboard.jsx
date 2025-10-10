@@ -975,7 +975,7 @@ export default function Dashboard() {
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <TokenIcon token={token} size={featured ? 'lg' : 'md'} />
+          <TokenIcon token={token} size="3xl" />
           <div>
             <h3 className={`${featured ? 'text-2xl' : 'text-xl'} font-bold text-purple-200`}>{token.token_name}</h3>
             <div className="flex items-center gap-2 mt-1 flex-wrap">

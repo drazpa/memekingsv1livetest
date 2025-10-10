@@ -278,7 +278,7 @@ export default function Pools() {
       <div className="glass rounded-lg p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <TokenIcon token={token} size="lg" />
+            <TokenIcon token={token} size="3xl" />
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-xl font-bold text-purple-200">{token.token_name}/XRP</h3>
@@ -389,7 +389,7 @@ export default function Pools() {
       <tr className="border-t border-purple-500/20 hover:bg-purple-900/20">
         <td className="px-4 py-3">
           <div className="flex items-center gap-3">
-            <TokenIcon token={token} size="sm" />
+            <TokenIcon token={token} size="3xl" />
             <div className="flex items-center gap-2">
               <div>
                 <div className="font-bold text-purple-200">{token.token_name}/XRP</div>
