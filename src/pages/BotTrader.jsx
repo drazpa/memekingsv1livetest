@@ -971,6 +971,26 @@ export default function BotTrader() {
     toast.success(`Stopped ${activeBots.length} bots`);
   };
 
+  const startAll = async () => {
+    const stoppedBots = bots.filter(b => b.status === 'stopped');
+    if (stoppedBots.length === 0) {
+      toast.error('No stopped bots to start');
+      return;
+    }
+
+    toast.loading(`Starting ${stoppedBots.length} bots...`);
+
+    for (let i = 0; i < stoppedBots.length; i++) {
+      await startBot(stoppedBots[i]);
+      if (i < stoppedBots.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+
+    toast.dismiss();
+    toast.success(`Started ${stoppedBots.length} bots`);
+  };
+
   const openEditBot = (bot) => {
     setEditingBot({
       ...bot,
@@ -1966,25 +1986,32 @@ export default function BotTrader() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-2xl font-bold text-blue-200">My Bots ({sortedBots.length})</h3>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={startAll}
+                className="px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 font-medium transition-colors"
+                title={`Start all stopped bots (${bots.filter(b => b.status === 'stopped').length})`}
+              >
+                ▶ Start All ({bots.filter(b => b.status === 'stopped').length})
+              </button>
               <button
                 onClick={pauseAll}
                 className="px-4 py-2 bg-yellow-500/20 text-yellow-300 rounded-lg hover:bg-yellow-500/30 font-medium transition-colors"
-                title="Pause all running bots"
+                title={`Pause all running bots (${bots.filter(b => b.status === 'running').length})`}
               >
-                ⏸ Pause All
+                ⏸ Pause All ({bots.filter(b => b.status === 'running').length})
               </button>
               <button
                 onClick={resumeAll}
                 className="px-4 py-2 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 font-medium transition-colors"
-                title="Resume all paused bots"
+                title={`Resume all paused bots (${bots.filter(b => b.status === 'paused').length})`}
               >
-                ▶ Resume All
+                ▶ Resume All ({bots.filter(b => b.status === 'paused').length})
               </button>
               <button
                 onClick={stopAll}
                 className="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 font-medium transition-colors"
-                title="Stop all active bots"
+                title={`Stop all active bots (${bots.filter(b => b.status === 'running' || b.status === 'paused').length})`}
               >
                 ⏹ Stop All
               </button>
