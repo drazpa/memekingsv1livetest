@@ -232,6 +232,7 @@ export default function BotTrader() {
     if (!connectedWallet || tokens.length === 0) return;
 
     try {
+      console.log('🔍 Fetching token balances for wallet:', connectedWallet.address);
       const client = new xrpl.Client('wss://xrplcluster.com');
       await client.connect();
 
@@ -243,40 +244,60 @@ export default function BotTrader() {
 
       await client.disconnect();
 
+      console.log('📊 Account has', accountLines.result.lines.length, 'trustlines');
+      console.log('🎯 Looking up balances for', tokens.length, 'tokens');
+
       const balances = {};
       tokens.forEach(token => {
         const currencyHex = token.currency_code.length > 3
           ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
           : token.currency_code;
 
+        console.log(`\n🔎 Searching for ${token.token_name}:`);
+        console.log(`   Currency Code: ${token.currency_code}`);
+        console.log(`   Currency Hex: ${currencyHex}`);
+        console.log(`   Issuer: ${token.issuer_address}`);
+
         const tokenLine = accountLines.result.lines.find(line => {
-          if (line.account !== token.issuer_address) return false;
+          console.log(`   Checking line: ${line.currency} from ${line.account}`);
+
+          if (line.account !== token.issuer_address) {
+            console.log(`   ❌ Issuer mismatch`);
+            return false;
+          }
 
           const lineCurrency = line.currency;
 
           if (token.currency_code.length <= 3) {
-            return lineCurrency === token.currency_code;
+            const match = lineCurrency === token.currency_code;
+            console.log(`   Standard code check: ${match}`);
+            return match;
           }
 
           if (lineCurrency.length === 40) {
-            return lineCurrency === currencyHex;
+            const match = lineCurrency === currencyHex;
+            console.log(`   Hex code check: ${match}`);
+            return match;
           }
 
-          return lineCurrency === token.currency_code;
+          const match = lineCurrency === token.currency_code;
+          console.log(`   Direct match check: ${match}`);
+          return match;
         });
 
         balances[token.id] = tokenLine ? parseFloat(tokenLine.balance) : 0;
 
         if (tokenLine) {
-          console.log(`✅ Balance for ${token.token_name}: ${tokenLine.balance}`);
+          console.log(`   ✅ FOUND Balance: ${tokenLine.balance}`);
         } else {
-          console.log(`❌ No balance found for ${token.token_name} (${token.currency_code})`);
+          console.log(`   ❌ NO BALANCE FOUND`);
         }
       });
 
+      console.log('\n💰 Final balances object:', balances);
       setTokenBalances(balances);
     } catch (error) {
-      console.error('Error fetching token balances:', error);
+      console.error('❌ Error fetching token balances:', error);
     }
   };
 
