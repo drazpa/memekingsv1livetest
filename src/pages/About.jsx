@@ -3,7 +3,7 @@ export default function About() {
     <div className="space-y-6">
       <div className="glass rounded-lg p-8 border-2 border-purple-500/30">
         <h2 className="text-4xl font-bold text-purple-200 mb-2">About MemeKings</h2>
-        <p className="text-xl text-purple-300">The Premier XRPL Meme Token Factory & Trading Platform</p>
+        <p className="text-xl text-purple-300">The Premier XRPL Meme Coin Factory & Trading Platform</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -133,7 +133,7 @@ export default function About() {
               3
             </div>
             <div className="flex-1">
-              <h4 className="text-2xl font-bold text-green-200 mb-2">Buy Tokens from Our Selection</h4>
+              <h4 className="text-2xl font-bold text-green-200 mb-2">Buy Coins from Our Selection</h4>
               <p className="text-green-300 mb-3">
                 Use the Trade page to buy tokens with XRP. Set your slippage tolerance, review the trade estimate, and execute instantly through the AMM.
               </p>

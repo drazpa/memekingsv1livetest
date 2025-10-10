@@ -372,7 +372,7 @@ export default function Memes() {
       { title: 'Connecting to XRPL', description: 'Establishing connection to XRP Ledger' },
       { title: 'Validating Wallets', description: 'Checking issuer and receiver wallet balances' },
       { title: 'Creating Trust Line', description: 'Setting up trust line for the new token' },
-      { title: 'Issuing Tokens', description: 'Minting tokens to receiver wallet' }
+      { title: 'Issuing Coins', description: 'Minting tokens to receiver wallet' }
     ];
 
     if (newToken.image) {
@@ -682,7 +682,7 @@ export default function Memes() {
       { title: 'Connecting to XRPL', description: 'Establishing connection to XRP Ledger testnet' },
       { title: 'Validating Wallets', description: 'Checking issuer and receiver wallet balances' },
       { title: 'Creating Trust Line', description: 'Setting up trust line for the new token' },
-      { title: 'Issuing Tokens', description: 'Minting tokens to receiver wallet' }
+      { title: 'Issuing Coins', description: 'Minting tokens to receiver wallet' }
     ];
 
     if (newToken.image) {
@@ -1121,7 +1121,7 @@ export default function Memes() {
                 </button>
               </div>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <p className="text-purple-400 text-sm">Meme Token</p>
+                <p className="text-purple-400 text-sm">Meme Coin</p>
                 {token.category && <CategoryBadge category={token.category} size="xs" />}
                 <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full font-medium">
                   📅 {calculateDaysOnMarket(token.created_at)}d
@@ -1400,7 +1400,7 @@ export default function Memes() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="🔍 Search tokens..."
+              placeholder="🔍 Search coins..."
               className="input flex-1 text-purple-200"
             />
             <select
@@ -1522,7 +1522,7 @@ export default function Memes() {
       {filteredAndSortedTokens.length === 0 && (
         <div className="glass rounded-lg p-12 text-center">
           <div className="text-6xl mb-4">🚀</div>
-          <h3 className="text-xl font-bold text-purple-200 mb-2">No Tokens Found</h3>
+          <h3 className="text-xl font-bold text-purple-200 mb-2">No Coins Found</h3>
           <p className="text-purple-400">
             {searchTerm ? 'Try a different search term' : 'Create your first token from the dashboard'}
           </p>

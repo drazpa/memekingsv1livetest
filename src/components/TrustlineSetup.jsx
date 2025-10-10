@@ -41,7 +41,7 @@ export function TrustlineSetup({ loading, setupTrustline }) {
       <div className="space-y-6">
         {/* Common Currencies */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Common Tokens</label>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Common Coins</label>
           <div className="grid grid-cols-2 gap-2">
             {COMMON_CURRENCIES.map((currency) => (
               <button

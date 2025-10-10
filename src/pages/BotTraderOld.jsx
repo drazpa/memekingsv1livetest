@@ -605,7 +605,7 @@ export default function BotTrader() {
         console.log(`Bot Name: ${bot.name}`);
         console.log(`Action: ${isBuy ? 'BUY' : 'SELL'} ${token.token_name}`);
         console.log(`XRP Amount: ${xrpAmount.toFixed(4)} XRP`);
-        console.log(`Estimated Tokens: ${estimatedTokenAmount.toFixed(4)}`);
+        console.log(`Estimated Coins: ${estimatedTokenAmount.toFixed(4)}`);
         console.log(`Current Price: ${currentPrice.toFixed(8)} XRP per token`);
         console.log(`Network: MAINNET (wss://xrplcluster.com)`);
         console.log(`===============================================================\n`);

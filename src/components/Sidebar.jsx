@@ -95,7 +95,7 @@ export default function Sidebar({ currentPage, onNavigate }) {
     { id: 'trade', label: 'Trade', icon: '💱' },
     { id: 'bottrader', label: 'Bot Trader', icon: '🤖' },
     { id: 'vault', label: 'Vault', icon: '🏦' },
-    { id: 'mytokens', label: 'My Tokens', icon: '💎' },
+    { id: 'mytokens', label: 'My Coins', icon: '💎' },
     { id: 'analytics', label: 'Analytics', icon: '📈' },
     { id: 'aichat', label: 'AI Chat', icon: '💬' },
     { id: 'about', label: 'About', icon: 'ℹ️' },
@@ -118,7 +118,7 @@ export default function Sidebar({ currentPage, onNavigate }) {
               textShadow: '0 0 12px rgba(168, 85, 247, 0.6)'
             }}>👑</span>
           </div>
-          <p className="text-purple-300/60 text-xs mt-1">XRPL Meme Token Factory</p>
+          <p className="text-purple-300/60 text-xs mt-1">XRPL Meme Coin Factory</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">

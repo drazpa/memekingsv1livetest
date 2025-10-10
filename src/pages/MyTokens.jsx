@@ -314,7 +314,7 @@ export default function MyTokens() {
     return (
       <div className="space-y-6">
         <div>
-          <h2 className="text-3xl font-bold text-purple-200">My Tokens</h2>
+          <h2 className="text-3xl font-bold text-purple-200">My Coins</h2>
           <p className="text-purple-400 mt-1">View your token holdings and LP positions</p>
         </div>
 
@@ -337,7 +337,7 @@ export default function MyTokens() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-purple-200">My Tokens</h2>
+          <h2 className="text-3xl font-bold text-purple-200">My Coins</h2>
           <p className="text-purple-400 mt-1">Your token holdings and LP positions</p>
         </div>
         <button
@@ -364,7 +364,7 @@ export default function MyTokens() {
           </div>
         </div>
         <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Total Tokens</div>
+          <div className="text-purple-400 text-sm mb-2">Total Coins</div>
           <div className="text-3xl font-bold text-purple-200">{analytics.totalTokens}</div>
           <div className="text-purple-500 text-xs mt-1">Unique holdings</div>
         </div>
@@ -392,7 +392,7 @@ export default function MyTokens() {
           <div className="glass rounded-lg p-4 flex flex-wrap gap-4 items-center">
             <input
               type="text"
-              placeholder="🔍 Search tokens..."
+              placeholder="🔍 Search coins..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 min-w-[200px] bg-purple-900/30 border border-purple-500/30 rounded-lg px-4 py-2 text-purple-200 placeholder-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -615,7 +615,7 @@ export default function MyTokens() {
       ) : (
         <div className="glass rounded-lg p-12 text-center">
           <div className="text-6xl mb-4">📭</div>
-          <h3 className="text-2xl font-bold text-purple-200 mb-2">No Tokens Found</h3>
+          <h3 className="text-2xl font-bold text-purple-200 mb-2">No Coins Found</h3>
           <p className="text-purple-400">You don't have any platform tokens in your wallet yet</p>
         </div>
       )}

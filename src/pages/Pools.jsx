@@ -321,7 +321,7 @@ export default function Pools() {
                 <div className="text-lg font-bold text-purple-200">{poolData.tokenAmount.toFixed(0)}</div>
               </div>
               <div className="glass rounded-lg p-4">
-                <div className="text-purple-400 text-xs mb-1">LP Tokens</div>
+                <div className="text-purple-400 text-xs mb-1">LP Coins</div>
                 <div className="text-lg font-bold text-purple-200">{poolData.lpTokens.toFixed(2)}</div>
               </div>
               <div className="glass rounded-lg p-4">
@@ -338,7 +338,7 @@ export default function Pools() {
                   <div>
                     <div className="text-green-300 text-sm font-medium mb-1">Your LP Position</div>
                     <div className="text-green-200 text-xs">
-                      {lpBalance.balance.toFixed(4)} LP Tokens ({lpBalance.share.toFixed(4)}% of pool)
+                      {lpBalance.balance.toFixed(4)} LP Coins ({lpBalance.share.toFixed(4)}% of pool)
                     </div>
                   </div>
                   <div className="text-right">

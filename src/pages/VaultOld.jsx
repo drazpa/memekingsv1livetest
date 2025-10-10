@@ -1141,7 +1141,7 @@ export default function Vault() {
       <div className="flex gap-4">
         <input
           type="text"
-          placeholder="Search tokens..."
+          placeholder="Search coins..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="input flex-1 text-purple-200"
@@ -1151,7 +1151,7 @@ export default function Vault() {
           onChange={(e) => setFilter(e.target.value)}
           className="input px-4 text-purple-200"
         >
-          <option value="all">All Tokens</option>
+          <option value="all">All Coins</option>
           <option value="staked">Staked Only</option>
           <option value="available">Available</option>
         </select>
@@ -1166,7 +1166,7 @@ export default function Vault() {
       {filteredTokens.length === 0 && (
         <div className="glass rounded-lg p-12 text-center">
           <div className="text-6xl mb-4">🔍</div>
-          <h3 className="text-2xl font-bold text-purple-200 mb-2">No Tokens Found</h3>
+          <h3 className="text-2xl font-bold text-purple-200 mb-2">No Coins Found</h3>
           <p className="text-purple-400">Try adjusting your search or filter</p>
         </div>
       )}
