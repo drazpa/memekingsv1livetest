@@ -92,14 +92,14 @@ async function executeTrade(bot: Bot, token: Token, wallet: Wallet, supabase: an
   let client: xrpl.Client | null = null;
   
   try {
-    console.log(`Executing trade for bot: ${bot.name}`);
+    console.log(`[${bot.name}] Executing trade...`);
     
     client = new xrpl.Client('wss://xrplcluster.com');
     await client.connect();
     
     const poolData = await fetchPoolData(token, client);
     if (!poolData) {
-      console.log(`No pool data for ${token.token_name}`);
+      console.log(`[${bot.name}] No pool data for ${token.token_name}`);
       await client.disconnect();
       return;
     }
@@ -124,7 +124,7 @@ async function executeTrade(bot: Bot, token: Token, wallet: Wallet, supabase: an
       const availableXRP = xrpBalance - reserve;
       
       if (availableXRP < maxXRPNeeded) {
-        console.log(`Insufficient XRP: need ${maxXRPNeeded}, have ${availableXRP}`);
+        console.log(`[${bot.name}] Insufficient XRP: need ${maxXRPNeeded}, have ${availableXRP}`);
         await supabase.from('trading_bots').update({
           last_error: `Insufficient XRP (need ${maxXRPNeeded.toFixed(2)}, have ${availableXRP.toFixed(2)})`,
           last_error_at: new Date().toISOString(),
@@ -152,7 +152,7 @@ async function executeTrade(bot: Bot, token: Token, wallet: Wallet, supabase: an
       const tokenNeeded = estimatedTokenAmount * (1 + parseFloat(bot.slippage.toString()) / 100);
       
       if (currentTokenBalance < tokenNeeded) {
-        console.log(`Insufficient tokens: need ${tokenNeeded}, have ${currentTokenBalance}`);
+        console.log(`[${bot.name}] Insufficient tokens: need ${tokenNeeded}, have ${currentTokenBalance}`);
         await supabase.from('trading_bots').update({
           last_error: `Insufficient ${token.token_name} (need ${tokenNeeded.toFixed(4)}, have ${currentTokenBalance.toFixed(4)})`,
           last_error_at: new Date().toISOString(),
@@ -247,7 +247,7 @@ async function executeTrade(bot: Bot, token: Token, wallet: Wallet, supabase: an
         last_error_at: null
       }).eq('id', bot.id);
       
-      console.log(`Trade executed: ${isBuy ? 'BUY' : 'SELL'} ${actualAmount} ${token.token_name} for ${xrpAmount} XRP`);
+      console.log(`[${bot.name}] ✅ Trade executed: ${isBuy ? 'BUY' : 'SELL'} ${actualAmount.toFixed(4)} ${token.token_name} for ${xrpAmount} XRP`);
     } else {
       throw new Error(`Transaction failed: ${result.result.meta.TransactionResult}`);
     }
@@ -255,7 +255,7 @@ async function executeTrade(bot: Bot, token: Token, wallet: Wallet, supabase: an
     await client.disconnect();
     
   } catch (error: any) {
-    console.error(`Trade error for bot ${bot.name}:`, error);
+    console.error(`[${bot.name}] ❌ Trade error:`, error);
     
     const errorMessage = error.message || error.toString();
     let errorMsg = 'Trade failed';
@@ -299,23 +299,31 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    const now = new Date().toISOString();
+    const now = new Date();
+    const bufferTime = new Date(now.getTime() + 30000);
+    const nowISO = bufferTime.toISOString();
+    
+    console.log(`🤖 Bot executor running at ${now.toISOString()}, checking for trades due before ${nowISO}`);
     
     const { data: runningBots, error: botsError } = await supabase
       .from('trading_bots')
       .select('*, tokens(*), wallets(*)')
       .eq('status', 'running')
-      .or(`next_trade_time.is.null,next_trade_time.lte.${now}`);
+      .or(`next_trade_time.is.null,next_trade_time.lte.${nowISO}`);
     
     if (botsError) {
+      console.error('❌ Error fetching bots:', botsError);
       throw botsError;
     }
+    
+    console.log(`📊 Found ${runningBots?.length || 0} running bots ready to trade`);
     
     if (!runningBots || runningBots.length === 0) {
       return new Response(JSON.stringify({
         success: true,
         message: 'No bots ready to trade',
-        executed: 0
+        executed: 0,
+        checkedAt: now.toISOString()
       }), {
         headers: {
           ...corsHeaders,
@@ -328,23 +336,27 @@ Deno.serve(async (req: Request) => {
     
     for (const bot of runningBots) {
       if (!bot.tokens || !bot.wallets) {
-        console.error(`Bot ${bot.id} missing token or wallet data`);
+        console.error(`❌ Bot ${bot.id} missing token or wallet data`);
         continue;
       }
       
       try {
         await executeTrade(bot, bot.tokens, bot.wallets, supabase);
-        results.push({ botId: bot.id, status: 'success' });
+        results.push({ botId: bot.id, botName: bot.name, status: 'success' });
       } catch (error) {
-        console.error(`Failed to execute trade for bot ${bot.id}:`, error);
-        results.push({ botId: bot.id, status: 'error', error: error.message });
+        console.error(`❌ Failed to execute trade for bot ${bot.id}:`, error);
+        results.push({ botId: bot.id, botName: bot.name, status: 'error', error: error.message });
       }
     }
     
+    console.log(`✅ Bot executor completed: ${results.filter(r => r.status === 'success').length}/${results.length} trades executed`);
+    
     return new Response(JSON.stringify({
       success: true,
-      executed: results.length,
-      results
+      executed: results.filter(r => r.status === 'success').length,
+      total: results.length,
+      results,
+      checkedAt: now.toISOString()
     }), {
       headers: {
         ...corsHeaders,
@@ -353,7 +365,7 @@ Deno.serve(async (req: Request) => {
     });
     
   } catch (error: any) {
-    console.error('Bot executor error:', error);
+    console.error('❌ Bot executor error:', error);
     return new Response(JSON.stringify({
       success: false,
       error: error.message

@@ -10,7 +10,6 @@ export function startBotExecutor() {
 
   const executeNow = async () => {
     if (isExecuting) {
-      console.log('⏳ Bot execution already in progress, skipping...');
       return;
     }
 
@@ -29,10 +28,14 @@ export function startBotExecutor() {
       if (response.ok) {
         const data = await response.json();
         if (data.executed > 0) {
-          console.log(`✅ Bot executor: ${data.executed} trades executed`);
+          console.log(`✅ Bot executor: ${data.executed} trade(s) executed`);
+          window.dispatchEvent(new CustomEvent('tokenUpdate'));
+        } else {
+          console.log('🤖 Bot executor: No trades ready');
         }
       } else {
-        console.error('❌ Bot executor error:', await response.text());
+        const errorText = await response.text();
+        console.error('❌ Bot executor error:', errorText);
       }
     } catch (error) {
       console.error('❌ Bot executor error:', error);
@@ -43,9 +46,9 @@ export function startBotExecutor() {
 
   executeNow();
 
-  executionInterval = setInterval(executeNow, 30000);
+  executionInterval = setInterval(executeNow, 10000);
 
-  console.log('✅ Bot executor service started (runs every 30 seconds)');
+  console.log('✅ Bot executor service started (runs every 10 seconds)');
 }
 
 export function stopBotExecutor() {
