@@ -18,42 +18,69 @@ export function TokenTrustButton({
   useEffect(() => {
     if (connectedWallet && token) {
       checkTrustlineStatus();
+    } else {
+      setCheckingTrustline(false);
     }
   }, [connectedWallet, token]);
 
   const checkTrustlineStatus = async () => {
-    if (!connectedWallet || !token) return;
+    if (!connectedWallet || !token) {
+      setCheckingTrustline(false);
+      return;
+    }
+
+    if (!token.currency_hex || !token.issuer_address) {
+      console.error('Token missing required fields:', token);
+      setCheckingTrustline(false);
+      return;
+    }
 
     setCheckingTrustline(true);
+    let client = null;
+
     try {
-      const client = new Client(
-        connectedWallet.network === 'mainnet'
-          ? 'wss://xrplcluster.com'
-          : 'wss://s.altnet.rippletest.net:51233'
-      );
+      const wsUrl = connectedWallet.network === 'mainnet'
+        ? 'wss://xrplcluster.com'
+        : 'wss://s.altnet.rippletest.net:51233';
 
-      await client.connect();
+      client = new Client(wsUrl);
 
-      try {
-        const response = await client.request({
+      await Promise.race([
+        client.connect(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Connection timeout')), 10000)
+        )
+      ]);
+
+      const response = await Promise.race([
+        client.request({
           command: 'account_lines',
           account: connectedWallet.address,
           ledger_index: 'validated'
-        });
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Request timeout')), 10000)
+        )
+      ]);
 
-        const trustlines = response.result.lines || [];
-        const exists = trustlines.some(
-          line => line.currency === token.currency_hex &&
-                  line.account === token.issuer_address
-        );
+      const trustlines = response.result.lines || [];
+      const exists = trustlines.some(
+        line => line.currency === token.currency_hex &&
+                line.account === token.issuer_address
+      );
 
-        setHasTrustline(exists);
-      } finally {
-        await client.disconnect();
-      }
+      setHasTrustline(exists);
     } catch (error) {
       console.error('Error checking trustline:', error);
+      setHasTrustline(false);
     } finally {
+      try {
+        if (client && client.isConnected()) {
+          await client.disconnect();
+        }
+      } catch (disconnectError) {
+        console.error('Error disconnecting client:', disconnectError);
+      }
       setCheckingTrustline(false);
     }
   };
@@ -69,61 +96,140 @@ export function TokenTrustButton({
       return;
     }
 
+    if (!token.currency_hex || !token.issuer_address) {
+      toast.error('Token missing required information (currency or issuer)');
+      return;
+    }
+
+    if (!connectedWallet.seed) {
+      toast.error('Wallet seed not available. Please reconnect your wallet.');
+      return;
+    }
+
     setLoading(true);
+    let client = null;
+
     try {
-      const client = new Client(
-        connectedWallet.network === 'mainnet'
-          ? 'wss://xrplcluster.com'
-          : 'wss://s.altnet.rippletest.net:51233'
-      );
+      await checkTrustlineStatus();
 
-      await client.connect();
+      if (hasTrustline) {
+        toast('Trustline already exists for this token', { icon: 'ℹ️' });
+        setLoading(false);
+        return;
+      }
 
-      try {
-        const xrplWallet = XrplWallet.fromSeed(connectedWallet.seed);
+      const wsUrl = connectedWallet.network === 'mainnet'
+        ? 'wss://xrplcluster.com'
+        : 'wss://s.altnet.rippletest.net:51233';
 
-        const trustSetTx = {
-          TransactionType: 'TrustSet',
-          Account: xrplWallet.address,
-          LimitAmount: {
-            currency: token.currency_hex,
-            issuer: token.issuer_address,
-            value: '1000000000'
-          }
-        };
+      client = new Client(wsUrl);
 
-        const prepared = await client.autofill(trustSetTx);
-        const signed = xrplWallet.sign(prepared);
-        const result = await client.submitAndWait(signed.tx_blob);
+      await Promise.race([
+        client.connect(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Connection timeout')), 15000)
+        )
+      ]);
 
-        if (result.result.meta.TransactionResult === 'tesSUCCESS') {
-          toast.success(`Trustline set for ${token.name}!`);
-          setHasTrustline(true);
+      const xrplWallet = XrplWallet.fromSeed(connectedWallet.seed);
 
-          await logActivity({
-            type: ACTION_TYPES.TRUSTLINE_CREATED,
-            walletAddress: connectedWallet.address,
-            details: {
-              token: token.name,
-              symbol: token.symbol,
-              issuer: token.issuer_address,
-              currency: token.currency_hex
-            }
-          });
+      if (xrplWallet.address !== connectedWallet.address) {
+        throw new Error('Wallet address mismatch. Please reconnect your wallet.');
+      }
 
-          if (onTrustlineUpdate) {
-            onTrustlineUpdate();
-          }
-        } else {
-          toast.error(`Failed to set trustline: ${result.result.meta.TransactionResult}`);
+      const trustSetTx = {
+        TransactionType: 'TrustSet',
+        Account: xrplWallet.address,
+        LimitAmount: {
+          currency: token.currency_hex,
+          issuer: token.issuer_address,
+          value: '1000000000'
         }
-      } finally {
-        await client.disconnect();
+      };
+
+      const prepared = await client.autofill(trustSetTx);
+      const signed = xrplWallet.sign(prepared);
+
+      const result = await Promise.race([
+        client.submitAndWait(signed.tx_blob),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Transaction timeout')), 30000)
+        )
+      ]);
+
+      if (result.result.meta.TransactionResult === 'tesSUCCESS') {
+        toast.success(`Trustline set for ${token.name || token.symbol}!`);
+        setHasTrustline(true);
+
+        await logActivity({
+          type: ACTION_TYPES.TRUSTLINE_CREATED,
+          walletAddress: connectedWallet.address,
+          details: {
+            token: token.name || token.symbol,
+            symbol: token.symbol,
+            issuer: token.issuer_address,
+            currency: token.currency_hex
+          }
+        });
+
+        if (onTrustlineUpdate) {
+          onTrustlineUpdate();
+        }
+      } else {
+        const errorCode = result.result.meta.TransactionResult;
+        let errorMessage = 'Failed to set trustline';
+
+        switch (errorCode) {
+          case 'tecNO_DST_INSUF_XRP':
+            errorMessage = 'Insufficient XRP balance. You need at least 10 XRP reserve.';
+            break;
+          case 'tecDST_TAG_NEEDED':
+            errorMessage = 'Destination tag required.';
+            break;
+          case 'tecNO_LINE_INSUF_RESERVE':
+            errorMessage = 'Insufficient reserve. You need more XRP in your wallet.';
+            break;
+          case 'tecUNFUNDED':
+            errorMessage = 'Wallet is unfunded. Please add XRP to your wallet.';
+            break;
+          case 'tefPAST_SEQ':
+            errorMessage = 'Transaction sequence error. Please try again.';
+            break;
+          case 'terRETRY':
+            errorMessage = 'Network busy. Please retry in a moment.';
+            break;
+          default:
+            errorMessage = `Failed: ${errorCode}`;
+        }
+
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error('Error setting up trustline:', error);
-      toast.error('Failed to set up trustline. Please try again.');
+
+      let errorMessage = 'Failed to set up trustline';
+
+      if (error.message.includes('timeout')) {
+        errorMessage = 'Request timed out. Please check your connection and try again.';
+      } else if (error.message.includes('Connection')) {
+        errorMessage = 'Connection failed. Please check your internet and try again.';
+      } else if (error.message.includes('address mismatch')) {
+        errorMessage = error.message;
+      } else if (error.data?.error === 'actNotFound') {
+        errorMessage = 'Account not found on the network. Please fund your wallet first.';
+      } else if (error.message) {
+        errorMessage = `Error: ${error.message}`;
+      }
+
+      toast.error(errorMessage);
     } finally {
+      try {
+        if (client && client.isConnected()) {
+          await client.disconnect();
+        }
+      } catch (disconnectError) {
+        console.error('Error disconnecting client:', disconnectError);
+      }
       setLoading(false);
     }
   };
@@ -139,61 +245,126 @@ export function TokenTrustButton({
       return;
     }
 
+    if (!token.currency_hex || !token.issuer_address) {
+      toast.error('Token missing required information');
+      return;
+    }
+
+    if (!connectedWallet.seed) {
+      toast.error('Wallet seed not available. Please reconnect your wallet.');
+      return;
+    }
+
     setLoading(true);
+    let client = null;
+
     try {
-      const client = new Client(
-        connectedWallet.network === 'mainnet'
-          ? 'wss://xrplcluster.com'
-          : 'wss://s.altnet.rippletest.net:51233'
-      );
+      await checkTrustlineStatus();
 
-      await client.connect();
+      if (!hasTrustline) {
+        toast('No trustline exists for this token', { icon: 'ℹ️' });
+        setLoading(false);
+        return;
+      }
 
-      try {
-        const xrplWallet = XrplWallet.fromSeed(connectedWallet.seed);
+      const wsUrl = connectedWallet.network === 'mainnet'
+        ? 'wss://xrplcluster.com'
+        : 'wss://s.altnet.rippletest.net:51233';
 
-        const trustSetTx = {
-          TransactionType: 'TrustSet',
-          Account: xrplWallet.address,
-          LimitAmount: {
-            currency: token.currency_hex,
-            issuer: token.issuer_address,
-            value: '0'
-          }
-        };
+      client = new Client(wsUrl);
 
-        const prepared = await client.autofill(trustSetTx);
-        const signed = xrplWallet.sign(prepared);
-        const result = await client.submitAndWait(signed.tx_blob);
+      await Promise.race([
+        client.connect(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Connection timeout')), 15000)
+        )
+      ]);
 
-        if (result.result.meta.TransactionResult === 'tesSUCCESS') {
-          toast.success(`Trustline removed for ${token.name}!`);
-          setHasTrustline(false);
+      const xrplWallet = XrplWallet.fromSeed(connectedWallet.seed);
 
-          await logActivity({
-            type: ACTION_TYPES.TRUSTLINE_REMOVED,
-            walletAddress: connectedWallet.address,
-            details: {
-              token: token.name,
-              symbol: token.symbol,
-              issuer: token.issuer_address,
-              currency: token.currency_hex
-            }
-          });
+      if (xrplWallet.address !== connectedWallet.address) {
+        throw new Error('Wallet address mismatch. Please reconnect your wallet.');
+      }
 
-          if (onTrustlineUpdate) {
-            onTrustlineUpdate();
-          }
-        } else {
-          toast.error(`Failed to remove trustline: ${result.result.meta.TransactionResult}`);
+      const trustSetTx = {
+        TransactionType: 'TrustSet',
+        Account: xrplWallet.address,
+        LimitAmount: {
+          currency: token.currency_hex,
+          issuer: token.issuer_address,
+          value: '0'
         }
-      } finally {
-        await client.disconnect();
+      };
+
+      const prepared = await client.autofill(trustSetTx);
+      const signed = xrplWallet.sign(prepared);
+
+      const result = await Promise.race([
+        client.submitAndWait(signed.tx_blob),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Transaction timeout')), 30000)
+        )
+      ]);
+
+      if (result.result.meta.TransactionResult === 'tesSUCCESS') {
+        toast.success(`Trustline removed for ${token.name || token.symbol}!`);
+        setHasTrustline(false);
+
+        await logActivity({
+          type: ACTION_TYPES.TRUSTLINE_REMOVED,
+          walletAddress: connectedWallet.address,
+          details: {
+            token: token.name || token.symbol,
+            symbol: token.symbol,
+            issuer: token.issuer_address,
+            currency: token.currency_hex
+          }
+        });
+
+        if (onTrustlineUpdate) {
+          onTrustlineUpdate();
+        }
+      } else {
+        const errorCode = result.result.meta.TransactionResult;
+        let errorMessage = 'Failed to remove trustline';
+
+        switch (errorCode) {
+          case 'tecNO_LINE':
+            errorMessage = 'Trustline does not exist.';
+            break;
+          case 'tecHAS_OBLIGATIONS':
+            errorMessage = 'Cannot remove trustline with obligations.';
+            break;
+          default:
+            errorMessage = `Failed: ${errorCode}`;
+        }
+
+        toast.error(errorMessage);
       }
     } catch (error) {
       console.error('Error removing trustline:', error);
-      toast.error('Failed to remove trustline. Please try again.');
+
+      let errorMessage = 'Failed to remove trustline';
+
+      if (error.message.includes('timeout')) {
+        errorMessage = 'Request timed out. Please check your connection and try again.';
+      } else if (error.message.includes('Connection')) {
+        errorMessage = 'Connection failed. Please check your internet and try again.';
+      } else if (error.message.includes('address mismatch')) {
+        errorMessage = error.message;
+      } else if (error.message) {
+        errorMessage = `Error: ${error.message}`;
+      }
+
+      toast.error(errorMessage);
     } finally {
+      try {
+        if (client && client.isConnected()) {
+          await client.disconnect();
+        }
+      } catch (disconnectError) {
+        console.error('Error disconnecting client:', disconnectError);
+      }
       setLoading(false);
     }
   };
