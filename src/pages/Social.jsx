@@ -6,44 +6,31 @@ import { Client, Wallet as XrplWallet } from 'xrpl';
 export default function Social() {
   const [connectedWallet, setConnectedWallet] = useState(null);
   const [walletAssets, setWalletAssets] = useState([]);
-  const [availableTokens, setAvailableTokens] = useState([]);
-  const [rooms, setRooms] = useState([]);
-  const [selectedRoom, setSelectedRoom] = useState(null);
-  const [messages, setMessages] = useState([]);
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [messageInput, setMessageInput] = useState('');
   const [nickname, setNickname] = useState('');
-  const [userAvatar, setUserAvatar] = useState(null);
   const [showNicknameModal, setShowNicknameModal] = useState(false);
-  const [showTipModal, setShowTipModal] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [tipRecipient, setTipRecipient] = useState(null);
-  const [selectedToken, setSelectedToken] = useState(null);
-  const [tipAmount, setTipAmount] = useState('');
-  const [sendingTip, setSendingTip] = useState(false);
-  const [activeVideoRoom, setActiveVideoRoom] = useState(null);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [activeDMs, setActiveDMs] = useState([]);
+  const [selectedDM, setSelectedDM] = useState(null);
+  const [dmMessages, setDmMessages] = useState([]);
   const [isVideoActive, setIsVideoActive] = useState(false);
-  const [roomAnalytics, setRoomAnalytics] = useState({
-    totalMessages: 0,
-    totalTips: 0,
-    activeUsers: 0
-  });
+  const [showCameraSelect, setShowCameraSelect] = useState(false);
+  const [availableCameras, setAvailableCameras] = useState([]);
+  const [selectedCamera, setSelectedCamera] = useState(null);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
 
   const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const dmMessagesEndRef = useRef(null);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
-  const emojis = ['😀', '😂', '🤣', '❤️', '😍', '😭', '😊', '👍', '👎', '🙏', '💪', '🔥', '⭐', '✨', '🎉', '🎊', '💎', '💰', '🚀', '🌟', '💯', '👏', '🤝', '💼', '📈', '📊', '🏆', '👑', '💵', '💸'];
-
   useEffect(() => {
     loadConnectedWallet();
-    loadChatRooms();
-    loadAvailableTokens();
-    subscribeToPresence();
     loadOnlineUsers();
+    subscribeToPresence();
 
     const interval = setInterval(() => {
       if (connectedWallet && nickname) {
@@ -62,29 +49,43 @@ export default function Social() {
   useEffect(() => {
     if (connectedWallet) {
       const storedNickname = localStorage.getItem(`nickname_${connectedWallet.address}`);
-      const storedAvatar = localStorage.getItem(`avatar_${connectedWallet.address}`);
       if (storedNickname) {
         setNickname(storedNickname);
-        setUserAvatar(storedAvatar);
         updatePresence(storedNickname, true);
       } else {
         setShowNicknameModal(true);
       }
       loadWalletAssets(connectedWallet);
+      loadMessages();
+      loadDMConversations();
+      subscribeToMessages();
     }
   }, [connectedWallet]);
 
   useEffect(() => {
-    if (selectedRoom) {
-      loadMessages();
-      loadRoomAnalytics();
-      subscribeToMessages();
+    if (selectedDM) {
+      loadDMMessages();
+      subscribeToDMMessages();
     }
-  }, [selectedRoom]);
+  }, [selectedDM]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (selectedDM) {
+      scrollDMToBottom();
+    }
+  }, [dmMessages]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const scrollDMToBottom = () => {
+    dmMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const loadConnectedWallet = () => {
     const stored = localStorage.getItem('connectedWallet');
@@ -109,15 +110,6 @@ export default function Social() {
       window.removeEventListener('walletConnected', handleWalletChange);
       window.removeEventListener('walletDisconnected', handleWalletChange);
     };
-  };
-
-  const loadAvailableTokens = async () => {
-    const { data } = await supabase
-      .from('tokens')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    setAvailableTokens(data || []);
   };
 
   const loadWalletAssets = async (wallet) => {
@@ -147,31 +139,19 @@ export default function Social() {
     }
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const loadChatRooms = async () => {
-    const { data, error } = await supabase
-      .from('chat_rooms')
-      .select('*')
-      .order('created_at', { ascending: true });
-
-    if (!error && data) {
-      setRooms(data);
-      if (data.length > 0 && !selectedRoom) {
-        setSelectedRoom(data[0]);
-      }
-    }
-  };
-
   const loadMessages = async () => {
-    if (!selectedRoom) return;
+    const { data: rooms } = await supabase
+      .from('chat_rooms')
+      .select('id')
+      .eq('type', 'general')
+      .maybeSingle();
+
+    if (!rooms) return;
 
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
-      .eq('room_id', selectedRoom.id)
+      .eq('room_id', rooms.id)
       .order('created_at', { ascending: true });
 
     if (!error) {
@@ -179,69 +159,18 @@ export default function Social() {
     }
   };
 
-  const loadRoomAnalytics = async () => {
-    if (!selectedRoom) return;
-
-    const { data: messagesData } = await supabase
-      .from('chat_messages')
-      .select('id')
-      .eq('room_id', selectedRoom.id);
-
-    const { data: tipsData } = await supabase
-      .from('chat_tips')
-      .select('amount')
-      .in('message_id', (messagesData || []).map(m => m.id));
-
-    const { data: usersData } = await supabase
-      .from('user_presence')
-      .select('wallet_address')
-      .eq('is_online', true);
-
-    setRoomAnalytics({
-      totalMessages: messagesData?.length || 0,
-      totalTips: tipsData?.length || 0,
-      activeUsers: usersData?.length || 0
-    });
-  };
-
   const subscribeToMessages = () => {
-    if (!selectedRoom) return;
-
     const channel = supabase
-      .channel(`room_${selectedRoom.id}`)
+      .channel('general_chat')
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'chat_messages',
-          filter: `room_id=eq.${selectedRoom.id}`
+          table: 'chat_messages'
         },
         (payload) => {
           setMessages((prev) => [...prev, payload.new]);
-          loadRoomAnalytics();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
-  const subscribeToPresence = () => {
-    const channel = supabase
-      .channel('user_presence_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'user_presence'
-        },
-        () => {
-          loadOnlineUsers();
-          loadRoomAnalytics();
         }
       )
       .subscribe();
@@ -261,6 +190,27 @@ export default function Social() {
     if (!error && data) {
       setOnlineUsers(data);
     }
+  };
+
+  const subscribeToPresence = () => {
+    const channel = supabase
+      .channel('user_presence_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_presence'
+        },
+        () => {
+          loadOnlineUsers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   };
 
   const updatePresence = async (displayName, online) => {
@@ -288,27 +238,30 @@ export default function Social() {
     }
 
     localStorage.setItem(`nickname_${connectedWallet.address}`, nickname);
-    if (userAvatar) {
-      localStorage.setItem(`avatar_${connectedWallet.address}`, userAvatar);
-    }
-
     await updatePresence(nickname, true);
     setShowNicknameModal(false);
-    toast.success('Profile saved!');
+    toast.success('Nickname saved!');
   };
 
   const sendMessage = async () => {
-    if ((!messageInput.trim() && !imagePreview) || !connectedWallet || !nickname || !selectedRoom) {
+    if (!messageInput.trim() || !connectedWallet || !nickname) {
       return;
     }
 
+    const { data: rooms } = await supabase
+      .from('chat_rooms')
+      .select('id')
+      .eq('type', 'general')
+      .maybeSingle();
+
+    if (!rooms) return;
+
     const messageData = {
-      room_id: selectedRoom.id,
+      room_id: rooms.id,
       wallet_address: connectedWallet.address,
       nickname: nickname,
-      message_type: imagePreview ? 'image' : 'text',
-      content: messageInput.trim() || 'Image',
-      image_url: imagePreview,
+      message_type: 'text',
+      content: messageInput.trim(),
       created_at: new Date().toISOString()
     };
 
@@ -323,41 +276,180 @@ export default function Social() {
     }
 
     setMessageInput('');
-    setImagePreview(null);
   };
 
-  const handleImageUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+  const handleUserClick = (user) => {
+    if (user.wallet_address === connectedWallet?.address) return;
+    setSelectedUser(user);
+    setShowUserModal(true);
+  };
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be less than 5MB');
-      return;
+  const openDM = async (user) => {
+    setShowUserModal(false);
+
+    const participants = [connectedWallet.address, user.wallet_address].sort();
+
+    const { data: existing } = await supabase
+      .from('dm_conversations')
+      .select('*')
+      .eq('participant_1', participants[0])
+      .eq('participant_2', participants[1])
+      .maybeSingle();
+
+    if (existing) {
+      setSelectedDM({ ...existing, otherWallet: user.wallet_address, otherNickname: user.nickname });
+    } else {
+      const { data: newConv } = await supabase
+        .from('dm_conversations')
+        .insert([{
+          participant_1: participants[0],
+          participant_2: participants[1],
+          last_message: '',
+          last_message_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      setSelectedDM({ ...newConv, otherWallet: user.wallet_address, otherNickname: user.nickname });
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result);
+    loadDMConversations();
+  };
+
+  const loadDMConversations = async () => {
+    if (!connectedWallet) return;
+
+    const { data } = await supabase
+      .from('dm_conversations')
+      .select('*')
+      .or(`participant_1.eq.${connectedWallet.address},participant_2.eq.${connectedWallet.address}`)
+      .order('last_message_at', { ascending: false });
+
+    if (data) {
+      const enriched = await Promise.all(data.map(async (conv) => {
+        const otherWallet = conv.participant_1 === connectedWallet.address
+          ? conv.participant_2
+          : conv.participant_1;
+
+        const { data: userData } = await supabase
+          .from('user_presence')
+          .select('nickname')
+          .eq('wallet_address', otherWallet)
+          .maybeSingle();
+
+        return {
+          ...conv,
+          otherWallet,
+          otherNickname: userData?.nickname || otherWallet.slice(0, 8)
+        };
+      }));
+
+      setActiveDMs(enriched);
+    }
+  };
+
+  const loadDMMessages = async () => {
+    if (!selectedDM || !connectedWallet) return;
+
+    const { data } = await supabase
+      .from('direct_messages')
+      .select('*')
+      .or(`and(from_wallet.eq.${connectedWallet.address},to_wallet.eq.${selectedDM.otherWallet}),and(from_wallet.eq.${selectedDM.otherWallet},to_wallet.eq.${connectedWallet.address})`)
+      .order('created_at', { ascending: true });
+
+    setDmMessages(data || []);
+  };
+
+  const subscribeToDMMessages = () => {
+    if (!selectedDM) return;
+
+    const channel = supabase
+      .channel(`dm_${selectedDM.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'direct_messages'
+        },
+        (payload) => {
+          if (
+            (payload.new.from_wallet === connectedWallet.address && payload.new.to_wallet === selectedDM.otherWallet) ||
+            (payload.new.from_wallet === selectedDM.otherWallet && payload.new.to_wallet === connectedWallet.address)
+          ) {
+            setDmMessages((prev) => [...prev, payload.new]);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
-    reader.readAsDataURL(file);
   };
 
-  const openTipModal = (user) => {
-    if (!connectedWallet) {
-      toast.error('Connect wallet to send tips');
-      return;
+  const sendDM = async () => {
+    if (!messageInput.trim() || !selectedDM || !connectedWallet) return;
+
+    const dmData = {
+      from_wallet: connectedWallet.address,
+      to_wallet: selectedDM.otherWallet,
+      from_nickname: nickname,
+      to_nickname: selectedDM.otherNickname,
+      message_type: 'text',
+      content: messageInput.trim(),
+      created_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('direct_messages')
+      .insert([dmData]);
+
+    if (!error) {
+      await supabase
+        .from('dm_conversations')
+        .update({
+          last_message: messageInput.trim(),
+          last_message_at: new Date().toISOString()
+        })
+        .eq('id', selectedDM.id);
+
+      setMessageInput('');
+      loadDMConversations();
     }
-    setTipRecipient(user);
-    setShowTipModal(true);
   };
 
-  const sendTip = async () => {
-    if (!selectedToken || !tipAmount || !tipRecipient || !connectedWallet) {
-      toast.error('Please select token and enter amount');
+  const closeDM = () => {
+    setSelectedDM(null);
+    setDmMessages([]);
+  };
+
+  const sendTip = async (recipient) => {
+    setShowUserModal(false);
+
+    const tokenOptions = [
+      { currency: 'XRP', issuer: 'XRP' },
+      ...walletAssets.map(a => ({ currency: a.currency, issuer: a.issuer }))
+    ];
+
+    const tokenList = tokenOptions.map((t, i) =>
+      `${i + 1}. ${t.currency}${t.currency !== 'XRP' ? ` (${walletAssets.find(a => a.currency === t.currency)?.value || 'N/A'})` : ''}`
+    ).join('\n');
+
+    const tokenIndex = prompt(`Select token to tip:\n\n${tokenList}\n\nEnter number:`);
+    if (!tokenIndex) return;
+
+    const selectedToken = tokenOptions[parseInt(tokenIndex) - 1];
+    if (!selectedToken) {
+      toast.error('Invalid token selection');
       return;
     }
 
-    setSendingTip(true);
+    const amount = prompt(`Enter amount of ${selectedToken.currency} to tip:`);
+    if (!amount || isNaN(parseFloat(amount))) {
+      toast.error('Invalid amount');
+      return;
+    }
 
     try {
       const client = new Client(
@@ -367,7 +459,6 @@ export default function Social() {
       );
 
       await client.connect();
-
       const wallet = XrplWallet.fromSeed(connectedWallet.seed);
 
       let payment;
@@ -375,18 +466,18 @@ export default function Social() {
         payment = {
           TransactionType: 'Payment',
           Account: wallet.address,
-          Destination: tipRecipient.wallet_address,
-          Amount: String(Math.floor(parseFloat(tipAmount) * 1000000))
+          Destination: recipient.wallet_address,
+          Amount: String(Math.floor(parseFloat(amount) * 1000000))
         };
       } else {
         payment = {
           TransactionType: 'Payment',
           Account: wallet.address,
-          Destination: tipRecipient.wallet_address,
+          Destination: recipient.wallet_address,
           Amount: {
             currency: selectedToken.currency,
             issuer: selectedToken.issuer,
-            value: tipAmount
+            value: amount
           }
         };
       }
@@ -396,40 +487,7 @@ export default function Social() {
       const result = await client.submitAndWait(signed.tx_blob);
 
       if (result.result.meta.TransactionResult === 'tesSUCCESS') {
-        const txHash = result.result.hash;
-
-        const tipMessage = {
-          room_id: selectedRoom.id,
-          wallet_address: connectedWallet.address,
-          nickname: nickname,
-          message_type: 'tip',
-          content: `💸 Sent ${tipAmount} ${selectedToken.currency} to ${tipRecipient.nickname}`,
-          tip_data: {
-            from: connectedWallet.address,
-            to: tipRecipient.wallet_address,
-            token: selectedToken.currency,
-            amount: tipAmount,
-            tx_hash: txHash
-          }
-        };
-
-        await supabase.from('chat_messages').insert([tipMessage]);
-
-        await supabase.from('chat_tips').insert([{
-          from_wallet: connectedWallet.address,
-          to_wallet: tipRecipient.wallet_address,
-          token_code: selectedToken.currency,
-          token_issuer: selectedToken.issuer || 'XRP',
-          amount: tipAmount,
-          tx_hash: txHash,
-          status: 'completed'
-        }]);
-
-        toast.success('Tip sent successfully!');
-        setShowTipModal(false);
-        setTipAmount('');
-        setSelectedToken(null);
-        loadRoomAnalytics();
+        toast.success(`Sent ${amount} ${selectedToken.currency} to ${recipient.nickname}!`);
       } else {
         toast.error('Transaction failed');
       }
@@ -438,20 +496,24 @@ export default function Social() {
     } catch (error) {
       console.error('Error sending tip:', error);
       toast.error('Failed to send tip');
-    } finally {
-      setSendingTip(false);
     }
   };
 
-  const startVideoRoom = async () => {
-    if (!connectedWallet || !nickname) {
-      toast.error('Connect wallet and set nickname first');
-      return;
+  const selectCamera = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter(d => d.kind === 'videoinput');
+      setAvailableCameras(cameras);
+      setShowCameraSelect(true);
+    } catch (error) {
+      toast.error('Failed to enumerate cameras');
     }
+  };
 
+  const startVideoWithCamera = async (deviceId) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720 },
+        video: deviceId ? { deviceId: { exact: deviceId } } : true,
         audio: true
       });
 
@@ -460,51 +522,54 @@ export default function Social() {
         streamRef.current = stream;
       }
 
-      const { data, error } = await supabase
-        .from('video_rooms')
-        .insert([{
-          room_name: `${nickname}'s Room`,
-          host_wallet: connectedWallet.address,
-          room_type: 'conference',
-          is_active: true
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setActiveVideoRoom(data);
       setIsVideoActive(true);
-      toast.success('Video room started!');
+      setShowCameraSelect(false);
+      toast.success('Video started!');
     } catch (error) {
       console.error('Error starting video:', error);
       toast.error('Failed to start video: ' + error.message);
     }
   };
 
-  const stopVideoRoom = async () => {
+  const toggleScreenShare = async () => {
+    try {
+      if (!isScreenSharing) {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { cursor: 'always' },
+          audio: true
+        });
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = screenStream;
+          if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+          }
+          streamRef.current = screenStream;
+        }
+
+        setIsScreenSharing(true);
+        toast.success('Screen sharing started');
+      } else {
+        await startVideoWithCamera(selectedCamera);
+        setIsScreenSharing(false);
+      }
+    } catch (error) {
+      console.error('Error toggling screen share:', error);
+      toast.error('Failed to toggle screen share');
+    }
+  };
+
+  const stopVideo = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
-
-    if (activeVideoRoom) {
-      await supabase
-        .from('video_rooms')
-        .update({
-          is_active: false,
-          ended_at: new Date().toISOString()
-        })
-        .eq('id', activeVideoRoom.id);
-    }
-
-    setActiveVideoRoom(null);
     setIsVideoActive(false);
-    toast.success('Video room ended');
+    setIsScreenSharing(false);
+    toast.success('Video stopped');
   };
 
   const formatTimestamp = (timestamp) => {
@@ -512,48 +577,33 @@ export default function Social() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
 
-  const getTokenImage = (tokenCode, tokenIssuer) => {
-    const token = availableTokens.find(
-      t => t.currency_code === tokenCode && t.issuer_address === tokenIssuer
-    );
-    return token?.image_url || null;
-  };
-
-  const getUserAvatar = (msg) => {
-    if (msg.wallet_address === connectedWallet?.address && userAvatar) {
-      return userAvatar;
-    }
-    return null;
-  };
-
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-900 via-blue-900/20 to-slate-900">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-purple-900 via-slate-900 to-purple-900">
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Rooms */}
-        <div className="w-72 bg-slate-900/50 backdrop-blur-xl flex flex-col border-r border-blue-500/20">
-          <div className="p-6 border-b border-blue-500/20 bg-gradient-to-r from-blue-600/10 to-purple-600/10">
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              Chat Rooms
-            </h2>
-            <p className="text-gray-400 text-sm mt-1">{rooms.length} rooms available</p>
+        {/* Left Sidebar - Online Users */}
+        <div className="w-72 bg-purple-900/20 backdrop-blur-xl flex flex-col border-r border-purple-500/20">
+          <div className="p-6 border-b border-purple-500/20">
+            <h2 className="text-2xl font-bold text-purple-200">Online Users</h2>
+            <p className="text-purple-400 text-sm mt-1">{onlineUsers.length} online</p>
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {rooms.map((room) => (
+            {onlineUsers.map((user) => (
               <button
-                key={room.id}
-                onClick={() => setSelectedRoom(room)}
-                className={`w-full p-4 rounded-xl text-left transition-all duration-300 ${
-                  selectedRoom?.id === room.id
-                    ? 'bg-gradient-to-r from-blue-600/30 to-purple-600/30 border-2 border-blue-500/50 shadow-lg shadow-blue-500/20'
-                    : 'bg-slate-800/50 hover:bg-slate-800/80 border-2 border-transparent'
-                }`}
+                key={user.wallet_address}
+                onClick={() => handleUserClick(user)}
+                className="w-full p-4 rounded-lg bg-purple-800/30 hover:bg-purple-800/50 transition-all duration-300 border border-purple-500/20 hover:border-purple-500/40"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                  <div className="flex-1">
-                    <div className="text-white font-bold">{room.name}</div>
-                    <div className="text-gray-400 text-xs capitalize">{room.type}</div>
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold">
+                      {user.nickname.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-purple-900"></div>
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="text-purple-200 font-bold truncate">{user.nickname}</div>
+                    <div className="text-purple-400 text-xs truncate">{user.wallet_address.slice(0, 12)}...</div>
                   </div>
                 </div>
               </button>
@@ -561,243 +611,98 @@ export default function Social() {
           </div>
 
           {/* Video Controls */}
-          <div className="p-4 border-t border-blue-500/20 space-y-2">
+          <div className="p-4 border-t border-purple-500/20 space-y-2">
             {!isVideoActive ? (
               <button
-                onClick={startVideoRoom}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white py-3 px-4 rounded-xl font-bold transition-all duration-300 shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
+                onClick={selectCamera}
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-3 px-4 rounded-lg font-bold transition-all duration-300"
               >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-                </svg>
-                Start Video Room
+                Start Video
               </button>
             ) : (
-              <button
-                onClick={stopVideoRoom}
-                className="w-full bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-500 hover:to-pink-500 text-white py-3 px-4 rounded-xl font-bold transition-all duration-300 shadow-lg shadow-red-500/30"
-              >
-                End Video Room
-              </button>
+              <>
+                <button
+                  onClick={toggleScreenShare}
+                  className="w-full bg-purple-700/50 hover:bg-purple-700/70 text-white py-2 px-4 rounded-lg font-medium transition-all"
+                >
+                  {isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
+                </button>
+                <button
+                  onClick={stopVideo}
+                  className="w-full bg-red-600/50 hover:bg-red-600/70 text-white py-2 px-4 rounded-lg font-medium transition-all"
+                >
+                  Stop Video
+                </button>
+              </>
             )}
-            <button
-              onClick={() => setShowSettingsModal(true)}
-              className="w-full bg-slate-800/50 hover:bg-slate-800/80 text-white py-2 px-4 rounded-xl font-medium transition-all duration-300 border border-blue-500/20"
-            >
-              Settings
-            </button>
           </div>
         </div>
 
         {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col bg-slate-900/30 backdrop-blur-sm">
-          {/* Chat Header with Analytics */}
-          <div className="bg-slate-900/50 backdrop-blur-xl border-b border-blue-500/20">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                    {selectedRoom?.name}
-                  </h3>
-                  <p className="text-gray-400 text-sm">{onlineUsers.length} users online</p>
-                </div>
-                {activeVideoRoom && (
-                  <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/50 text-green-400 px-4 py-2 rounded-xl font-bold flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    Video Room Active
-                  </div>
-                )}
-              </div>
-
-              {/* Analytics Dashboard */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-gradient-to-br from-blue-600/10 to-blue-600/5 border border-blue-500/20 rounded-xl p-4">
-                  <div className="text-blue-400 text-sm font-medium mb-1">Total Messages</div>
-                  <div className="text-3xl font-bold text-white">{roomAnalytics.totalMessages}</div>
-                </div>
-                <div className="bg-gradient-to-br from-purple-600/10 to-purple-600/5 border border-purple-500/20 rounded-xl p-4">
-                  <div className="text-purple-400 text-sm font-medium mb-1">Tips Sent</div>
-                  <div className="text-3xl font-bold text-white">{roomAnalytics.totalTips}</div>
-                </div>
-                <div className="bg-gradient-to-br from-green-600/10 to-green-600/5 border border-green-500/20 rounded-xl p-4">
-                  <div className="text-green-400 text-sm font-medium mb-1">Active Users</div>
-                  <div className="text-3xl font-bold text-white">{roomAnalytics.activeUsers}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Video Preview */}
-            {isVideoActive && (
-              <div className="px-6 pb-4">
-                <div className="bg-black rounded-xl overflow-hidden border-2 border-blue-500/50 shadow-lg shadow-blue-500/20">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    muted
-                    className="w-full h-48 object-cover"
-                  />
-                </div>
-              </div>
-            )}
+        <div className="flex-1 flex flex-col">
+          <div className="p-4 bg-purple-900/20 backdrop-blur-xl border-b border-purple-500/20">
+            <h3 className="text-2xl font-bold text-purple-200">General Chat</h3>
+            <p className="text-purple-400 text-sm">Public conversation</p>
           </div>
 
-          {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {/* Video Preview */}
+          {isVideoActive && (
+            <div className="p-4 bg-purple-900/10">
+              <div className="bg-black rounded-lg overflow-hidden border-2 border-purple-500/30">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  muted
+                  className="w-full h-48 object-cover"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex items-start gap-4 group ${
-                  msg.wallet_address === connectedWallet?.address ? 'flex-row-reverse' : ''
-                }`}
+                className={`flex gap-3 ${msg.wallet_address === connectedWallet?.address ? 'flex-row-reverse' : ''}`}
               >
-                <div className="relative flex-shrink-0">
-                  {getUserAvatar(msg) ? (
-                    <img
-                      src={getUserAvatar(msg)}
-                      alt="avatar"
-                      className="w-12 h-12 rounded-xl object-cover border-2 border-blue-500/50"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                      {msg.nickname.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-slate-900"></div>
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold flex-shrink-0">
+                  {msg.nickname.charAt(0).toUpperCase()}
                 </div>
-
-                <div className={`flex-1 max-w-2xl ${msg.wallet_address === connectedWallet?.address ? 'items-end' : ''}`}>
-                  <div className="flex items-baseline gap-3 mb-1">
-                    <span className="text-white font-bold text-lg">{msg.nickname}</span>
-                    <span className="text-gray-500 text-xs">{formatTimestamp(msg.created_at)}</span>
-                    {msg.wallet_address !== connectedWallet?.address && (
-                      <button
-                        onClick={() => openTipModal({ wallet_address: msg.wallet_address, nickname: msg.nickname })}
-                        className="opacity-0 group-hover:opacity-100 text-yellow-400 hover:text-yellow-300 text-xs font-medium transition-all"
-                      >
-                        💸 Tip
-                      </button>
-                    )}
+                <div className="flex-1 max-w-2xl">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className="text-purple-200 font-bold">{msg.nickname}</span>
+                    <span className="text-purple-400 text-xs">{formatTimestamp(msg.created_at)}</span>
                   </div>
-
-                  {msg.message_type === 'tip' ? (
-                    <div className="bg-gradient-to-r from-yellow-600/20 to-orange-600/20 border-2 border-yellow-500/50 rounded-2xl p-4 shadow-lg shadow-yellow-500/10">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center text-2xl">
-                          💸
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-yellow-300 font-bold text-lg">{msg.content}</div>
-                          {msg.tip_data?.tx_hash && (
-                            <a
-                              href={`https://xrpscan.com/tx/${msg.tip_data.tx_hash}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-400 hover:text-blue-300 hover:underline mt-1 inline-block"
-                            >
-                              View Transaction →
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ) : msg.message_type === 'image' ? (
-                    <div className={`${
-                      msg.wallet_address === connectedWallet?.address
-                        ? 'bg-gradient-to-br from-blue-600/30 to-purple-600/30 border-blue-500/50'
-                        : 'bg-slate-800/50 border-slate-700/50'
-                    } border-2 rounded-2xl p-4 shadow-lg`}>
-                      <p className="text-gray-300 mb-3">{msg.content}</p>
-                      {msg.image_url && (
-                        <img
-                          src={msg.image_url}
-                          alt="Shared"
-                          className="max-w-md rounded-xl border-2 border-blue-500/30"
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <div className={`${
-                      msg.wallet_address === connectedWallet?.address
-                        ? 'bg-gradient-to-br from-blue-600/30 to-purple-600/30 border-blue-500/50'
-                        : 'bg-slate-800/50 border-slate-700/50'
-                    } border-2 rounded-2xl p-4 shadow-lg`}>
-                      <p className="text-white text-lg leading-relaxed">{msg.content}</p>
-                    </div>
-                  )}
+                  <div className={`p-3 rounded-lg ${
+                    msg.wallet_address === connectedWallet?.address
+                      ? 'bg-purple-600/30 border border-purple-500/50'
+                      : 'bg-purple-800/30 border border-purple-500/20'
+                  }`}>
+                    <p className="text-purple-100">{msg.content}</p>
+                  </div>
                 </div>
               </div>
             ))}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Message Input */}
-          <div className="p-6 bg-slate-900/50 backdrop-blur-xl border-t border-blue-500/20">
-            {imagePreview && (
-              <div className="mb-4 relative inline-block">
-                <img src={imagePreview} alt="Preview" className="h-24 rounded-xl border-2 border-blue-500/50" />
-                <button
-                  onClick={() => setImagePreview(null)}
-                  className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center font-bold shadow-lg"
-                >
-                  ×
-                </button>
-              </div>
-            )}
-            <div className="flex gap-3">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleImageUpload}
-                accept="image/*"
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="bg-slate-800/50 hover:bg-slate-800/80 text-white p-3 rounded-xl border border-blue-500/20 transition-all"
-                title="Upload Image"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </button>
-              <div className="relative">
-                <button
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  className="bg-slate-800/50 hover:bg-slate-800/80 text-white p-3 rounded-xl border border-blue-500/20 transition-all text-xl"
-                  title="Emojis"
-                >
-                  😀
-                </button>
-                {showEmojiPicker && (
-                  <div className="absolute bottom-full left-0 mb-2 bg-slate-800/95 backdrop-blur-xl p-3 rounded-xl shadow-2xl border border-blue-500/30 grid grid-cols-6 gap-2 max-w-xs z-50">
-                    {emojis.map((emoji) => (
-                      <button
-                        key={emoji}
-                        onClick={() => {
-                          setMessageInput(messageInput + emoji);
-                          setShowEmojiPicker(false);
-                        }}
-                        className="hover:bg-slate-700/50 p-2 rounded-lg text-2xl transition-all hover:scale-110"
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+          {/* Input */}
+          <div className="p-4 bg-purple-900/20 backdrop-blur-xl border-t border-purple-500/20">
+            <div className="flex gap-2">
               <input
                 type="text"
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder={nickname ? `Message ${selectedRoom?.name}...` : 'Set nickname first...'}
+                onKeyPress={(e) => e.key === 'Enter' && (selectedDM ? sendDM() : sendMessage())}
+                placeholder={nickname ? 'Type a message...' : 'Set nickname first...'}
                 disabled={!connectedWallet || !nickname}
-                className="flex-1 bg-slate-800/50 text-white px-6 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 border border-blue-500/20 placeholder-gray-500"
+                className="flex-1 bg-purple-800/30 text-purple-100 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-500/20 placeholder-purple-400/50"
               />
               <button
-                onClick={sendMessage}
-                disabled={(!messageInput.trim() && !imagePreview) || !connectedWallet || !nickname}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-bold transition-all duration-300 shadow-lg shadow-blue-500/30"
+                onClick={selectedDM ? sendDM : sendMessage}
+                disabled={!messageInput.trim() || !connectedWallet || !nickname}
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-bold transition-all"
               >
                 Send
               </button>
@@ -805,206 +710,167 @@ export default function Social() {
           </div>
         </div>
 
-        {/* Right Sidebar - Online Users */}
-        <div className="w-80 bg-slate-900/50 backdrop-blur-xl border-l border-blue-500/20 flex flex-col">
-          <div className="p-6 border-b border-blue-500/20 bg-gradient-to-r from-purple-600/10 to-blue-600/10">
-            <h3 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-              Online - {onlineUsers.length}
-            </h3>
+        {/* Right Sidebar - DMs */}
+        <div className="w-80 bg-purple-900/20 backdrop-blur-xl border-l border-purple-500/20 flex flex-col">
+          <div className="p-4 border-b border-purple-500/20">
+            <h3 className="text-xl font-bold text-purple-200">Direct Messages</h3>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            {onlineUsers.map((user) => (
-              <div
-                key={user.wallet_address}
-                className="bg-slate-800/30 hover:bg-slate-800/60 p-4 rounded-xl cursor-pointer group transition-all duration-300 border border-blue-500/10 hover:border-blue-500/30"
-              >
+
+          {selectedDM ? (
+            <>
+              <div className="p-4 bg-purple-800/30 border-b border-purple-500/20 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                      {user.nickname.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 rounded-full border-2 border-slate-900 animate-pulse"></div>
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold">
+                    {selectedDM.otherNickname.charAt(0).toUpperCase()}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-white font-bold truncate">{user.nickname}</div>
-                    <div className="text-gray-400 text-xs truncate">{user.wallet_address.slice(0, 12)}...</div>
+                  <div>
+                    <div className="text-purple-200 font-bold">{selectedDM.otherNickname}</div>
+                    <div className="text-purple-400 text-xs">{selectedDM.otherWallet.slice(0, 12)}...</div>
                   </div>
-                  {user.wallet_address !== connectedWallet?.address && (
-                    <button
-                      onClick={() => openTipModal(user)}
-                      className="opacity-0 group-hover:opacity-100 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-white text-xs px-3 py-2 rounded-lg font-bold transition-all shadow-lg"
-                    >
-                      💸 Tip
-                    </button>
-                  )}
                 </div>
+                <button
+                  onClick={closeDM}
+                  className="text-purple-400 hover:text-purple-200 transition-colors"
+                >
+                  ✕
+                </button>
               </div>
-            ))}
-          </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {dmMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex gap-2 ${msg.from_wallet === connectedWallet?.address ? 'flex-row-reverse' : ''}`}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                      {msg.from_nickname.charAt(0).toUpperCase()}
+                    </div>
+                    <div className={`p-3 rounded-lg max-w-[70%] ${
+                      msg.from_wallet === connectedWallet?.address
+                        ? 'bg-purple-600/30 border border-purple-500/50'
+                        : 'bg-purple-800/30 border border-purple-500/20'
+                    }`}>
+                      <p className="text-purple-100 text-sm">{msg.content}</p>
+                      <span className="text-purple-400 text-xs mt-1 block">{formatTimestamp(msg.created_at)}</span>
+                    </div>
+                  </div>
+                ))}
+                <div ref={dmMessagesEndRef} />
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {activeDMs.length === 0 ? (
+                <div className="text-center text-purple-400 text-sm p-8">
+                  Click on a user to start a conversation
+                </div>
+              ) : (
+                activeDMs.map((dm) => (
+                  <button
+                    key={dm.id}
+                    onClick={() => setSelectedDM(dm)}
+                    className="w-full p-3 rounded-lg bg-purple-800/30 hover:bg-purple-800/50 transition-all border border-purple-500/20 text-left"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-sm">
+                        {dm.otherNickname.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-purple-200 font-medium truncate text-sm">{dm.otherNickname}</div>
+                        <div className="text-purple-400 text-xs truncate">{dm.last_message || 'No messages yet'}</div>
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Nickname Modal */}
       {showNicknameModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-8 max-w-md w-full border-2 border-blue-500/50 shadow-2xl shadow-blue-500/20">
-            <h3 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-6">
-              Create Your Profile
-            </h3>
-
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-white font-medium mb-2">Nickname</label>
-                <input
-                  type="text"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="Enter your nickname..."
-                  maxLength={20}
-                  className="w-full bg-slate-800/50 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 border border-blue-500/30"
-                />
-              </div>
-
-              <div>
-                <label className="block text-white font-medium mb-2">Choose Avatar (Optional)</label>
-                <div className="grid grid-cols-5 gap-2">
-                  {availableTokens.slice(0, 10).map((token) => (
-                    token.image_url && (
-                      <button
-                        key={token.id}
-                        onClick={() => setUserAvatar(token.image_url)}
-                        className={`p-2 rounded-xl border-2 transition-all ${
-                          userAvatar === token.image_url
-                            ? 'border-blue-500 bg-blue-500/20'
-                            : 'border-slate-700 hover:border-blue-500/50'
-                        }`}
-                      >
-                        <img src={token.image_url} alt={token.symbol} className="w-full h-full object-cover rounded-lg" />
-                      </button>
-                    )
-                  ))}
-                </div>
-              </div>
-            </div>
-
+          <div className="bg-gradient-to-br from-purple-900 to-slate-900 rounded-lg p-8 max-w-md w-full border border-purple-500/30">
+            <h3 className="text-2xl font-bold text-purple-200 mb-6">Set Your Nickname</h3>
+            <input
+              type="text"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              placeholder="Enter nickname..."
+              maxLength={20}
+              className="w-full bg-purple-800/30 text-purple-100 px-4 py-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 border border-purple-500/30 mb-4"
+            />
             <button
               onClick={saveNickname}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white py-4 rounded-xl font-bold text-lg transition-all duration-300 shadow-lg shadow-blue-500/30"
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-3 rounded-lg font-bold transition-all"
             >
-              Save Profile
+              Save Nickname
             </button>
           </div>
         </div>
       )}
 
-      {/* Tip Modal */}
-      {showTipModal && tipRecipient && (
+      {/* User Action Modal */}
+      {showUserModal && selectedUser && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-8 max-w-md w-full border-2 border-yellow-500/50 shadow-2xl shadow-yellow-500/20">
-            <h3 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent mb-6">
-              Send Tip to {tipRecipient.nickname}
-            </h3>
-
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-gray-400 font-medium mb-2">Select Token</label>
-                <select
-                  value={selectedToken ? JSON.stringify(selectedToken) : ''}
-                  onChange={(e) => setSelectedToken(JSON.parse(e.target.value))}
-                  className="w-full bg-slate-800/50 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 border border-yellow-500/30"
-                >
-                  <option value="">Choose token...</option>
-                  <option value={JSON.stringify({ currency: 'XRP', issuer: 'XRP' })}>XRP</option>
-                  {walletAssets?.map((asset, idx) => (
-                    <option
-                      key={idx}
-                      value={JSON.stringify({ currency: asset.currency, issuer: asset.issuer })}
-                    >
-                      {asset.currency} ({parseFloat(asset.value).toFixed(2)} available)
-                    </option>
-                  ))}
-                </select>
+          <div className="bg-gradient-to-br from-purple-900 to-slate-900 rounded-lg p-8 max-w-md w-full border border-purple-500/30">
+            <div className="text-center mb-6">
+              <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4">
+                {selectedUser.nickname.charAt(0).toUpperCase()}
               </div>
-
-              <div>
-                <label className="block text-gray-400 font-medium mb-2">Amount</label>
-                <input
-                  type="number"
-                  value={tipAmount}
-                  onChange={(e) => setTipAmount(e.target.value)}
-                  placeholder="0.00"
-                  step="0.01"
-                  className="w-full bg-slate-800/50 text-white px-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 border border-yellow-500/30"
-                />
-              </div>
+              <h3 className="text-2xl font-bold text-purple-200">{selectedUser.nickname}</h3>
+              <p className="text-purple-400 text-sm mt-1">{selectedUser.wallet_address}</p>
             </div>
 
-            <div className="flex gap-3">
+            <div className="space-y-3">
               <button
-                onClick={() => {
-                  setShowTipModal(false);
-                  setTipAmount('');
-                  setSelectedToken(null);
-                }}
-                className="flex-1 bg-slate-800/50 hover:bg-slate-800/80 text-white py-3 rounded-xl font-medium transition-all border border-blue-500/20"
+                onClick={() => openDM(selectedUser)}
+                className="w-full bg-purple-700/50 hover:bg-purple-700/70 text-white py-3 rounded-lg font-medium transition-all"
               >
-                Cancel
+                💬 Send Direct Message
               </button>
               <button
-                onClick={sendTip}
-                disabled={sendingTip || !selectedToken || !tipAmount}
-                className="flex-1 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white py-3 rounded-xl font-bold transition-all shadow-lg"
+                onClick={() => sendTip(selectedUser)}
+                className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white py-3 rounded-lg font-medium transition-all"
               >
-                {sendingTip ? 'Sending...' : '💸 Send Tip'}
+                💸 Send Tip
+              </button>
+              <button
+                onClick={() => setShowUserModal(false)}
+                className="w-full bg-slate-700/50 hover:bg-slate-700/70 text-white py-3 rounded-lg font-medium transition-all"
+              >
+                Cancel
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Settings Modal */}
-      {showSettingsModal && (
+      {/* Camera Selection Modal */}
+      {showCameraSelect && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-8 max-w-md w-full border-2 border-blue-500/50 shadow-2xl">
-            <h3 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent mb-6">
-              Settings
-            </h3>
-
-            <div className="space-y-4 mb-6">
-              <button
-                onClick={() => {
-                  setShowSettingsModal(false);
-                  setShowNicknameModal(true);
-                }}
-                className="w-full bg-slate-800/50 hover:bg-slate-800/80 text-white p-4 rounded-xl text-left transition-all border border-blue-500/20"
-              >
-                <div className="font-bold mb-1">Edit Profile</div>
-                <div className="text-gray-400 text-sm">Change nickname and avatar</div>
-              </button>
-
-              <div className="bg-slate-800/30 p-4 rounded-xl border border-blue-500/10">
-                <div className="text-gray-400 text-sm mb-2">Current Profile</div>
-                <div className="flex items-center gap-3">
-                  {userAvatar ? (
-                    <img src={userAvatar} alt="avatar" className="w-12 h-12 rounded-xl border-2 border-blue-500/50" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
-                      {nickname.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div>
-                    <div className="text-white font-bold">{nickname}</div>
-                    <div className="text-gray-400 text-xs">{connectedWallet?.address.slice(0, 12)}...</div>
-                  </div>
-                </div>
-              </div>
+          <div className="bg-gradient-to-br from-purple-900 to-slate-900 rounded-lg p-8 max-w-md w-full border border-purple-500/30">
+            <h3 className="text-2xl font-bold text-purple-200 mb-6">Select Camera</h3>
+            <div className="space-y-2 mb-4">
+              {availableCameras.map((camera) => (
+                <button
+                  key={camera.deviceId}
+                  onClick={() => {
+                    setSelectedCamera(camera.deviceId);
+                    startVideoWithCamera(camera.deviceId);
+                  }}
+                  className="w-full bg-purple-800/30 hover:bg-purple-800/50 text-purple-200 px-4 py-3 rounded-lg transition-all text-left"
+                >
+                  {camera.label || `Camera ${camera.deviceId.slice(0, 8)}`}
+                </button>
+              ))}
             </div>
-
             <button
-              onClick={() => setShowSettingsModal(false)}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white py-3 rounded-xl font-bold transition-all"
+              onClick={() => setShowCameraSelect(false)}
+              className="w-full bg-slate-700/50 hover:bg-slate-700/70 text-white py-3 rounded-lg font-medium transition-all"
             >
-              Close
+              Cancel
             </button>
           </div>
         </div>
