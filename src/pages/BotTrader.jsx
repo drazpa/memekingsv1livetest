@@ -1167,21 +1167,52 @@ export default function BotTrader() {
 
       if (isBuy) {
         const maxXRPNeeded = xrpAmount * (1 + parseFloat(bot.slippage) / 100) + 1;
-        if (xrpBalance - reserve < maxXRPNeeded) {
+        const availableXRP = xrpBalance - reserve;
+
+        console.log(`💰 XRP Balance Check: Have ${xrpBalance.toFixed(2)} XRP, Reserve ${reserve} XRP, Available ${availableXRP.toFixed(2)} XRP, Need ${maxXRPNeeded.toFixed(2)} XRP`);
+
+        if (availableXRP < maxXRPNeeded) {
+          const shortfall = maxXRPNeeded - availableXRP;
           setBotAnnouncements(prev => ({
             ...prev,
-            [bot.id]: `⚠️ Insufficient XRP (need ${maxXRPNeeded.toFixed(2)})`
+            [bot.id]: `⚠️ Need ${shortfall.toFixed(2)} more XRP (have ${availableXRP.toFixed(2)}, need ${maxXRPNeeded.toFixed(2)})`
           }));
           await client.disconnect();
           return;
         }
       } else {
-        const currentTokenBalance = tokenBalances[token.id] || 0;
+        const currencyHex = token.currency_code.length > 3
+          ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+          : token.currency_code;
 
-        if (currentTokenBalance < estimatedTokenAmount) {
+        let currentTokenBalance = 0;
+        try {
+          const accountLines = await client.request({
+            command: 'account_lines',
+            account: connectedWallet.address,
+            ledger_index: 'validated'
+          });
+
+          const trustLine = accountLines.result.lines?.find(
+            line => line.currency === currencyHex && line.account === token.issuer_address
+          );
+
+          currentTokenBalance = trustLine ? parseFloat(trustLine.balance) : 0;
+
+          console.log(`💰 Token Balance Check: Have ${formatToken(currentTokenBalance)} ${token.token_name}, Need ${formatToken(estimatedTokenAmount)} ${token.token_name}`);
+        } catch (balanceError) {
+          console.error('Error fetching token balance:', balanceError);
+          currentTokenBalance = tokenBalances[token.id] || 0;
+          console.log(`💰 Using cached balance: ${formatToken(currentTokenBalance)} ${token.token_name}`);
+        }
+
+        const tokenNeeded = estimatedTokenAmount * (1 + parseFloat(bot.slippage) / 100);
+
+        if (currentTokenBalance < tokenNeeded) {
+          const shortfall = tokenNeeded - currentTokenBalance;
           setBotAnnouncements(prev => ({
             ...prev,
-            [bot.id]: `⚠️ Insufficient ${token.token_name} (have ${formatToken(currentTokenBalance)}, need ${formatToken(estimatedTokenAmount)})`
+            [bot.id]: `⚠️ Need ${formatToken(shortfall)} more ${token.token_name} (have ${formatToken(currentTokenBalance)}, need ${formatToken(tokenNeeded)})`
           }));
           await client.disconnect();
           return;
@@ -1305,23 +1336,61 @@ export default function BotTrader() {
 
       const errorMessage = error.message || error.toString();
       let errorMsg = '❌ Trade failed';
+      let shouldPauseBot = false;
 
       if (errorMessage.includes('tecPATH_DRY')) {
-        errorMsg = '⚠️ No liquidity path found';
+        errorMsg = '⚠️ No liquidity path found - Pool may be empty or token pairing issue';
+        console.log(`📊 Pool liquidity issue for ${token.token_name}`);
       } else if (errorMessage.includes('tecPATH_PARTIAL')) {
         if (bot.slippage >= 25) {
-          errorMsg = `⚠️ Slippage tolerance reached (${bot.slippage}%) - Low liquidity or high volatility`;
+          errorMsg = `⚠️ Max slippage reached (${bot.slippage}%) - Market too volatile or liquidity too low`;
+          shouldPauseBot = true;
         } else {
           const suggestedSlippage = Math.min(Math.max(Math.ceil(bot.slippage * 1.5), bot.slippage + 5), 30);
-          errorMsg = `⚠️ Slippage too low - Increase from ${bot.slippage}% to ${suggestedSlippage}%`;
+          errorMsg = `💡 Try increasing slippage from ${bot.slippage}% to ${suggestedSlippage}% (Edit bot to adjust)`;
         }
-      } else if (errorMessage.includes('tecUNFUNDED')) {
-        errorMsg = '⚠️ Insufficient funds';
+        console.log(`📊 Slippage issue - Current: ${bot.slippage}%, Action: ${isBuy ? 'BUY' : 'SELL'}`);
+      } else if (errorMessage.includes('tecUNFUNDED_PAYMENT') || errorMessage.includes('tecUNFUNDED')) {
+        try {
+          const accountInfo = await client.request({
+            command: 'account_info',
+            account: connectedWallet.address,
+            ledger_index: 'validated'
+          });
+          const currentXRP = parseFloat(xrpl.dropsToXrp(accountInfo.result.account_data.Balance));
+
+          if (isBuy) {
+            const needed = xrpAmount * (1 + parseFloat(bot.slippage) / 100) + 1;
+            errorMsg = `⚠️ Need ${(needed - currentXRP + 10).toFixed(2)} more XRP (have ${currentXRP.toFixed(2)}, need ${needed.toFixed(2)} for trade)`;
+          } else {
+            errorMsg = `⚠️ Insufficient ${token.token_name} tokens - Balance may have changed. Check wallet.`;
+          }
+        } catch {
+          if (isBuy) {
+            errorMsg = `⚠️ Insufficient XRP - Check wallet balance`;
+          } else {
+            errorMsg = `⚠️ Insufficient ${token.token_name} tokens - Check wallet balance`;
+          }
+        }
+        shouldPauseBot = true;
+        console.log(`💰 Balance issue detected - Action: ${isBuy ? 'BUY' : 'SELL'}`);
       } else if (errorMessage.includes('tefPAST_SEQ')) {
-        errorMsg = '⏱️ Transaction timing issue - Will retry';
+        errorMsg = '⏱️ Transaction timing issue - Will retry next cycle';
+      } else if (errorMessage.includes('telINSUF_FEE_P')) {
+        errorMsg = '⚠️ Network fees too high - Will retry';
+      } else if (errorMessage.includes('terQUEUED')) {
+        errorMsg = '⏳ Transaction queued - Network congestion';
+      } else {
+        errorMsg = `❌ ${errorMessage.substring(0, 100)}`;
       }
 
       setBotAnnouncements(prev => ({ ...prev, [bot.id]: errorMsg }));
+
+      if (shouldPauseBot) {
+        console.log(`⏸️ Auto-pausing bot ${bot.name} due to: ${errorMsg}`);
+        await pauseBot(bot.id);
+        toast.error(`Bot "${bot.name}" paused: ${errorMsg}`);
+      }
 
       console.log(`❌ Trade failed for ${bot.name}: ${errorMsg}`);
       console.log(`   Error details: ${errorMessage}`);
