@@ -122,6 +122,47 @@ export default function Social() {
   }, [selectedDM]);
 
   useEffect(() => {
+    if (viewingStream?.stream_signal) {
+      if (viewingStream.wallet_address === connectedWallet?.address) {
+        if (viewerVideoRef.current && mainStreamRef.current) {
+          viewerVideoRef.current.srcObject = mainStreamRef.current;
+          viewerVideoRef.current.play().catch(e => console.error('Play error:', e));
+        }
+      } else {
+        const peer = new Peer({
+          initiator: false,
+          trickle: false
+        });
+
+        peer.on('signal', (signal) => {
+          console.log('Viewer signal generated');
+        });
+
+        peer.on('stream', (remoteStream) => {
+          if (viewerVideoRef.current) {
+            viewerVideoRef.current.srcObject = remoteStream;
+            viewerVideoRef.current.play().catch(e => console.error('Play error:', e));
+          }
+        });
+
+        peer.on('error', (err) => {
+          console.error('Viewer peer error:', err);
+        });
+
+        peer.signal(viewingStream.stream_signal);
+        viewerPeerRef.current = peer;
+
+        return () => {
+          if (viewerPeerRef.current) {
+            viewerPeerRef.current.destroy();
+            viewerPeerRef.current = null;
+          }
+        };
+      }
+    }
+  }, [viewingStream, mainStreamRef.current]);
+
+  useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
@@ -1249,6 +1290,7 @@ export default function Social() {
                   <video
                     ref={mainVideoRef}
                     autoPlay
+                    playsInline
                     muted
                     className="w-full h-full object-cover"
                   />
@@ -1265,6 +1307,7 @@ export default function Social() {
                       <video
                         ref={pipVideoRef}
                         autoPlay
+                        playsInline
                         muted
                         className="w-full h-full object-cover"
                       />
@@ -1315,6 +1358,20 @@ export default function Social() {
                     ))}
                   </div>
                 )}
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => setViewingStream(currentStream)}
+                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-bold transition-all"
+                  >
+                    📺 View Full Stream
+                  </button>
+                  <button
+                    onClick={endStream}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-bold transition-all"
+                  >
+                    Stop Stream
+                  </button>
+                </div>
               </div>
             )}
 
