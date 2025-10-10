@@ -3,6 +3,9 @@ import { supabase } from '../utils/supabase';
 import toast from 'react-hot-toast';
 import { Client, Wallet as XrplWallet } from 'xrpl';
 import TipModal from '../components/TipModal';
+import LiveFeedsPage from '../components/LiveFeedsPage';
+import StreamAnalytics from '../components/StreamAnalytics';
+import LiveNotification from '../components/LiveNotification';
 
 const DEV_WALLET = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
 
@@ -36,6 +39,8 @@ export default function Social() {
   const [showTipModal, setShowTipModal] = useState(false);
   const [tipRecipient, setTipRecipient] = useState(null);
   const [viewerCount, setViewerCount] = useState(0);
+  const [notifications, setNotifications] = useState([]);
+  const [streamCategory, setStreamCategory] = useState('Just Chatting');
 
   const messagesEndRef = useRef(null);
   const dmMessagesEndRef = useRef(null);
@@ -57,6 +62,7 @@ export default function Social() {
     loadLiveStreams();
     subscribeToPresence();
     subscribeToStreams();
+    subscribeToTipsAndCrowns();
 
     const interval = setInterval(() => {
       if (connectedWallet && nickname) {
@@ -369,6 +375,106 @@ export default function Social() {
     };
   };
 
+  const subscribeToTipsAndCrowns = () => {
+    const tipsChannel = supabase
+      .channel('tips_notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'stream_tips'
+        },
+        (payload) => {
+          showNotification({
+            type: 'tip',
+            from: payload.new.from_nickname,
+            to: payload.new.to_nickname,
+            amount: parseFloat(payload.new.amount).toFixed(4),
+            currency: payload.new.currency
+          });
+        }
+      )
+      .subscribe();
+
+    const crownsChannel = supabase
+      .channel('crowns_notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'stream_reactions'
+        },
+        (payload) => {
+          showNotification({
+            type: 'crown',
+            from: payload.new.from_nickname,
+            to: payload.new.from_wallet
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(tipsChannel);
+      supabase.removeChannel(crownsChannel);
+    };
+  };
+
+  const showNotification = (notif) => {
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, ...notif }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 5000);
+  };
+
+  const sendCrown = async (recipient) => {
+    if (!connectedWallet || !nickname) {
+      toast.error('Please connect wallet and set nickname');
+      return;
+    }
+
+    if (!currentStream && !viewingStream) {
+      toast.error('No active stream');
+      return;
+    }
+
+    const streamId = currentStream?.id || viewingStream?.id;
+
+    const { error } = await supabase
+      .from('stream_reactions')
+      .insert([{
+        stream_id: streamId,
+        from_wallet: connectedWallet.address,
+        from_nickname: nickname,
+        reaction_type: 'crown'
+      }]);
+
+    if (!error) {
+      const { data: stream } = await supabase
+        .from('live_streams')
+        .select('crown_count')
+        .eq('id', streamId)
+        .single();
+
+      await supabase
+        .from('live_streams')
+        .update({
+          crown_count: (stream?.crown_count || 0) + 1
+        })
+        .eq('id', streamId);
+
+      toast.success('Crown sent! 👑');
+      if (viewingStream) {
+        loadStreamDetails(streamId);
+      }
+    } else {
+      toast.error('Failed to send crown');
+    }
+  };
+
   const updatePresence = async (displayName, online) => {
     if (!connectedWallet) return;
 
@@ -614,6 +720,18 @@ export default function Social() {
 
   const startStream = async (deviceId) => {
     try {
+      const { data: existing } = await supabase
+        .from('live_streams')
+        .select('*')
+        .eq('wallet_address', connectedWallet.address)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (existing) {
+        toast.error('You already have an active stream. Please end it first.');
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: deviceId ? { deviceId: { exact: deviceId } } : true,
         audio: true
@@ -630,9 +748,11 @@ export default function Social() {
           wallet_address: connectedWallet.address,
           nickname: nickname,
           title: `${nickname}'s Stream`,
+          category: streamCategory,
           is_active: true,
           viewer_count: 0,
-          total_tips: 0
+          total_tips: 0,
+          crown_count: 0
         }])
         .select()
         .single();
@@ -839,6 +959,17 @@ export default function Social() {
 
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-purple-900 via-slate-900 to-purple-900">
+      {/* Notifications */}
+      <div className="fixed top-20 right-6 z-50 space-y-2">
+        {notifications.map((notif) => (
+          <LiveNotification
+            key={notif.id}
+            notification={notif}
+            onClose={() => setNotifications(prev => prev.filter(n => n.id !== notif.id))}
+          />
+        ))}
+      </div>
+
       {/* Tab Navigation */}
       <div className="bg-purple-900/20 backdrop-blur-xl border-b border-purple-500/20 px-6 pt-4">
         <div className="flex gap-4">
@@ -866,6 +997,16 @@ export default function Social() {
                 {liveStreams.length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`px-6 py-3 rounded-t-lg font-bold transition-all ${
+              activeTab === 'analytics'
+                ? 'bg-purple-800/50 text-purple-200 border-t-2 border-x-2 border-purple-500/50'
+                : 'text-purple-400 hover:text-purple-200'
+            }`}
+          >
+            Analytics
           </button>
         </div>
       </div>
@@ -1189,61 +1330,11 @@ export default function Social() {
       )}
 
       {activeTab === 'feeds' && (
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto">
-            <h2 className="text-3xl font-bold text-purple-200 mb-6">Live Streams</h2>
-            {liveStreams.length === 0 ? (
-              <div className="text-center py-20">
-                <div className="text-6xl mb-4">📡</div>
-                <div className="text-purple-400 text-xl">No live streams at the moment</div>
-                <div className="text-purple-500 text-sm mt-2">Start streaming to be the first!</div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {liveStreams.map((stream) => (
-                  <button
-                    key={stream.id}
-                    onClick={() => viewStream(stream)}
-                    className="bg-purple-800/30 rounded-lg overflow-hidden border border-purple-500/20 hover:border-purple-500/50 transition-all group"
-                  >
-                    <div className="aspect-video bg-black relative">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-6xl">📹</div>
-                      </div>
-                      <div className="absolute top-2 right-2 flex items-center gap-2 bg-red-500 px-3 py-1 rounded">
-                        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                        <span className="text-white font-bold text-xs">LIVE</span>
-                      </div>
-                      <div className="absolute top-2 left-2 bg-purple-900/90 backdrop-blur-xl px-3 py-1 rounded">
-                        <span className="text-green-400 font-bold text-xs">💸 {parseFloat(stream.total_tips).toFixed(2)} XRP</span>
-                      </div>
-                    </div>
-                    <div className="p-4">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold">
-                          {stream.nickname.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 text-left">
-                          <div className="flex items-center gap-2">
-                            <div className="text-purple-200 font-bold">{stream.nickname}</div>
-                            {stream.wallet_address === DEV_WALLET && (
-                              <span className="text-yellow-400 text-sm">👑</span>
-                            )}
-                          </div>
-                          <div className="text-purple-400 text-xs">{stream.title}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-purple-400">Started {formatTimestamp(stream.started_at)}</span>
-                        <span className="text-purple-300 font-medium">Watch →</span>
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <LiveFeedsPage onViewStream={viewStream} connectedWallet={connectedWallet} />
+      )}
+
+      {activeTab === 'analytics' && (
+        <StreamAnalytics />
       )}
 
       {activeTab === 'viewing' && viewingStream && (
@@ -1357,7 +1448,16 @@ export default function Social() {
                 )}
               </div>
 
-              <div className="p-4 border-t border-purple-500/20">
+              <div className="p-4 border-t border-purple-500/20 space-y-2">
+                <button
+                  onClick={() => {
+                    const user = { wallet_address: viewingStream.wallet_address, nickname: viewingStream.nickname };
+                    sendCrown(user);
+                  }}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white py-3 rounded-lg font-bold transition-all"
+                >
+                  👑 Send Crown
+                </button>
                 <button
                   onClick={() => {
                     const user = { wallet_address: viewingStream.wallet_address, nickname: viewingStream.nickname };
