@@ -773,8 +773,6 @@ export default function BotTrader() {
       }
     };
 
-    executeAndSchedule();
-
     const interval = setInterval(() => {
       executeAndSchedule();
     }, bot.interval * 60 * 1000);
@@ -888,11 +886,6 @@ export default function BotTrader() {
   };
 
   const openEditBot = (bot) => {
-    if (bot.status === 'running') {
-      toast.error('Stop the bot before editing');
-      return;
-    }
-
     setEditingBot({
       ...bot,
       minAmount: bot.min_amount,
@@ -925,7 +918,7 @@ export default function BotTrader() {
     }
 
     if (isNaN(maxAmount) || maxAmount < MIN_XRP_AMOUNT) {
-      toast.error(`Maximum amount must be at least ${MIN_XRP_AMOUNT} XRP`);
+      toast.error(`Maximum amount must be at least ${MAX_XRP_AMOUNT} XRP`);
       return;
     }
 
@@ -940,8 +933,14 @@ export default function BotTrader() {
       return;
     }
 
+    const wasRunning = editingBot.status === 'running';
+
     try {
       setLoading(true);
+
+      if (wasRunning) {
+        await stopBot(editingBot.id);
+      }
 
       const { error } = await supabase
         .from('trading_bots')
@@ -961,8 +960,8 @@ export default function BotTrader() {
         throw error;
       }
 
-      setBots(prev => prev.map(b => b.id === editingBot.id ? {
-        ...b,
+      const updatedBot = {
+        ...editingBot,
         name: editingBot.name.trim(),
         interval: interval,
         min_amount: minAmount,
@@ -970,7 +969,9 @@ export default function BotTrader() {
         slippage: slippage,
         strategy: editingBot.strategy,
         trade_mode: editingBot.buyProbability
-      } : b));
+      };
+
+      setBots(prev => prev.map(b => b.id === editingBot.id ? updatedBot : b));
 
       setBotAnnouncements(prev => {
         const newAnnouncements = { ...prev };
@@ -983,6 +984,12 @@ export default function BotTrader() {
       toast.success('Bot updated successfully!');
       setShowEditBot(false);
       setEditingBot(null);
+
+      if (wasRunning) {
+        setTimeout(() => {
+          startBot(updatedBot);
+        }, 500);
+      }
     } catch (error) {
       console.error('Error updating bot:', error);
       toast.error(error.message || 'Failed to update bot');
