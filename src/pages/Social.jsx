@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabase';
 import toast from 'react-hot-toast';
 import { Client, Wallet as XrplWallet } from 'xrpl';
-import Peer from 'simple-peer';
 import TipModal from '../components/TipModal';
 import LiveFeedsPage from '../components/LiveFeedsPage';
 import StreamAnalytics from '../components/StreamAnalytics';
@@ -60,9 +59,6 @@ export default function Social() {
   const pipVideoRef = useRef(null);
   const mainStreamRef = useRef(null);
   const pipStreamRef = useRef(null);
-  const broadcasterPeerRef = useRef(null);
-  const viewerPeerRef = useRef(null);
-  const viewerVideoRef = useRef(null);
 
   const emojis = ['😀', '😂', '🤣', '😊', '😍', '🥰', '😎', '🤔', '😭', '😱', '🤯', '😴', '🥳', '🤑', '🤗',
     '👍', '👎', '👏', '🙏', '💪', '🤝', '✌️', '🤞', '👌', '🤘', '🔥', '⭐', '✨', '💎', '💰',
@@ -346,18 +342,7 @@ export default function Social() {
       .order('started_at', { ascending: false });
 
     if (!error && data) {
-      const uniqueStreams = new Map();
-      data.forEach(stream => {
-        if (!uniqueStreams.has(stream.wallet_address)) {
-          uniqueStreams.set(stream.wallet_address, stream);
-        } else {
-          const existing = uniqueStreams.get(stream.wallet_address);
-          if (new Date(stream.started_at) > new Date(existing.started_at)) {
-            uniqueStreams.set(stream.wallet_address, stream);
-          }
-        }
-      });
-      setLiveStreams(Array.from(uniqueStreams.values()));
+      setLiveStreams(data);
     }
   };
 
@@ -884,7 +869,7 @@ export default function Social() {
         mainStreamRef.current = stream;
       }
 
-      const { data: newStream, error: insertError } = await supabase
+      const { data: newStream } = await supabase
         .from('live_streams')
         .insert([{
           wallet_address: connectedWallet.address,
@@ -899,32 +884,9 @@ export default function Social() {
         .select()
         .single();
 
-      if (insertError) {
-        throw insertError;
-      }
-
-      const peer = new Peer({
-        initiator: true,
-        trickle: false,
-        stream: stream
-      });
-
-      peer.on('signal', async (signal) => {
-        await supabase
-          .from('live_streams')
-          .update({ stream_signal: signal })
-          .eq('id', newStream.id);
-      });
-
-      peer.on('error', (err) => {
-        console.error('Broadcaster peer error:', err);
-      });
-
-      broadcasterPeerRef.current = peer;
       setCurrentStream(newStream);
       setIsStreaming(true);
       setShowCameraSelect(false);
-      setStreamDuration(0);
       toast.success('Stream started!');
       loadLiveStreams();
     } catch (error) {
@@ -974,14 +936,6 @@ export default function Social() {
   };
 
   const endStream = async () => {
-    if (broadcasterPeerRef.current) {
-      broadcasterPeerRef.current.destroy();
-      broadcasterPeerRef.current = null;
-    }
-    if (viewerPeerRef.current) {
-      viewerPeerRef.current.destroy();
-      viewerPeerRef.current = null;
-    }
     if (mainStreamRef.current) {
       mainStreamRef.current.getTracks().forEach(track => track.stop());
       mainStreamRef.current = null;
@@ -1002,8 +956,7 @@ export default function Social() {
         .from('live_streams')
         .update({
           is_active: false,
-          ended_at: new Date().toISOString(),
-          stream_signal: null
+          ended_at: new Date().toISOString()
         })
         .eq('id', currentStream.id);
     }
@@ -1013,7 +966,6 @@ export default function Social() {
     setCurrentStream(null);
     setStreamTips([]);
     setTotalTips(0);
-    setViewingStream(null);
     toast.success('Stream ended');
     loadLiveStreams();
   };
@@ -1297,7 +1249,6 @@ export default function Social() {
                   <video
                     ref={mainVideoRef}
                     autoPlay
-                    playsInline
                     muted
                     className="w-full h-full object-cover"
                   />
@@ -1314,7 +1265,6 @@ export default function Social() {
                       <video
                         ref={pipVideoRef}
                         autoPlay
-                        playsInline
                         muted
                         className="w-full h-full object-cover"
                       />
@@ -1743,18 +1693,13 @@ export default function Social() {
           </div>
           <div className="flex-1 flex overflow-hidden min-h-0">
             <div className="flex-1 bg-black flex flex-col min-w-0">
-              <div className="flex-1 flex items-center justify-center relative min-h-0 bg-gradient-to-br from-purple-900/20 via-black to-purple-900/20">
-                <div className="text-center px-8">
-                  <div className="text-8xl mb-4 animate-pulse">🎥</div>
-                  <div className="text-purple-200 text-2xl font-bold mb-2">{viewingStream.nickname} is LIVE!</div>
-                  <div className="text-purple-400 text-lg mb-4">{viewingStream.title}</div>
-                  <div className="bg-purple-900/50 backdrop-blur-xl px-6 py-4 rounded-lg border border-purple-500/30 max-w-md mx-auto">
-                    <div className="text-purple-300 text-sm">
-                      💬 Chat with the streamer and send tips to show support!
-                    </div>
-                  </div>
+              <div className="flex-1 flex items-center justify-center relative min-h-0">
+                <div className="text-center">
+                  <div className="text-8xl mb-4">📹</div>
+                  <div className="text-purple-400 text-xl">Stream Preview</div>
+                  <div className="text-purple-500 text-sm mt-2">Live video streaming coming soon</div>
                 </div>
-                <div className="absolute top-4 right-4 flex items-center gap-2 bg-red-500 backdrop-blur-xl px-4 py-2 rounded-lg shadow-lg">
+                <div className="absolute top-4 right-4 flex items-center gap-2 bg-red-500/90 backdrop-blur-xl px-4 py-2 rounded-lg">
                   <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
                   <span className="text-white font-bold text-sm">LIVE</span>
                 </div>
