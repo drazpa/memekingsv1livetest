@@ -11,6 +11,7 @@ import SlippageRetryModal from '../components/SlippageRetryModal';
 import PoolHistoryModal from '../components/PoolHistoryModal';
 import { onTokenUpdate } from '../utils/tokenEvents';
 import { XRPScanLink } from '../components/XRPScanLink';
+import { getXRPBalance } from '../utils/xrplBalance';
 
 const RECEIVER_ADDRESS = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
 const TRADING_FEE = 0.01;
@@ -50,6 +51,7 @@ export default function Trade({ preselectedToken = null }) {
   const [settingTrustline, setSettingTrustline] = useState(false);
   const [trading, setTrading] = useState(false);
   const [tokenBalance, setTokenBalance] = useState('0');
+  const [xrpBalance, setXrpBalance] = useState(0);
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [chartType, setChartType] = useState('area');
   const [timeframe, setTimeframe] = useState('15m');
@@ -932,43 +934,50 @@ export default function Trade({ preselectedToken = null }) {
     }
   };
 
-  const fetchTokenBalance = async () => {
-    if (!selectedToken || !connectedWallet) {
-      setTokenBalance('0');
-      return;
-    }
+  const fetchBalances = async () => {
+    if (!connectedWallet) return;
 
     try {
       setLoadingBalance(true);
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
 
-      const response = await client.request({
-        command: 'account_lines',
-        account: connectedWallet.address,
-        ledger_index: 'validated'
-      });
+      const balance = await getXRPBalance(connectedWallet.address);
+      setXrpBalance(balance);
 
-      const currencyHex = selectedToken.currency_code.length > 3
-        ? Buffer.from(selectedToken.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
-        : selectedToken.currency_code;
+      if (selectedToken) {
+        const client = new xrpl.Client('wss://xrplcluster.com');
+        await client.connect();
 
-      const tokenLine = response.result.lines.find(
-        line => line.account === selectedToken.issuer_address &&
-                (line.currency === selectedToken.currency_code ||
-                 line.currency === currencyHex ||
-                 line.currency === selectedToken.currency_code.substring(0, 3))
-      );
+        const response = await client.request({
+          command: 'account_lines',
+          account: connectedWallet.address,
+          ledger_index: 'validated'
+        });
 
-      setTokenBalance(tokenLine ? tokenLine.balance : '0');
-      await client.disconnect();
+        const currencyHex = selectedToken.currency_code.length > 3
+          ? Buffer.from(selectedToken.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+          : selectedToken.currency_code;
+
+        const tokenLine = response.result.lines.find(
+          line => line.account === selectedToken.issuer_address &&
+                  (line.currency === selectedToken.currency_code ||
+                   line.currency === currencyHex ||
+                   line.currency === selectedToken.currency_code.substring(0, 3))
+        );
+
+        setTokenBalance(tokenLine ? tokenLine.balance : '0');
+        await client.disconnect();
+      } else {
+        setTokenBalance('0');
+      }
     } catch (error) {
-      console.error('Error fetching token balance:', error);
+      console.error('Error fetching balances:', error);
       setTokenBalance('0');
     } finally {
       setLoadingBalance(false);
     }
   };
+
+  const fetchTokenBalance = fetchBalances;
 
   const checkTrustline = async () => {
     if (!selectedToken || !connectedWallet) {
@@ -1995,8 +2004,34 @@ export default function Trade({ preselectedToken = null }) {
                   step="0.000001"
                   className="input w-full text-purple-200 text-lg"
                 />
-                <div className="text-purple-400 text-xs mt-1">
-                  {tradeType === 'buy' ? 'Enter XRP to spend' : `Enter ${selectedToken?.token_name || 'tokens'} to sell`}
+                <div className="flex items-center justify-between mt-2">
+                  <div className="text-purple-400 text-xs">
+                    {tradeType === 'buy'
+                      ? `Balance: ${xrpBalance.toFixed(4)} XRP`
+                      : `Balance: ${parseFloat(tokenBalance).toFixed(4)} ${selectedToken?.token_name || ''}`
+                    }
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-2 mt-2">
+                  {['25', '50', '75', '100'].map((percent) => (
+                    <button
+                      key={percent}
+                      onClick={() => {
+                        const balance = tradeType === 'buy' ? xrpBalance : parseFloat(tokenBalance);
+                        const percentage = parseFloat(percent) / 100;
+                        let calculatedAmount = balance * percentage;
+
+                        if (tradeType === 'buy') {
+                          calculatedAmount = Math.max(0, calculatedAmount - 2);
+                        }
+
+                        setAmount(calculatedAmount > 0 ? calculatedAmount.toFixed(6) : '0');
+                      }}
+                      className="py-1.5 rounded-lg text-xs font-medium glass text-purple-300 hover:bg-purple-600 hover:text-white transition-all"
+                    >
+                      {percent === '100' ? 'MAX' : `${percent}%`}
+                    </button>
+                  ))}
                 </div>
               </div>
 
