@@ -397,6 +397,7 @@ export default function Social() {
 
   const sendMessage = async () => {
     if (!messageInput.trim() || !connectedWallet || !nickname) {
+      toast.error('Please ensure you have a nickname set');
       return;
     }
 
@@ -406,25 +407,32 @@ export default function Social() {
       .eq('type', 'general')
       .maybeSingle();
 
-    if (!rooms) return;
+    if (!rooms) {
+      toast.error('Chat room not found');
+      return;
+    }
 
     const messageData = {
       room_id: rooms.id,
       wallet_address: connectedWallet.address,
       nickname: nickname,
       message_type: 'text',
-      content: messageInput.trim(),
-      created_at: new Date().toISOString()
+      content: messageInput.trim()
     };
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('chat_messages')
-      .insert([messageData]);
+      .insert([messageData])
+      .select();
 
     if (error) {
       console.error('Error sending message:', error);
-      toast.error('Failed to send message');
+      toast.error('Failed to send message: ' + error.message);
       return;
+    }
+
+    if (data && data.length > 0) {
+      setMessages((prev) => [...prev, data[0]]);
     }
 
     setMessageInput('');
@@ -549,26 +557,33 @@ export default function Social() {
       from_nickname: nickname,
       to_nickname: selectedDM.otherNickname,
       message_type: 'text',
-      content: messageInput.trim(),
-      created_at: new Date().toISOString()
+      content: messageInput.trim()
     };
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('direct_messages')
-      .insert([dmData]);
+      .insert([dmData])
+      .select();
 
-    if (!error) {
-      await supabase
-        .from('dm_conversations')
-        .update({
-          last_message: messageInput.trim(),
-          last_message_at: new Date().toISOString()
-        })
-        .eq('id', selectedDM.id);
-
-      setMessageInput('');
-      loadDMConversations();
+    if (error) {
+      toast.error('Failed to send DM: ' + error.message);
+      return;
     }
+
+    if (data && data.length > 0) {
+      setDmMessages((prev) => [...prev, data[0]]);
+    }
+
+    await supabase
+      .from('dm_conversations')
+      .update({
+        last_message: messageInput.trim(),
+        last_message_at: new Date().toISOString()
+      })
+      .eq('id', selectedDM.id);
+
+    setMessageInput('');
+    loadDMConversations();
   };
 
   const closeDM = () => {
