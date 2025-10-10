@@ -1,19 +1,14 @@
-import * as xrpl from 'xrpl';
+import { requestWithRetry } from './xrplClient';
 
 export async function getXRPBalance(address) {
   if (!address) return 0;
 
   try {
-    const client = new xrpl.Client('wss://xrplcluster.com');
-    await client.connect();
-
-    const response = await client.request({
+    const response = await requestWithRetry({
       command: 'account_info',
       account: address,
       ledger_index: 'validated'
     });
-
-    await client.disconnect();
 
     const balance = parseFloat(response.result.account_data.Balance) / 1000000;
     return balance;
