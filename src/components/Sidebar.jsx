@@ -193,10 +193,10 @@ export default function Sidebar({ currentPage, onNavigate }) {
 
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg text-purple-300 hover:bg-purple-900/30 transition-all duration-200"
+            className="p-2 rounded-lg text-purple-300 hover:bg-purple-900/30 transition-all duration-200 touch-manipulation active:scale-95"
             aria-label="Toggle menu"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {mobileMenuOpen ? (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               ) : (
@@ -212,7 +212,7 @@ export default function Sidebar({ currentPage, onNavigate }) {
             mobileMenuOpen ? 'max-h-[calc(100vh-80px)] opacity-100' : 'max-h-0 opacity-0'
           }`}
         >
-          <div className="px-3 pb-3 space-y-1 max-h-[calc(100vh-100px)] overflow-y-auto">
+          <div className="px-2 pb-3 space-y-1 max-h-[calc(100vh-100px)] overflow-y-auto">
             {menuItems.map((item) => (
               <button
                 key={item.id}
@@ -220,7 +220,7 @@ export default function Sidebar({ currentPage, onNavigate }) {
                   onNavigate(item.id);
                   setMobileMenuOpen(false);
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 touch-manipulation active:scale-98 text-base ${
                   currentPage === item.id
                     ? 'bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg'
                     : 'text-purple-300 hover:bg-purple-900/30'

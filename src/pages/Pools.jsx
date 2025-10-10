@@ -12,7 +12,9 @@ export default function Pools() {
   const [refreshing, setRefreshing] = useState(false);
   const [connectedWallet, setConnectedWallet] = useState(null);
   const [lpBalances, setLpBalances] = useState({});
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState(() => {
+    return window.innerWidth < 768 ? 'grid' : 'list';
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('liquidity');
   const [poolFilter, setPoolFilter] = useState('all');

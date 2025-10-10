@@ -24,57 +24,57 @@ export default function TokenGridCard({ token, poolData, isFavorited, onToggleFa
 
   return (
     <div
-      className="glass rounded-lg p-6 hover:bg-purple-500/10 transition-all cursor-pointer space-y-4"
+      className="glass rounded-lg p-4 sm:p-6 hover:bg-purple-500/10 transition-all cursor-pointer space-y-3 sm:space-y-4"
       onClick={onClick}
     >
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <TokenIcon token={token} size="lg" />
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xl font-bold text-purple-200">{token.token_name}</h3>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <h3 className="text-base sm:text-xl font-bold text-purple-200 truncate">{token.token_name}</h3>
               {onToggleFavorite && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onToggleFavorite(token.id, e);
                   }}
-                  className="text-lg hover:scale-110 transition-transform"
+                  className="text-base sm:text-lg hover:scale-110 transition-transform flex-shrink-0"
                 >
                   {isFavorited ? '⭐' : '☆'}
                 </button>
               )}
             </div>
-            <div className="text-purple-400 text-sm">{token.currency_code}</div>
+            <div className="text-purple-400 text-xs sm:text-sm truncate">{token.currency_code}</div>
           </div>
         </div>
 
         {token.amm_pool_created ? (
-          <span className="px-2 py-1 bg-green-500/20 text-green-300 text-xs rounded-full">
+          <span className="px-2 py-0.5 sm:py-1 bg-green-500/20 text-green-300 text-xs rounded-full whitespace-nowrap flex-shrink-0">
             ✓ Active
           </span>
         ) : (
-          <span className="px-2 py-1 bg-yellow-500/20 text-yellow-300 text-xs rounded-full">
+          <span className="px-2 py-0.5 sm:py-1 bg-yellow-500/20 text-yellow-300 text-xs rounded-full whitespace-nowrap flex-shrink-0">
             ⏳ Pending
           </span>
         )}
       </div>
 
       {/* Badges */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5 sm:gap-2">
         {token.category && <CategoryBadge category={token.category} size="sm" />}
         {showMemeKingBadge && isMemeKingToken && (
-          <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 text-xs rounded-full font-medium">
+          <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-yellow-500/20 text-yellow-300 text-xs rounded-full font-medium whitespace-nowrap">
             👑 MemeKing
           </span>
         )}
         {!isMemeKingToken && (
-          <span className="px-3 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full font-medium">
+          <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full font-medium whitespace-nowrap">
             👤 Community
           </span>
         )}
-        <span className="px-3 py-1 bg-purple-500/20 text-purple-300 text-xs rounded-full font-medium">
+        <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-purple-500/20 text-purple-300 text-xs rounded-full font-medium whitespace-nowrap">
           📅 {calculateDaysOnMarket(token.created_at)}d
         </span>
       </div>
@@ -82,38 +82,38 @@ export default function TokenGridCard({ token, poolData, isFavorited, onToggleFa
       {/* Stats Grid */}
       {showStats && poolData && (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="glass rounded-lg p-3">
-              <div className="text-purple-400 text-xs mb-1">Price</div>
-              <div className="text-purple-200 font-bold text-lg">{formatPrice(price)} XRP</div>
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className="glass rounded-lg p-2 sm:p-3">
+              <div className="text-purple-400 text-xs mb-0.5 sm:mb-1">Price</div>
+              <div className="text-purple-200 font-bold text-sm sm:text-lg truncate">{formatPrice(price)} XRP</div>
             </div>
-            <div className="glass rounded-lg p-3">
-              <div className="text-purple-400 text-xs mb-1">Market Cap</div>
-              <div className="text-purple-200 font-bold text-lg">{formatMarketCap(marketCap)} XRP</div>
+            <div className="glass rounded-lg p-2 sm:p-3">
+              <div className="text-purple-400 text-xs mb-0.5 sm:mb-1">Market Cap</div>
+              <div className="text-purple-200 font-bold text-sm sm:text-lg truncate">{formatMarketCap(marketCap)} XRP</div>
             </div>
-            <div className="glass rounded-lg p-3">
-              <div className="text-purple-400 text-xs mb-1">XRP Locked</div>
-              <div className="text-purple-200 font-bold text-lg">{formatMarketCap(xrpLocked)} XRP</div>
+            <div className="glass rounded-lg p-2 sm:p-3">
+              <div className="text-purple-400 text-xs mb-0.5 sm:mb-1">XRP Locked</div>
+              <div className="text-purple-200 font-bold text-sm sm:text-lg truncate">{formatMarketCap(xrpLocked)} XRP</div>
             </div>
-            <div className="glass rounded-lg p-3">
-              <div className="text-purple-400 text-xs mb-1">Supply</div>
-              <div className="text-purple-200 font-bold text-lg">{(token.supply / 1000000).toFixed(2)}M</div>
+            <div className="glass rounded-lg p-2 sm:p-3">
+              <div className="text-purple-400 text-xs mb-0.5 sm:mb-1">Supply</div>
+              <div className="text-purple-200 font-bold text-sm sm:text-lg truncate">{(token.supply / 1000000).toFixed(2)}M</div>
             </div>
           </div>
 
           {/* % Change Indicators */}
-          <div className="flex justify-around items-center py-2 glass rounded-lg">
+          <div className="flex justify-around items-center py-1.5 sm:py-2 glass rounded-lg">
             <div className="text-center">
-              <div className="text-purple-400 text-xs mb-1">1H %</div>
-              <div className="text-gray-400 text-sm">-</div>
+              <div className="text-purple-400 text-xs mb-0.5 sm:mb-1">1H %</div>
+              <div className="text-gray-400 text-xs sm:text-sm">-</div>
             </div>
             <div className="text-center">
-              <div className="text-purple-400 text-xs mb-1">24H %</div>
-              <div className="text-gray-400 text-sm">-</div>
+              <div className="text-purple-400 text-xs mb-0.5 sm:mb-1">24H %</div>
+              <div className="text-gray-400 text-xs sm:text-sm">-</div>
             </div>
             <div className="text-center">
-              <div className="text-purple-400 text-xs mb-1">7D %</div>
-              <div className="text-gray-400 text-sm">-</div>
+              <div className="text-purple-400 text-xs mb-0.5 sm:mb-1">7D %</div>
+              <div className="text-gray-400 text-xs sm:text-sm">-</div>
             </div>
           </div>
         </>

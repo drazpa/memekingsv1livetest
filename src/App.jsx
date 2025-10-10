@@ -164,7 +164,7 @@ export default function App() {
 
         <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
 
-        <div className="lg:ml-64 pt-20 lg:pt-6 p-4 sm:p-6 lg:p-8">
+        <div className="lg:ml-64 pt-20 lg:pt-6 p-3 sm:p-4 md:p-6 lg:p-8">
           <div className="w-full mx-auto">
             {renderPage()}
           </div>

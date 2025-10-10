@@ -23,7 +23,9 @@ export default function Memes() {
   const [filter, setFilter] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState(() => {
+    return window.innerWidth < 768 ? 'grid' : 'list';
+  });
   const [sortBy, setSortBy] = useState('newest');
   const [favorites, setFavorites] = useState([]);
   const [connectedWallet, setConnectedWallet] = useState(null);

@@ -20,11 +20,11 @@ function TokenIcon({ token, size = 'md', className = '' }) {
   const imageUrlRef = useRef(null);
 
   const sizeClasses = {
-    sm: 'w-8 h-8 text-sm',
-    md: 'w-12 h-12 text-xl',
-    lg: 'w-16 h-16 text-2xl',
-    xl: 'w-20 h-20 text-3xl',
-    '3xl': 'w-24 h-24 text-4xl'
+    sm: 'w-8 h-8 min-w-[2rem] min-h-[2rem] text-sm',
+    md: 'w-12 h-12 min-w-[3rem] min-h-[3rem] text-xl',
+    lg: 'w-16 h-16 min-w-[4rem] min-h-[4rem] text-2xl',
+    xl: 'w-20 h-20 min-w-[5rem] min-h-[5rem] text-3xl',
+    '3xl': 'w-24 h-24 min-w-[6rem] min-h-[6rem] text-4xl'
   };
 
   const sizeClass = sizeClasses[size] || sizeClasses.md;
@@ -92,7 +92,7 @@ function TokenIcon({ token, size = 'md', className = '' }) {
     const finalUrl = imageUrl;
 
     return (
-      <div className={`relative inline-block ${sizeClass}`}>
+      <div className={`relative inline-block ${sizeClass} flex-shrink-0`}>
         {!imageLoaded && (
           <div className={`absolute inset-0 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white font-bold ${className}`}>
             {token.token_name[0]}
@@ -102,7 +102,7 @@ function TokenIcon({ token, size = 'md', className = '' }) {
           key={`${token.id}-${currentGatewayIndex}-${retryCount}`}
           src={finalUrl}
           alt={token.token_name}
-          className={`${sizeClass} rounded-full object-cover border-2 border-purple-500 ${className} transition-opacity duration-200 ${!imageLoaded ? 'opacity-0' : 'opacity-100'}`}
+          className={`${sizeClass} rounded-full object-cover border-2 border-purple-500 ${className} transition-opacity duration-200 ${!imageLoaded ? 'opacity-0' : 'opacity-100'} aspect-square`}
           onLoad={() => {
             const cacheKey = `${token.id}-${token.image_url}`;
             imageCache.set(cacheKey, true);
@@ -115,7 +115,7 @@ function TokenIcon({ token, size = 'md', className = '' }) {
   }
 
   return (
-    <div className={`${sizeClass} rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white font-bold ${className}`}>
+    <div className={`${sizeClass} rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white font-bold ${className} flex-shrink-0 aspect-square`}>
       {token.token_name[0]}
     </div>
   );

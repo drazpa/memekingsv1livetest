@@ -60,7 +60,9 @@ export default function Dashboard() {
   const [manualImageFile, setManualImageFile] = useState(null);
   const [manualImagePreview, setManualImagePreview] = useState(null);
   const [uploadingManualImage, setUploadingManualImage] = useState(false);
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState(() => {
+    return window.innerWidth < 768 ? 'grid' : 'list';
+  });
   const [topViewMode, setTopViewMode] = useState('grid');
   const [selectedToken, setSelectedToken] = useState(null);
   const [showActivityModal, setShowActivityModal] = useState(false);

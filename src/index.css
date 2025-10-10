@@ -44,7 +44,7 @@
   }
 
   .token-card {
-    @apply rounded-lg p-6 transition-all duration-300;
+    @apply rounded-lg p-4 sm:p-6 transition-all duration-300;
     border: var(--glass-border);
     background: linear-gradient(135deg, rgba(88, 28, 135, 0.4), rgba(59, 7, 100, 0.4));
     backdrop-filter: blur(24px);
@@ -103,7 +103,7 @@
   }
 
   .btn {
-    @apply rounded-lg px-4 py-2 transition-all duration-300;
+    @apply rounded-lg px-3 py-1.5 sm:px-4 sm:py-2 text-sm sm:text-base transition-all duration-300;
     border: var(--glass-border);
     background: rgba(88, 28, 135, 0.3);
     backdrop-filter: blur(8px);
@@ -135,7 +135,7 @@
   }
 
   .input {
-    @apply rounded-lg px-4 py-2 transition-all duration-300;
+    @apply rounded-lg px-3 py-2 sm:px-4 text-sm sm:text-base transition-all duration-300;
     border: var(--glass-border);
     background: rgba(88, 28, 135, 0.2);
     backdrop-filter: blur(8px);
@@ -153,6 +153,18 @@
 }
 
 @layer utilities {
+  .heading-responsive {
+    @apply text-xl sm:text-2xl md:text-3xl lg:text-4xl;
+  }
+
+  .subheading-responsive {
+    @apply text-lg sm:text-xl md:text-2xl;
+  }
+
+  .text-responsive {
+    @apply text-sm sm:text-base;
+  }
+
   .text-glow {
     text-shadow: 0 0 10px var(--glow-color);
   }
