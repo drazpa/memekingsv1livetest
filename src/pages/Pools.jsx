@@ -178,14 +178,14 @@ export default function Pools() {
 
             let contributors = 0;
             try {
-              const lpHoldersResponse = await client.request({
-                command: 'account_lines',
+              const accountInfoResponse = await client.request({
+                command: 'account_info',
                 account: amm.account,
                 ledger_index: 'validated'
               });
-              contributors = lpHoldersResponse.result.lines?.length || 0;
+              contributors = accountInfoResponse.result.account_data?.OwnerCount || 0;
             } catch (e) {
-              console.log(`Could not fetch LP holders for ${token.token_name}`);
+              console.log(`Could not fetch contributors for ${token.token_name}`);
             }
 
             poolData[token.id] = {
@@ -208,14 +208,16 @@ export default function Pools() {
           }
         } catch (error) {
           console.error(`Error fetching pool data for ${token.token_name}:`, error.message);
+          poolData[token.id] = null;
         }
       }
 
       setPoolsData(poolData);
+      console.log('All pool data loaded:', poolData);
       await client.disconnect();
     } catch (error) {
       console.error('Error fetching pools data:', error);
-      toast.error('Failed to fetch pool data');
+      toast.error(`Failed to fetch pool data: ${error.message}`);
     } finally {
       setRefreshing(false);
     }
@@ -236,18 +238,20 @@ export default function Pools() {
       });
 
       const lpBal = {};
-      response.result.lines.forEach(line => {
-        const poolData = Object.entries(poolsData).find(
-          ([_, data]) => data.accountId === line.account
-        );
+      if (response.result.lines) {
+        response.result.lines.forEach(line => {
+          const poolData = Object.entries(poolsData).find(
+            ([_, data]) => data && data.accountId === line.account
+          );
 
-        if (poolData) {
-          const [tokenId, data] = poolData;
-          const balance = parseFloat(line.balance);
-          const share = (balance / data.lpTokens) * 100;
-          lpBal[tokenId] = { balance, share };
-        }
-      });
+          if (poolData) {
+            const [tokenId, data] = poolData;
+            const balance = parseFloat(line.balance);
+            const share = data.lpTokens > 0 ? (balance / data.lpTokens) * 100 : 0;
+            lpBal[tokenId] = { balance, share };
+          }
+        });
+      }
 
       setLpBalances(lpBal);
       await client.disconnect();
@@ -408,6 +412,10 @@ export default function Pools() {
     const poolData = poolsData[token.id];
     const lpBalance = lpBalances[token.id];
     const livePrice = getLivePrice(token);
+
+    if (!poolData) {
+      return null;
+    }
 
     return (
       <tr className="border-t border-purple-500/20 hover:bg-purple-900/20">
@@ -599,6 +607,7 @@ export default function Pools() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {tokens
               .filter(token => {
+                if (!token.amm_pool_created) return false;
                 const matchesSearch = token.token_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                   token.currency_code.toLowerCase().includes(searchQuery.toLowerCase());
                 const hasLP = lpBalances[token.id] && lpBalances[token.id].balance > 0;
@@ -637,6 +646,7 @@ export default function Pools() {
               <tbody>
                 {tokens
                   .filter(token => {
+                    if (!token.amm_pool_created) return false;
                     const matchesSearch = token.token_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                       token.currency_code.toLowerCase().includes(searchQuery.toLowerCase());
                     const hasLP = lpBalances[token.id] && lpBalances[token.id].balance > 0;
