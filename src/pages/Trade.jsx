@@ -78,6 +78,12 @@ export default function Trade({ preselectedToken = null }) {
   const [lastTxDetails, setLastTxDetails] = useState(null);
   const [autoRetrying, setAutoRetrying] = useState(false);
   const [retryAttempt, setRetryAttempt] = useState(0);
+  const [lpPosition, setLpPosition] = useState(null);
+  const [loadingLpPosition, setLoadingLpPosition] = useState(false);
+  const [showPositionTab, setShowPositionTab] = useState(false);
+  const [withdrawMode, setWithdrawMode] = useState('both');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
   const priceChartContainerRef = useRef(null);
   const volumeChartContainerRef = useRef(null);
   const priceChartInstanceRef = useRef(null);
@@ -131,6 +137,7 @@ export default function Trade({ preselectedToken = null }) {
     if (selectedToken && connectedWallet) {
       checkTrustline();
       fetchTokenBalance();
+      fetchLpPosition();
     }
     if (selectedToken) {
       fetchMarketData();
@@ -1045,6 +1052,82 @@ export default function Trade({ preselectedToken = null }) {
     }
   };
 
+  const fetchLpPosition = async () => {
+    if (!selectedToken || !connectedWallet) {
+      setLpPosition(null);
+      return;
+    }
+
+    try {
+      setLoadingLpPosition(true);
+      const client = new xrpl.Client('wss://xrplcluster.com');
+      await client.connect();
+
+      const currencyHex = selectedToken.currency_code.length > 3
+        ? Buffer.from(selectedToken.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+        : selectedToken.currency_code;
+
+      const ammInfo = await client.request({
+        command: 'amm_info',
+        asset: { currency: 'XRP' },
+        asset2: { currency: currencyHex, issuer: selectedToken.issuer_address },
+        ledger_index: 'validated'
+      });
+
+      if (!ammInfo?.result?.amm) {
+        setLpPosition(null);
+        await client.disconnect();
+        return;
+      }
+
+      const amm = ammInfo.result.amm;
+      const lpTokenCurrency = amm.lp_token.currency;
+      const lpTokenIssuer = amm.lp_token.issuer;
+
+      const accountLines = await client.request({
+        command: 'account_lines',
+        account: connectedWallet.address,
+        ledger_index: 'validated'
+      });
+
+      const lpTokenLine = accountLines.result.lines.find(
+        line => line.currency === lpTokenCurrency && line.account === lpTokenIssuer
+      );
+
+      if (lpTokenLine) {
+        const userLpTokens = parseFloat(lpTokenLine.balance);
+        const totalLpTokens = parseFloat(amm.lp_token.value);
+        const sharePercentage = (userLpTokens / totalLpTokens) * 100;
+
+        const poolXrp = parseFloat(amm.amount) / 1000000;
+        const poolTokens = parseFloat(amm.amount2.value);
+
+        const userXrp = (poolXrp * sharePercentage) / 100;
+        const userTokens = (poolTokens * sharePercentage) / 100;
+        const estimatedValue = userXrp * 2;
+
+        setLpPosition({
+          xrp: userXrp.toFixed(6),
+          tokens: userTokens.toFixed(6),
+          lpTokens: userLpTokens.toFixed(6),
+          sharePercentage: sharePercentage.toFixed(6),
+          estimatedValue: estimatedValue.toFixed(6),
+          lpTokenCurrency,
+          lpTokenIssuer
+        });
+      } else {
+        setLpPosition(null);
+      }
+
+      await client.disconnect();
+    } catch (error) {
+      console.error('Error fetching LP position:', error);
+      setLpPosition(null);
+    } finally {
+      setLoadingLpPosition(false);
+    }
+  };
+
   const updateTradeStep = (stepIndex, status, data = {}) => {
     setTradeSteps(prev => {
       const updated = [...prev];
@@ -1733,17 +1816,42 @@ export default function Trade({ preselectedToken = null }) {
 
           <div className="glass rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-bold text-purple-200">Trade</h3>
-              <select
-                value={swapMode}
-                onChange={(e) => setSwapMode(e.target.value)}
-                className="input px-3 py-1.5 text-sm text-purple-200 bg-purple-900/50 border-purple-500/30"
-              >
-                <option value="amm">AMM Pool</option>
-                <option value="market">Market</option>
-              </select>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowPositionTab(false)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                    !showPositionTab
+                      ? 'bg-purple-600 text-white'
+                      : 'glass text-purple-300 hover:bg-purple-900/50'
+                  }`}
+                >
+                  Trade
+                </button>
+                <button
+                  onClick={() => setShowPositionTab(true)}
+                  className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                    showPositionTab
+                      ? 'bg-purple-600 text-white'
+                      : 'glass text-purple-300 hover:bg-purple-900/50'
+                  }`}
+                >
+                  My Position
+                </button>
+              </div>
+              {!showPositionTab && (
+                <select
+                  value={swapMode}
+                  onChange={(e) => setSwapMode(e.target.value)}
+                  className="input px-3 py-1.5 text-sm text-purple-200 bg-purple-900/50 border-purple-500/30"
+                >
+                  <option value="amm">AMM Pool</option>
+                  <option value="market">Market</option>
+                </select>
+              )}
             </div>
 
+            {!showPositionTab ? (
+              <>
             <div className="flex gap-2 mb-3">
               <button
                 onClick={() => setTradeType('buy')}
@@ -1959,6 +2067,114 @@ export default function Trade({ preselectedToken = null }) {
                 </div>
               )}
             </div>
+            </>
+            ) : (
+              <div className="space-y-4">
+                {loadingLpPosition ? (
+                  <div className="text-center py-8 text-purple-400">
+                    Loading position...
+                  </div>
+                ) : !connectedWallet ? (
+                  <div className="text-center py-8 text-purple-400">
+                    Connect wallet to view your position
+                  </div>
+                ) : !lpPosition ? (
+                  <div className="text-center py-8 text-purple-400">
+                    No LP position found for this pool
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between py-3 border-b border-purple-500/20">
+                          <div className="flex items-center gap-2 text-purple-400">
+                            <span className="text-2xl">✕</span>
+                            <span>XRP</span>
+                          </div>
+                          <span className="text-purple-200 font-bold text-lg">{lpPosition.xrp}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between py-3 border-b border-purple-500/20">
+                          <div className="flex items-center gap-2 text-purple-400">
+                            <TokenIcon token={selectedToken} size="sm" />
+                            <span>{selectedToken.token_name}</span>
+                          </div>
+                          <span className="text-purple-200 font-bold text-lg">{lpPosition.tokens}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between py-3 border-b border-purple-500/20">
+                          <div className="flex items-center gap-2 text-purple-400">
+                            <span className="text-2xl">🔗</span>
+                            <span>LP_{selectedToken.currency_code}_XRP</span>
+                          </div>
+                          <span className="text-purple-200 font-bold text-lg">{lpPosition.lpTokens}</span>
+                        </div>
+                      </div>
+
+                      <div className="glass rounded-lg p-4 space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-purple-400">Share</span>
+                          <span className="text-purple-200 font-bold">{lpPosition.sharePercentage}%</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-purple-400">Estimated value</span>
+                          <span className="text-purple-200 font-bold">{lpPosition.estimatedValue} XRP</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 mt-6 pt-6 border-t border-purple-500/20">
+                        <h4 className="font-bold text-purple-200 mb-3">Withdraw</h4>
+
+                        <div>
+                          <label className="block text-purple-300 mb-2">Amount to Withdraw</label>
+                          <input
+                            type="number"
+                            value={withdrawAmount}
+                            onChange={(e) => setWithdrawAmount(e.target.value)}
+                            placeholder="0.00"
+                            max={lpPosition.lpTokens}
+                            step="0.000001"
+                            className="input w-full text-purple-200 text-lg"
+                          />
+                          <div className="flex justify-between text-xs text-purple-400 mt-1">
+                            <span>LP Tokens to withdraw</span>
+                            <button
+                              onClick={() => setWithdrawAmount(lpPosition.lpTokens)}
+                              className="text-purple-300 hover:text-purple-200 font-medium"
+                            >
+                              MAX
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-purple-300 mb-2">Withdrawn asset</label>
+                          <div className="glass rounded-lg p-3 flex items-center justify-between cursor-not-allowed">
+                            <div className="flex items-center gap-2">
+                              <TokenIcon token={selectedToken} size="sm" />
+                              <span className="text-2xl">✕</span>
+                              <span className="text-purple-200">Both</span>
+                            </div>
+                            <span className="text-purple-400">→</span>
+                          </div>
+                          <div className="text-xs text-purple-400 mt-1">
+                            Withdrawing both XRP and {selectedToken.token_name}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => toast.error('Withdraw functionality coming soon')}
+                          disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || withdrawing}
+                          className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                          {withdrawing ? 'Withdrawing...' : 'Withdraw from Pool'}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
