@@ -10,7 +10,7 @@ import { logActivity, ACTION_TYPES } from '../utils/activityLogger';
 import { getRandomWord } from '../utils/dictionary';
 import { emitTokenUpdate } from '../utils/tokenEvents';
 import { setFeaturedPosition, promoteToFeatured } from '../utils/featuredTokens';
-import { CategoryBadge, calculateDaysOnMarket } from '../utils/categoryUtils';
+import { CategoryBadge, calculateDaysOnMarket, CATEGORIES } from '../utils/categoryUtils';
 
 const ISSUER_SEED = 'sEd7bAfzqZWKxaatJpoWzTvENyaTg1Y';
 const ISSUER_ADDRESS = 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6';
@@ -80,6 +80,7 @@ export default function Dashboard() {
   const [createdTokenData, setCreatedTokenData] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [currentPage, setCurrentPage] = useState(1);
   const [tokenFilterTab, setTokenFilterTab] = useState('all');
@@ -918,10 +919,11 @@ export default function Dashboard() {
       const matchesFilter = filterStatus === 'all' ||
                           (filterStatus === 'active' && t.amm_pool_created) ||
                           (filterStatus === 'pending' && !t.amm_pool_created);
+      const matchesCategory = filterCategory === 'all' || t.category === filterCategory;
       const matchesTab = tokenFilterTab === 'all' ||
                         (tokenFilterTab === 'memeking' && t.issuer_address === ISSUER_ADDRESS) ||
                         (tokenFilterTab === 'user' && t.issuer_address !== ISSUER_ADDRESS);
-      return matchesSearch && matchesFilter && matchesTab;
+      return matchesSearch && matchesFilter && matchesCategory && matchesTab;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -929,10 +931,22 @@ export default function Dashboard() {
           return new Date(b.created_at) - new Date(a.created_at);
         case 'oldest':
           return new Date(a.created_at) - new Date(b.created_at);
+        case 'name-asc':
+          return a.token_name.localeCompare(b.token_name);
+        case 'name-desc':
+          return b.token_name.localeCompare(a.token_name);
         case 'marketcap':
           return parseFloat(calculateMarketCap(b)) - parseFloat(calculateMarketCap(a));
+        case 'supply-high':
+          return b.supply - a.supply;
+        case 'supply-low':
+          return a.supply - b.supply;
         case 'supply':
           return b.supply - a.supply;
+        case 'price-high':
+          return parseFloat(calculatePrice(b)) - parseFloat(calculatePrice(a));
+        case 'price-low':
+          return parseFloat(calculatePrice(a)) - parseFloat(calculatePrice(b));
         default:
           return 0;
       }
@@ -1363,7 +1377,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
           <input
             type="text"
             placeholder="🔍 Search tokens..."
@@ -1381,14 +1395,34 @@ export default function Dashboard() {
             <option value="pending">Pending Only</option>
           </select>
           <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="input text-purple-200"
+          >
+            <option value="all">All Categories</option>
+            <option value="Meme">😂 Meme</option>
+            <option value="Gaming">🎮 Gaming</option>
+            <option value="DeFi">💰 DeFi</option>
+            <option value="Utility">🔧 Utility</option>
+            <option value="Community">👥 Community</option>
+            <option value="NFT">🎨 NFT</option>
+            <option value="AI">🤖 AI</option>
+            <option value="Other">📦 Other</option>
+          </select>
+          <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
             className="input text-purple-200"
           >
             <option value="newest">Newest First</option>
             <option value="oldest">Oldest First</option>
+            <option value="name-asc">Name (A-Z)</option>
+            <option value="name-desc">Name (Z-A)</option>
             <option value="marketcap">Market Cap</option>
-            <option value="supply">Supply</option>
+            <option value="supply-high">Supply (High-Low)</option>
+            <option value="supply-low">Supply (Low-High)</option>
+            <option value="price-high">Price (High-Low)</option>
+            <option value="price-low">Price (Low-High)</option>
           </select>
         </div>
 

@@ -21,6 +21,7 @@ const RECEIVER_ADDRESS = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
 export default function Memes() {
   const [tokens, setTokens] = useState([]);
   const [filter, setFilter] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState('list');
   const [sortBy, setSortBy] = useState('newest');
@@ -1063,7 +1064,8 @@ export default function Memes() {
         (filter === 'active' && token.amm_pool_created) ||
         (filter === 'pending' && !token.amm_pool_created) ||
         (filter === 'favorites' && favorites.includes(token.id));
-      return matchesSearch && matchesFilter;
+      const matchesCategory = filterCategory === 'all' || token.category === filterCategory;
+      return matchesSearch && matchesFilter && matchesCategory;
     })
     .sort((a, b) => {
       switch (sortBy) {
@@ -1083,6 +1085,8 @@ export default function Memes() {
           return calculatePrice(b) - calculatePrice(a);
         case 'price-low':
           return calculatePrice(a) - calculatePrice(b);
+        case 'marketcap':
+          return calculateMarketCap(b) - calculateMarketCap(a);
         default:
           return 0;
       }
@@ -1404,6 +1408,21 @@ export default function Memes() {
               className="input flex-1 text-purple-200"
             />
             <select
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="input text-purple-200 w-full md:w-auto"
+            >
+              <option value="all">All Categories</option>
+              <option value="Meme">😂 Meme</option>
+              <option value="Gaming">🎮 Gaming</option>
+              <option value="DeFi">💰 DeFi</option>
+              <option value="Utility">🔧 Utility</option>
+              <option value="Community">👥 Community</option>
+              <option value="NFT">🎨 NFT</option>
+              <option value="AI">🤖 AI</option>
+              <option value="Other">📦 Other</option>
+            </select>
+            <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className="input text-purple-200 w-full md:w-auto"
@@ -1412,6 +1431,7 @@ export default function Memes() {
               <option value="oldest">Oldest First</option>
               <option value="name-asc">Name (A-Z)</option>
               <option value="name-desc">Name (Z-A)</option>
+              <option value="marketcap">Market Cap</option>
               <option value="supply-high">Supply (High-Low)</option>
               <option value="supply-low">Supply (Low-High)</option>
               <option value="price-high">Price (High-Low)</option>
