@@ -3,6 +3,8 @@ import { supabase } from '../utils/supabase';
 import toast from 'react-hot-toast';
 import { Client, Wallet as XrplWallet } from 'xrpl';
 
+const DEV_WALLET = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
+
 export default function Social() {
   const [connectedWallet, setConnectedWallet] = useState(null);
   const [walletAssets, setWalletAssets] = useState([]);
@@ -21,15 +23,24 @@ export default function Social() {
   const [availableCameras, setAvailableCameras] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState(null);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [bannedWallets, setBannedWallets] = useState([]);
 
   const messagesEndRef = useRef(null);
   const dmMessagesEndRef = useRef(null);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
+  const emojis = ['😀', '😂', '🤣', '😊', '😍', '🥰', '😎', '🤔', '😭', '😱', '🤯', '😴', '🥳', '🤑', '🤗',
+    '👍', '👎', '👏', '🙏', '💪', '🤝', '✌️', '🤞', '👌', '🤘', '🔥', '⭐', '✨', '💎', '💰',
+    '🚀', '🎉', '🎊', '🏆', '👑', '💯', '💸', '📈', '📊', '🌟'];
+
+  const isDevWallet = connectedWallet?.address === DEV_WALLET;
+
   useEffect(() => {
     loadConnectedWallet();
     loadOnlineUsers();
+    loadBannedWallets();
     subscribeToPresence();
 
     const interval = setInterval(() => {
@@ -48,6 +59,7 @@ export default function Social() {
 
   useEffect(() => {
     if (connectedWallet) {
+      checkIfBanned();
       const storedNickname = localStorage.getItem(`nickname_${connectedWallet.address}`);
       if (storedNickname) {
         setNickname(storedNickname);
@@ -112,6 +124,76 @@ export default function Social() {
     };
   };
 
+  const loadBannedWallets = async () => {
+    const { data } = await supabase
+      .from('banned_wallets')
+      .select('wallet_address');
+
+    if (data) {
+      setBannedWallets(data.map(b => b.wallet_address));
+    }
+  };
+
+  const checkIfBanned = async () => {
+    if (!connectedWallet) return;
+
+    const { data } = await supabase
+      .from('banned_wallets')
+      .select('*')
+      .eq('wallet_address', connectedWallet.address)
+      .maybeSingle();
+
+    if (data) {
+      toast.error('Your wallet has been banned from Social');
+      window.dispatchEvent(new Event('walletDisconnected'));
+      localStorage.removeItem('connectedWallet');
+    }
+  };
+
+  const banWallet = async (walletAddress) => {
+    if (!isDevWallet) {
+      toast.error('Only developer can ban wallets');
+      return;
+    }
+
+    const reason = prompt('Reason for ban (optional):');
+
+    const { error } = await supabase
+      .from('banned_wallets')
+      .insert([{
+        wallet_address: walletAddress,
+        banned_by: connectedWallet.address,
+        reason: reason || 'No reason provided'
+      }]);
+
+    if (!error) {
+      toast.success('Wallet banned successfully');
+      loadBannedWallets();
+      loadOnlineUsers();
+    } else {
+      toast.error('Failed to ban wallet');
+    }
+  };
+
+  const deleteMessage = async (messageId) => {
+    if (!isDevWallet) {
+      toast.error('Only developer can delete messages');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('id', messageId);
+
+    if (!error) {
+      setMessages(messages.filter(m => m.id !== messageId));
+      toast.success('Message deleted');
+    } else {
+      toast.error('Failed to delete message');
+    }
+  };
+
   const loadWalletAssets = async (wallet) => {
     if (!wallet?.address) return;
 
@@ -173,6 +255,17 @@ export default function Social() {
           setMessages((prev) => [...prev, payload.new]);
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'chat_messages'
+        },
+        (payload) => {
+          setMessages((prev) => prev.filter(m => m.id !== payload.old.id));
+        }
+      )
       .subscribe();
 
     return () => {
@@ -188,7 +281,8 @@ export default function Social() {
       .order('nickname', { ascending: true });
 
     if (!error && data) {
-      setOnlineUsers(data);
+      const filtered = data.filter(u => !bannedWallets.includes(u.wallet_address));
+      setOnlineUsers(filtered);
     }
   };
 
@@ -602,7 +696,12 @@ export default function Social() {
                     <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-purple-900"></div>
                   </div>
                   <div className="flex-1 text-left min-w-0">
-                    <div className="text-purple-200 font-bold truncate">{user.nickname}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-purple-200 font-bold truncate">{user.nickname}</span>
+                      {user.wallet_address === DEV_WALLET && (
+                        <span className="text-yellow-400 text-lg" title="Developer">👑</span>
+                      )}
+                    </div>
                     <div className="text-purple-400 text-xs truncate">{user.wallet_address.slice(0, 12)}...</div>
                   </div>
                 </div>
@@ -664,7 +763,7 @@ export default function Social() {
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex gap-3 ${msg.wallet_address === connectedWallet?.address ? 'flex-row-reverse' : ''}`}
+                className={`flex gap-3 group ${msg.wallet_address === connectedWallet?.address ? 'flex-row-reverse' : ''}`}
               >
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold flex-shrink-0">
                   {msg.nickname.charAt(0).toUpperCase()}
@@ -672,7 +771,18 @@ export default function Social() {
                 <div className="flex-1 max-w-2xl">
                   <div className="flex items-baseline gap-2 mb-1">
                     <span className="text-purple-200 font-bold">{msg.nickname}</span>
+                    {msg.wallet_address === DEV_WALLET && (
+                      <span className="text-yellow-400 text-sm" title="Developer">👑</span>
+                    )}
                     <span className="text-purple-400 text-xs">{formatTimestamp(msg.created_at)}</span>
+                    {isDevWallet && (
+                      <button
+                        onClick={() => deleteMessage(msg.id)}
+                        className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 text-xs font-medium transition-all"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                   <div className={`p-3 rounded-lg ${
                     msg.wallet_address === connectedWallet?.address
@@ -689,7 +799,34 @@ export default function Social() {
 
           {/* Input */}
           <div className="p-4 bg-purple-900/20 backdrop-blur-xl border-t border-purple-500/20">
-            <div className="flex gap-2">
+            <div className="flex gap-2 relative">
+              <div className="relative">
+                <button
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  className="bg-purple-800/30 hover:bg-purple-800/50 text-white p-3 rounded-lg border border-purple-500/20 transition-all text-xl"
+                  title="Emojis"
+                >
+                  😀
+                </button>
+                {showEmojiPicker && (
+                  <div className="absolute bottom-full left-0 mb-2 bg-purple-900/95 backdrop-blur-xl p-3 rounded-lg shadow-2xl border border-purple-500/30 z-50">
+                    <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto" style={{ width: '320px' }}>
+                      {emojis.map((emoji, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setMessageInput(messageInput + emoji);
+                            setShowEmojiPicker(false);
+                          }}
+                          className="hover:bg-purple-700/50 p-2 rounded text-2xl transition-all hover:scale-110"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               <input
                 type="text"
                 value={messageInput}
@@ -819,7 +956,12 @@ export default function Social() {
               <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-3xl mx-auto mb-4">
                 {selectedUser.nickname.charAt(0).toUpperCase()}
               </div>
-              <h3 className="text-2xl font-bold text-purple-200">{selectedUser.nickname}</h3>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <h3 className="text-2xl font-bold text-purple-200">{selectedUser.nickname}</h3>
+                {selectedUser.wallet_address === DEV_WALLET && (
+                  <span className="text-yellow-400 text-2xl" title="Developer">👑</span>
+                )}
+              </div>
               <p className="text-purple-400 text-sm mt-1">{selectedUser.wallet_address}</p>
             </div>
 
@@ -836,6 +978,17 @@ export default function Social() {
               >
                 💸 Send Tip
               </button>
+              {isDevWallet && selectedUser.wallet_address !== DEV_WALLET && (
+                <button
+                  onClick={() => {
+                    banWallet(selectedUser.wallet_address);
+                    setShowUserModal(false);
+                  }}
+                  className="w-full bg-red-700/50 hover:bg-red-700/70 text-white py-3 rounded-lg font-medium transition-all"
+                >
+                  🚫 Ban Wallet
+                </button>
+              )}
               <button
                 onClick={() => setShowUserModal(false)}
                 className="w-full bg-slate-700/50 hover:bg-slate-700/70 text-white py-3 rounded-lg font-medium transition-all"
