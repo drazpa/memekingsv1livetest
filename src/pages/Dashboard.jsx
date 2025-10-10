@@ -1246,82 +1246,90 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <div className="glass rounded-lg p-4 sm:p-6">
           <div className="text-purple-400 text-xs sm:text-sm mb-2">Total Tokens</div>
-          <div className="text-2xl sm:text-3xl font-bold text-green-400">{analytics.totalTokens}</div>
-          {tokens24h > 0 && (
-            <div className="text-green-300 text-xs sm:text-sm mt-1">
-              +{tokens24h} ({tokens24h > 0 ? '+' : ''}{((tokens24h / analytics.totalTokens) * 100).toFixed(1)}%)
-            </div>
-          )}
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <div className="text-2xl sm:text-3xl font-bold text-green-400">{analytics.totalTokens}</div>
+            {tokens24h > 0 && (
+              <div className="text-green-300 text-sm sm:text-base font-medium">
+                +{tokens24h} (+{((tokens24h / analytics.totalTokens) * 100).toFixed(1)}%)
+              </div>
+            )}
+          </div>
           <div className="text-purple-500 text-xs mt-1">Last 24h</div>
         </div>
 
         <div className="glass rounded-lg p-4 sm:p-6">
           <div className="text-purple-400 text-xs sm:text-sm mb-2">Total XRP Locked</div>
-          <div className="text-2xl sm:text-3xl font-bold text-green-400">{livePoolStats.totalXrpLocked.toFixed(2)}</div>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <div className="text-2xl sm:text-3xl font-bold text-green-400">{livePoolStats.totalXrpLocked.toFixed(2)}</div>
+            {poolStats24hAgo.totalXrpLocked > 0 && (
+              <div className={`text-sm sm:text-base font-medium ${
+                livePoolStats.totalXrpLocked > poolStats24hAgo.totalXrpLocked
+                  ? 'text-green-300'
+                  : livePoolStats.totalXrpLocked < poolStats24hAgo.totalXrpLocked
+                  ? 'text-red-300'
+                  : 'text-purple-400'
+              }`}>
+                {livePoolStats.totalXrpLocked > poolStats24hAgo.totalXrpLocked ? '+' : ''}
+                {(livePoolStats.totalXrpLocked - poolStats24hAgo.totalXrpLocked).toFixed(2)}
+                ({((livePoolStats.totalXrpLocked - poolStats24hAgo.totalXrpLocked) / poolStats24hAgo.totalXrpLocked * 100).toFixed(1)}%)
+              </div>
+            )}
+          </div>
           <div className="text-green-300 text-xs sm:text-sm mt-1">
             ${(livePoolStats.totalXrpLocked * xrpUsdPrice).toFixed(2)} USD
           </div>
-          {poolStats24hAgo.totalXrpLocked > 0 && (
-            <div className={`text-xs sm:text-sm mt-1 ${
-              livePoolStats.totalXrpLocked > poolStats24hAgo.totalXrpLocked
-                ? 'text-green-300'
-                : livePoolStats.totalXrpLocked < poolStats24hAgo.totalXrpLocked
-                ? 'text-red-300'
-                : 'text-purple-400'
-            }`}>
-              {livePoolStats.totalXrpLocked > poolStats24hAgo.totalXrpLocked ? '+' : ''}
-              {(livePoolStats.totalXrpLocked - poolStats24hAgo.totalXrpLocked).toFixed(2)}
-              ({((livePoolStats.totalXrpLocked - poolStats24hAgo.totalXrpLocked) / poolStats24hAgo.totalXrpLocked * 100).toFixed(1)}%)
-            </div>
-          )}
           <div className="text-purple-500 text-xs mt-1">Last 24h</div>
         </div>
 
         <div className="glass rounded-lg p-4 sm:p-6">
           <div className="text-purple-400 text-xs sm:text-sm mb-2">Total Market Cap</div>
-          <div className="text-2xl sm:text-3xl font-bold text-green-400">
-            {livePoolStats.totalMarketCap.toFixed(2)}
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <div className="text-2xl sm:text-3xl font-bold text-green-400">
+              {livePoolStats.totalMarketCap.toFixed(2)}
+            </div>
+            {poolStats24hAgo.totalMarketCap > 0 && (
+              <div className={`text-sm sm:text-base font-medium ${
+                livePoolStats.totalMarketCap > poolStats24hAgo.totalMarketCap
+                  ? 'text-green-300'
+                  : livePoolStats.totalMarketCap < poolStats24hAgo.totalMarketCap
+                  ? 'text-red-300'
+                  : 'text-purple-400'
+              }`}>
+                {livePoolStats.totalMarketCap > poolStats24hAgo.totalMarketCap ? '+' : ''}
+                {(livePoolStats.totalMarketCap - poolStats24hAgo.totalMarketCap).toFixed(2)}
+                ({((livePoolStats.totalMarketCap - poolStats24hAgo.totalMarketCap) / poolStats24hAgo.totalMarketCap * 100).toFixed(1)}%)
+              </div>
+            )}
           </div>
           <div className="text-green-300 text-xs sm:text-sm mt-1">
             ${(livePoolStats.totalMarketCap * xrpUsdPrice).toFixed(2)} USD
           </div>
-          {poolStats24hAgo.totalMarketCap > 0 && (
-            <div className={`text-xs sm:text-sm mt-1 ${
-              livePoolStats.totalMarketCap > poolStats24hAgo.totalMarketCap
-                ? 'text-green-300'
-                : livePoolStats.totalMarketCap < poolStats24hAgo.totalMarketCap
-                ? 'text-red-300'
-                : 'text-purple-400'
-            }`}>
-              {livePoolStats.totalMarketCap > poolStats24hAgo.totalMarketCap ? '+' : ''}
-              {(livePoolStats.totalMarketCap - poolStats24hAgo.totalMarketCap).toFixed(2)}
-              ({((livePoolStats.totalMarketCap - poolStats24hAgo.totalMarketCap) / poolStats24hAgo.totalMarketCap * 100).toFixed(1)}%)
-            </div>
-          )}
           <div className="text-purple-500 text-xs mt-1">Last 24h</div>
         </div>
 
         <div className="glass rounded-lg p-4 sm:p-6">
           <div className="text-purple-400 text-xs sm:text-sm mb-2">Total Holders</div>
-          <div className="text-2xl sm:text-3xl font-bold text-green-400">
-            {trustlineStats.totalHolders.toLocaleString()}
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <div className="text-2xl sm:text-3xl font-bold text-green-400">
+              {trustlineStats.totalHolders.toLocaleString()}
+            </div>
+            {trustlineStats.holders24hAgo > 0 && (
+              <div className={`text-sm sm:text-base font-medium ${
+                trustlineStats.totalHolders > trustlineStats.holders24hAgo
+                  ? 'text-green-300'
+                  : trustlineStats.totalHolders < trustlineStats.holders24hAgo
+                  ? 'text-red-300'
+                  : 'text-purple-400'
+              }`}>
+                {trustlineStats.totalHolders > trustlineStats.holders24hAgo ? '+' : ''}
+                {(trustlineStats.totalHolders - trustlineStats.holders24hAgo).toLocaleString()}
+                ({((trustlineStats.totalHolders - trustlineStats.holders24hAgo) / trustlineStats.holders24hAgo * 100).toFixed(1)}%)
+              </div>
+            )}
           </div>
           <div className="text-green-300 text-xs sm:text-sm mt-1">
             {trustlineStats.totalTrustlines.toLocaleString()} trustlines
           </div>
-          {trustlineStats.holders24hAgo > 0 && (
-            <div className={`text-xs sm:text-sm mt-1 ${
-              trustlineStats.totalHolders > trustlineStats.holders24hAgo
-                ? 'text-green-300'
-                : trustlineStats.totalHolders < trustlineStats.holders24hAgo
-                ? 'text-red-300'
-                : 'text-purple-400'
-            }`}>
-              {trustlineStats.totalHolders > trustlineStats.holders24hAgo ? '+' : ''}
-              {(trustlineStats.totalHolders - trustlineStats.holders24hAgo).toLocaleString()}
-              ({((trustlineStats.totalHolders - trustlineStats.holders24hAgo) / trustlineStats.holders24hAgo * 100).toFixed(1)}%)
-            </div>
-          )}
           <div className="text-purple-500 text-xs mt-1">Last 24h</div>
         </div>
       </div>
