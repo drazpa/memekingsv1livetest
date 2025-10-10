@@ -15,6 +15,7 @@ import About from './pages/About';
 import WalletManagement from './components/WalletManagement';
 import Setup from './pages/Setup';
 import AIChat from './pages/AIChat';
+import Social from './pages/Social';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -133,6 +134,8 @@ export default function App() {
         return <Setup />;
       case 'aichat':
         return <AIChat />;
+      case 'social':
+        return <Social />;
       default:
         return <Dashboard />;
     }
