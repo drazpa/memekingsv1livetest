@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
 import toast from 'react-hot-toast';
 import * as xrpl from 'xrpl';
+import { TrustlineDropdown } from './TrustlineDropdown';
+import { PinProtection } from './PinProtection';
 
 export default function WalletManagement() {
   const [wallets, setWallets] = useState([]);
@@ -20,6 +22,9 @@ export default function WalletManagement() {
   const [importingSeed, setImportingSeed] = useState(false);
   const [importedWalletData, setImportedWalletData] = useState(null);
   const [importSeedInput, setImportSeedInput] = useState('');
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pendingSeedView, setPendingSeedView] = useState(null);
+  const [tokenBalances, setTokenBalances] = useState([]);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
@@ -452,6 +457,16 @@ export default function WalletManagement() {
           >
             + Add Existing
           </button>
+          {connectedWallet && (
+            <TrustlineDropdown
+              wallet={connectedWallet}
+              network={connectedWallet.network || 'testnet'}
+              tokenBalances={tokenBalances}
+              onTrustlineUpdate={() => {
+                toast.success('Trustlines updated');
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -543,7 +558,21 @@ export default function WalletManagement() {
                       <span>Seed</span>
                       <div className="flex gap-2">
                         <button
-                          onClick={() => setShowSeedFor(showSeedFor === wallet.id ? null : wallet.id)}
+                          onClick={() => {
+                            const isVisible = showSeedFor === wallet.id;
+                            if (isVisible) {
+                              setShowSeedFor(null);
+                            } else {
+                              const hasPinSet = localStorage.getItem(`wallet_pin_${wallet.address}`);
+                              if (hasPinSet) {
+                                setPendingSeedView(wallet);
+                                setShowPinModal(true);
+                              } else {
+                                setPendingSeedView(wallet);
+                                setShowPinModal(true);
+                              }
+                            }
+                          }}
                           className="text-purple-400 hover:text-purple-300"
                         >
                           {showSeedFor === wallet.id ? '🙈' : '👁️'}
@@ -1138,6 +1167,21 @@ export default function WalletManagement() {
             )}
           </div>
         </div>
+      )}
+
+      {showPinModal && pendingSeedView && (
+        <PinProtection
+          walletAddress={pendingSeedView.address}
+          onSuccess={() => {
+            setShowSeedFor(pendingSeedView.id);
+            setPendingSeedView(null);
+            setShowPinModal(false);
+          }}
+          onCancel={() => {
+            setPendingSeedView(null);
+            setShowPinModal(false);
+          }}
+        />
       )}
     </div>
   );

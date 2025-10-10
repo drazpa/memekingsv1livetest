@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { XRPScanLink } from './XRPScanLink';
 import { Wallet as XrplWallet } from 'xrpl';
 import toast from 'react-hot-toast';
+import { PinProtection } from './PinProtection';
 
 export function WalletManager({ 
   loading, 
@@ -24,6 +25,8 @@ export function WalletManager({
     return saved ? JSON.parse(saved) : {};
   });
   const [editingLabel, setEditingLabel] = useState(null);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pendingSeedView, setPendingSeedView] = useState(null);
 
   const updateLabel = (address, label) => {
     const newLabels = { ...walletLabels, [address]: label };
@@ -83,15 +86,41 @@ export function WalletManager({
   };
 
   const toggleSeedVisibility = (address) => {
-    setVisibleSeeds(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(address)) {
+    const isVisible = visibleSeeds.has(address);
+
+    if (isVisible) {
+      setVisibleSeeds(prev => {
+        const newSet = new Set(prev);
         newSet.delete(address);
+        return newSet;
+      });
+    } else {
+      const hasPinSet = localStorage.getItem(`wallet_pin_${address}`);
+      if (hasPinSet) {
+        setPendingSeedView(address);
+        setShowPinModal(true);
       } else {
-        newSet.add(address);
+        setPendingSeedView(address);
+        setShowPinModal(true);
       }
-      return newSet;
-    });
+    }
+  };
+
+  const handlePinSuccess = () => {
+    if (pendingSeedView) {
+      setVisibleSeeds(prev => {
+        const newSet = new Set(prev);
+        newSet.add(pendingSeedView);
+        return newSet;
+      });
+      setPendingSeedView(null);
+    }
+    setShowPinModal(false);
+  };
+
+  const handlePinCancel = () => {
+    setPendingSeedView(null);
+    setShowPinModal(false);
   };
 
   return (
@@ -405,6 +434,14 @@ export function WalletManager({
             ))}
           </div>
         </div>
+      )}
+
+      {showPinModal && pendingSeedView && (
+        <PinProtection
+          walletAddress={pendingSeedView}
+          onSuccess={handlePinSuccess}
+          onCancel={handlePinCancel}
+        />
       )}
     </div>
   );
