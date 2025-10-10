@@ -905,12 +905,13 @@ export default function Social() {
         audio: true
       });
 
+      mainStreamRef.current = stream;
       if (mainVideoRef.current) {
         mainVideoRef.current.srcObject = stream;
-        mainStreamRef.current = stream;
+        mainVideoRef.current.play().catch(e => console.log('Play error:', e));
       }
 
-      const { data: newStream } = await supabase
+      const { data: newStream, error: insertError } = await supabase
         .from('live_streams')
         .insert([{
           wallet_address: connectedWallet.address,
@@ -925,10 +926,38 @@ export default function Social() {
         .select()
         .single();
 
+      if (insertError) {
+        console.error('Error creating stream:', insertError);
+        toast.error('Failed to create stream record');
+        return;
+      }
+
+      console.log('Stream created:', newStream);
       setCurrentStream(newStream);
       setIsStreaming(true);
       setShowCameraSelect(false);
-      toast.success('Stream started!');
+
+      const peer = new Peer({
+        initiator: true,
+        trickle: false,
+        stream: stream
+      });
+
+      peer.on('signal', async (signal) => {
+        console.log('Broadcaster signal generated');
+        await supabase
+          .from('live_streams')
+          .update({ stream_signal: signal })
+          .eq('id', newStream.id);
+      });
+
+      peer.on('error', (err) => {
+        console.error('Broadcaster peer error:', err);
+      });
+
+      broadcasterPeerRef.current = peer;
+
+      toast.success('🎥 Stream started! You are now LIVE!');
       loadLiveStreams();
     } catch (error) {
       console.error('Error starting stream:', error);
@@ -992,6 +1021,11 @@ export default function Social() {
       pipVideoRef.current.srcObject = null;
     }
 
+    if (broadcasterPeerRef.current) {
+      broadcasterPeerRef.current.destroy();
+      broadcasterPeerRef.current = null;
+    }
+
     if (currentStream) {
       await supabase
         .from('live_streams')
@@ -1006,6 +1040,7 @@ export default function Social() {
     setIsScreenSharing(false);
     setCurrentStream(null);
     setStreamTips([]);
+    setViewingStream(null);
     setTotalTips(0);
     toast.success('Stream ended');
     loadLiveStreams();
