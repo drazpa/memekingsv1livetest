@@ -90,6 +90,9 @@ export function TokenTrustButton({
       setHasTrustline(exists);
     } catch (error) {
       console.error('Error checking trustline:', error);
+      if (error.data?.error === 'actNotFound') {
+        console.log('Wallet not activated on network');
+      }
       setHasTrustline(false);
     } finally {
       try {
@@ -131,14 +134,6 @@ export function TokenTrustButton({
     let client = null;
 
     try {
-      await checkTrustlineStatus();
-
-      if (hasTrustline) {
-        toast('Trustline already exists for this token', { icon: 'ℹ️' });
-        setLoading(false);
-        return;
-      }
-
       const wsUrl = connectedWallet.network === 'mainnet'
         ? 'wss://xrplcluster.com'
         : 'wss://s.altnet.rippletest.net:51233';
@@ -151,6 +146,32 @@ export function TokenTrustButton({
           setTimeout(() => reject(new Error('Connection timeout')), 15000)
         )
       ]);
+
+      const checkResponse = await Promise.race([
+        client.request({
+          command: 'account_lines',
+          account: connectedWallet.address,
+          ledger_index: 'validated'
+        }),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Request timeout')), 10000)
+        )
+      ]);
+
+      const existingTrustlines = checkResponse.result.lines || [];
+      const trustlineExists = existingTrustlines.some(
+        line => line.currency === currencyHex && line.account === issuerAddress
+      );
+
+      if (trustlineExists) {
+        toast.success('You already have a trustline for this token!');
+        setHasTrustline(true);
+        setLoading(false);
+        if (client && client.isConnected()) {
+          await client.disconnect();
+        }
+        return;
+      }
 
       const xrplWallet = XrplWallet.fromSeed(connectedWallet.seed);
 
@@ -230,14 +251,20 @@ export function TokenTrustButton({
 
       let errorMessage = 'Failed to set up trustline';
 
-      if (error.message.includes('timeout')) {
-        errorMessage = 'Request timed out. Please check your connection and try again.';
-      } else if (error.message.includes('Connection')) {
-        errorMessage = 'Connection failed. Please check your internet and try again.';
+      if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+        errorMessage = 'Connection timed out. The network may be slow. Please try again.';
+      } else if (error.message.includes('Connection') || error.message.includes('connect')) {
+        errorMessage = 'Unable to connect to the XRPL network. Please check your internet connection and try again.';
       } else if (error.message.includes('address mismatch')) {
         errorMessage = error.message;
       } else if (error.data?.error === 'actNotFound') {
-        errorMessage = 'Account not found on the network. Please fund your wallet first.';
+        errorMessage = 'Your wallet is not activated on the network. Please send at least 2 XRP to your wallet first.';
+      } else if (error.data?.error === 'amendmentBlocked') {
+        errorMessage = 'This transaction type is blocked by the network. Please try again later.';
+      } else if (error.data?.error_code === 19) {
+        errorMessage = 'Insufficient XRP balance. You need at least 2 XRP plus reserve for trustlines.';
+      } else if (error.name === 'RippledError') {
+        errorMessage = `Network error: ${error.data?.error_message || 'Unknown error'}`;
       } else if (error.message) {
         errorMessage = `Error: ${error.message}`;
       }
@@ -370,12 +397,16 @@ export function TokenTrustButton({
 
       let errorMessage = 'Failed to remove trustline';
 
-      if (error.message.includes('timeout')) {
-        errorMessage = 'Request timed out. Please check your connection and try again.';
-      } else if (error.message.includes('Connection')) {
-        errorMessage = 'Connection failed. Please check your internet and try again.';
+      if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+        errorMessage = 'Connection timed out. The network may be slow. Please try again.';
+      } else if (error.message.includes('Connection') || error.message.includes('connect')) {
+        errorMessage = 'Unable to connect to the XRPL network. Please check your internet connection and try again.';
       } else if (error.message.includes('address mismatch')) {
         errorMessage = error.message;
+      } else if (error.data?.error === 'actNotFound') {
+        errorMessage = 'Your wallet is not activated on the network.';
+      } else if (error.name === 'RippledError') {
+        errorMessage = `Network error: ${error.data?.error_message || 'Unknown error'}`;
       } else if (error.message) {
         errorMessage = `Error: ${error.message}`;
       }
