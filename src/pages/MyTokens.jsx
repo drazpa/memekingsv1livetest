@@ -437,6 +437,7 @@ export default function MyTokens() {
                     <th className="text-left p-4 text-purple-300 font-medium">Days</th>
                     <th className="text-right p-4 text-purple-300 font-medium">Balance</th>
                     <th className="text-right p-4 text-purple-300 font-medium">% of Supply</th>
+                    <th className="text-right p-4 text-purple-300 font-medium">Total Supply</th>
                     <th className="text-right p-4 text-purple-300 font-medium">Price</th>
                     <th className="text-right p-4 text-purple-300 font-medium">24H Change</th>
                     <th className="text-right p-4 text-purple-300 font-medium">Value</th>
@@ -524,9 +525,18 @@ export default function MyTokens() {
                       {holding.balance.toFixed(4)}
                     </td>
                     <td className="text-right p-4 text-purple-200 font-mono">
-                      {holding.token.max_supply && holding.token.max_supply > 0 ? (
+                      {holding.token.supply && holding.token.supply > 0 ? (
                         <span className="text-blue-400 font-medium">
-                          {((holding.balance / holding.token.max_supply) * 100).toFixed(4)}%
+                          {((holding.balance / parseFloat(holding.token.supply)) * 100).toFixed(4)}%
+                        </span>
+                      ) : (
+                        <span className="text-purple-500">-</span>
+                      )}
+                    </td>
+                    <td className="text-right p-4 text-purple-200 font-mono">
+                      {holding.token.supply ? (
+                        <span className="text-purple-300">
+                          {parseFloat(holding.token.supply).toLocaleString()}
                         </span>
                       ) : (
                         <span className="text-purple-500">-</span>
