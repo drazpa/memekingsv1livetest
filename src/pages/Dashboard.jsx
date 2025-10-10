@@ -1254,6 +1254,9 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+          <div className="text-green-300 text-xs sm:text-sm mt-1">
+            MEMEKINGS Tokens
+          </div>
           <div className="text-purple-500 text-xs mt-1">Last 24h</div>
         </div>
 
