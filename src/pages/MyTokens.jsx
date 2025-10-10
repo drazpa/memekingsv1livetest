@@ -410,8 +410,6 @@ export default function MyTokens() {
             >
               <option value="value">Sort by Value</option>
               <option value="balance">Sort by Balance</option>
-              <option value="supplyPercent">Sort by % of Supply</option>
-              <option value="days">Sort by Days</option>
               <option value="name">Sort by Name</option>
               <option value="price">Sort by Price</option>
               <option value="token">Sort by Token</option>
@@ -466,16 +464,6 @@ export default function MyTokens() {
                       if (sortBy === 'value') compareValue = b.value - a.value;
                       else if (sortBy === 'balance') compareValue = b.balance - a.balance;
                       else if (sortBy === 'price') compareValue = b.price - a.price;
-                      else if (sortBy === 'supplyPercent') {
-                        const percentA = a.supplyPercent || 0;
-                        const percentB = b.supplyPercent || 0;
-                        compareValue = percentB - percentA;
-                      }
-                      else if (sortBy === 'days') {
-                        const daysA = a.token.created_at ? calculateDaysOnMarket(a.token.created_at) : Infinity;
-                        const daysB = b.token.created_at ? calculateDaysOnMarket(b.token.created_at) : Infinity;
-                        compareValue = daysB - daysA;
-                      }
                       else if (sortBy === 'name') compareValue = a.token.token_name.localeCompare(b.token.token_name);
                       else if (sortBy === 'token') {
                         if (a.isLPToken === b.isLPToken) {

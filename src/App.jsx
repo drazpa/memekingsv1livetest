@@ -14,7 +14,6 @@ import About from './pages/About';
 import WalletManagement from './components/WalletManagement';
 import Setup from './pages/Setup';
 import AIChat from './pages/AIChat';
-import { startBotExecutor, stopBotExecutor } from './utils/botExecutor';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -100,14 +99,6 @@ export default function App() {
     return () => {
       window.removeEventListener('navigateToTrade', handleNavigateToTrade);
       window.removeEventListener('navigateToPage', handleNavigateToPage);
-    };
-  }, []);
-
-  useEffect(() => {
-    startBotExecutor();
-
-    return () => {
-      stopBotExecutor();
     };
   }, []);
 
