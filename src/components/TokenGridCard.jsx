@@ -1,4 +1,5 @@
 import TokenIcon from './TokenIcon';
+import { CategoryBadge, calculateDaysOnMarket } from '../utils/categoryUtils';
 
 export default function TokenGridCard({ token, poolData, isFavorited, onToggleFavorite, onClick, showStats = true, showMemeKingBadge = true }) {
   const price = poolData?.price || 0;
@@ -62,16 +63,20 @@ export default function TokenGridCard({ token, poolData, isFavorited, onToggleFa
 
       {/* Badges */}
       <div className="flex flex-wrap gap-2">
+        {token.category && <CategoryBadge category={token.category} size="sm" />}
         {showMemeKingBadge && isMemeKingToken && (
           <span className="px-3 py-1 bg-yellow-500/20 text-yellow-300 text-xs rounded-full font-medium">
-            👑 MemeKing Token
+            👑 MemeKing
           </span>
         )}
         {!isMemeKingToken && (
           <span className="px-3 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full font-medium">
-            👤 Community Token
+            👤 Community
           </span>
         )}
+        <span className="px-3 py-1 bg-purple-500/20 text-purple-300 text-xs rounded-full font-medium">
+          📅 {calculateDaysOnMarket(token.created_at)}d
+        </span>
       </div>
 
       {/* Stats Grid */}

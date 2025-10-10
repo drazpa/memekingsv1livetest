@@ -872,6 +872,7 @@ export default function Dashboard() {
         amm_xrp_amount: parseFloat(editingToken.amm_xrp_amount),
         amm_asset_amount: parseFloat(editingToken.amm_asset_amount),
         image_url: imageUrl,
+        category: editingToken.category || 'Other',
         updated_at: new Date().toISOString()
       };
 
@@ -2040,6 +2041,39 @@ export default function Dashboard() {
                   onChange={(e) => setEditingToken({ ...editingToken, amm_asset_amount: e.target.value })}
                   className="input w-full text-purple-200"
                 />
+              </div>
+
+              <div>
+                <label className="block text-purple-300 mb-3">Category</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { value: 'Meme', color: 'from-pink-500 to-rose-500', emoji: '😂' },
+                    { value: 'Gaming', color: 'from-violet-500 to-purple-500', emoji: '🎮' },
+                    { value: 'DeFi', color: 'from-blue-500 to-cyan-500', emoji: '💰' },
+                    { value: 'Utility', color: 'from-green-500 to-emerald-500', emoji: '🔧' },
+                    { value: 'Community', color: 'from-orange-500 to-amber-500', emoji: '👥' },
+                    { value: 'NFT', color: 'from-indigo-500 to-blue-500', emoji: '🎨' },
+                    { value: 'AI', color: 'from-teal-500 to-cyan-500', emoji: '🤖' },
+                    { value: 'Other', color: 'from-gray-500 to-slate-500', emoji: '📦' },
+                  ].map((category) => (
+                    <button
+                      key={category.value}
+                      type="button"
+                      onClick={() => setEditingToken({ ...editingToken, category: category.value })}
+                      className={`px-3 py-2 rounded-lg transition-all text-sm font-medium ${
+                        editingToken.category === category.value
+                          ? `bg-gradient-to-r ${category.color} text-white shadow-lg`
+                          : 'glass text-purple-300 hover:bg-purple-500/20'
+                      }`}
+                    >
+                      <span className="mr-1">{category.emoji}</span>
+                      {category.value}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-purple-400 text-xs mt-2">
+                  Current category: {editingToken.category || 'Other'}
+                </p>
               </div>
 
               <div className="border-t border-purple-500/20 pt-4">

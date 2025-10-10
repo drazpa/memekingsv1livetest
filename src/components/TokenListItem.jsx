@@ -1,4 +1,5 @@
 import TokenIcon from './TokenIcon';
+import { CategoryBadge, calculateDaysOnMarket } from '../utils/categoryUtils';
 
 export default function TokenListItem({ token, poolData, isFavorited, onToggleFavorite, onClick, showStats = true, showMemeKingBadge = true }) {
   const price = poolData?.price || 0;
@@ -30,8 +31,9 @@ export default function TokenListItem({ token, poolData, isFavorited, onToggleFa
         <div className="flex items-center gap-3 flex-shrink-0">
           <TokenIcon token={token} size="md" />
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg font-bold text-purple-200">{token.token_name}</h3>
+              {token.category && <CategoryBadge category={token.category} size="xs" />}
               {showMemeKingBadge && isMemeKingToken && (
                 <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs rounded-full font-medium">
                   👑 MemeKing
@@ -40,6 +42,9 @@ export default function TokenListItem({ token, poolData, isFavorited, onToggleFa
               {token.amm_pool_created && (
                 <span className="text-green-400 text-xs">✓ Active</span>
               )}
+              <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full font-medium">
+                📅 {calculateDaysOnMarket(token.created_at)}d
+              </span>
             </div>
             <div className="text-purple-400 text-sm">{token.currency_code}</div>
           </div>

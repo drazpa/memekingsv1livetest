@@ -1128,6 +1128,110 @@ export default function Trade({ preselectedToken = null }) {
     }
   };
 
+  const calculateWithdrawEstimate = () => {
+    if (!lpPosition || !withdrawAmount || isNaN(withdrawAmount)) return null;
+
+    const lpTokensToWithdraw = parseFloat(withdrawAmount);
+    const totalLpTokens = parseFloat(lpPosition.lpTokens);
+    const withdrawPercentage = (lpTokensToWithdraw / totalLpTokens);
+
+    const xrpToReceive = parseFloat(lpPosition.xrp) * withdrawPercentage;
+    const tokensToReceive = parseFloat(lpPosition.tokens) * withdrawPercentage;
+
+    return {
+      xrpToReceive: xrpToReceive.toFixed(6),
+      tokensToReceive: tokensToReceive.toFixed(6),
+      networkFee: '0.00001',
+      estimatedTotal: (xrpToReceive * 2).toFixed(6)
+    };
+  };
+
+  const executeWithdraw = async () => {
+    if (!connectedWallet || !connectedWallet.seed) {
+      toast.error('Wallet seed required for withdrawal');
+      return;
+    }
+
+    if (!lpPosition) {
+      toast.error('No LP position found');
+      return;
+    }
+
+    const estimate = calculateWithdrawEstimate();
+    if (!estimate) {
+      toast.error('Invalid withdraw amount');
+      return;
+    }
+
+    try {
+      setWithdrawing(true);
+
+      const client = new xrpl.Client('wss://xrplcluster.com');
+      await client.connect();
+
+      const wallet = xrpl.Wallet.fromSeed(connectedWallet.seed);
+
+      const currencyHex = selectedToken.currency_code.length > 3
+        ? Buffer.from(selectedToken.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+        : selectedToken.currency_code;
+
+      const lpTokensDrops = Math.floor(parseFloat(withdrawAmount) * 1000000);
+
+      const withdrawTx = {
+        TransactionType: 'AMMWithdraw',
+        Account: connectedWallet.address,
+        Asset: { currency: 'XRP' },
+        Asset2: { currency: currencyHex, issuer: selectedToken.issuer_address },
+        LPTokenIn: {
+          currency: lpPosition.lpTokenCurrency,
+          issuer: lpPosition.lpTokenIssuer,
+          value: withdrawAmount
+        },
+        Flags: 1048576
+      };
+
+      console.log('Withdraw TX:', withdrawTx);
+
+      const prepared = await client.autofill(withdrawTx);
+      const signed = wallet.sign(prepared);
+      const result = await client.submitAndWait(signed.tx_blob, { timeout: 45000 });
+
+      if (result.result.meta.TransactionResult === 'tesSUCCESS') {
+        toast.success((t) => (
+          <div className="flex flex-col gap-2">
+            <div className="font-semibold">Withdrawal Successful!</div>
+            <div className="text-sm">
+              Received {estimate.xrpToReceive} XRP and {estimate.tokensToReceive} {selectedToken.token_name}
+            </div>
+            <div className="text-xs">
+              <XRPScanLink type="tx" value={result.result.hash} network="mainnet" />
+            </div>
+          </div>
+        ), {
+          duration: 8000,
+          style: {
+            background: '#065f46',
+            color: '#d1fae5',
+            border: '1px solid #10b981',
+          },
+        });
+
+        setWithdrawAmount('');
+        await fetchLpPosition();
+        await fetchTokenBalance();
+      } else {
+        throw new Error(`Withdrawal failed: ${result.result.meta.TransactionResult}`);
+      }
+
+      await client.disconnect();
+    } catch (error) {
+      console.error('Withdrawal error:', error);
+      toast.error('Withdrawal failed: ' + error.message);
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   const updateTradeStep = (stepIndex, status, data = {}) => {
     setTradeSteps(prev => {
       const updated = [...prev];
@@ -2147,9 +2251,32 @@ export default function Trade({ preselectedToken = null }) {
                           </div>
                         </div>
 
+                        {withdrawAmount && parseFloat(withdrawAmount) > 0 && calculateWithdrawEstimate() && (
+                          <div className="glass rounded-lg p-4 space-y-2">
+                            <h5 className="font-medium text-purple-200 mb-2">Withdraw Estimate</h5>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-purple-400">You will receive</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-purple-400">XRP</span>
+                              <span className="text-purple-200 font-bold">{calculateWithdrawEstimate().xrpToReceive}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-purple-400">{selectedToken.token_name}</span>
+                              <span className="text-purple-200 font-bold">{calculateWithdrawEstimate().tokensToReceive}</span>
+                            </div>
+                            <div className="pt-2 border-t border-purple-500/20">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-purple-400">Network Fee</span>
+                                <span className="text-purple-300">{calculateWithdrawEstimate().networkFee} XRP</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         <div>
                           <label className="block text-purple-300 mb-2">Withdrawn asset</label>
-                          <div className="glass rounded-lg p-3 flex items-center justify-between cursor-not-allowed">
+                          <div className="glass rounded-lg p-3 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <TokenIcon token={selectedToken} size="sm" />
                               <span className="text-2xl">✕</span>
@@ -2163,8 +2290,8 @@ export default function Trade({ preselectedToken = null }) {
                         </div>
 
                         <button
-                          onClick={() => toast.error('Withdraw functionality coming soon')}
-                          disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || withdrawing}
+                          onClick={executeWithdraw}
+                          disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || withdrawing || parseFloat(withdrawAmount) > parseFloat(lpPosition.lpTokens)}
                           className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
                           {withdrawing ? 'Withdrawing...' : 'Withdraw from Pool'}
