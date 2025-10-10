@@ -1095,6 +1095,16 @@ export default function Social() {
             {/* Stream Preview */}
             {isStreaming && (
               <div className="p-4 bg-purple-900/10">
+                <div className="mb-2 flex items-center justify-between">
+                  <div>
+                    <div className="text-purple-200 font-bold text-lg">Your Live Stream</div>
+                    <div className="text-purple-400 text-sm">Now visible in Live Feeds tab - viewers can watch and chat!</div>
+                  </div>
+                  <div className="flex items-center gap-2 bg-red-500 px-4 py-2 rounded-lg">
+                    <div className="w-3 h-3 bg-white rounded-full animate-pulse"></div>
+                    <span className="text-white font-bold">BROADCASTING</span>
+                  </div>
+                </div>
                 <div className="bg-black rounded-lg overflow-hidden border-2 border-purple-500/30 relative aspect-video">
                   <video
                     ref={mainVideoRef}
