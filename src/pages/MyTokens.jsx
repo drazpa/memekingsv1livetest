@@ -436,6 +436,7 @@ export default function MyTokens() {
                     <th className="text-left p-4 text-purple-300 font-medium">Category</th>
                     <th className="text-left p-4 text-purple-300 font-medium">Days</th>
                     <th className="text-right p-4 text-purple-300 font-medium">Balance</th>
+                    <th className="text-right p-4 text-purple-300 font-medium">% of Supply</th>
                     <th className="text-right p-4 text-purple-300 font-medium">Price</th>
                     <th className="text-right p-4 text-purple-300 font-medium">24H Change</th>
                     <th className="text-right p-4 text-purple-300 font-medium">Value</th>
@@ -521,6 +522,15 @@ export default function MyTokens() {
                     </td>
                     <td className="text-right p-4 text-purple-200 font-mono">
                       {holding.balance.toFixed(4)}
+                    </td>
+                    <td className="text-right p-4 text-purple-200 font-mono">
+                      {holding.token.max_supply && holding.token.max_supply > 0 ? (
+                        <span className="text-blue-400 font-medium">
+                          {((holding.balance / holding.token.max_supply) * 100).toFixed(4)}%
+                        </span>
+                      ) : (
+                        <span className="text-purple-500">-</span>
+                      )}
                     </td>
                     <td className="text-right p-4 text-purple-200 font-mono">
                       {holding.price > 0 ? `${holding.price.toFixed(8)} XRP` : 'N/A'}
