@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet as XrplWallet, Client } from 'xrpl';
+import { Buffer } from 'buffer';
 import toast from 'react-hot-toast';
 import { logActivity, ACTION_TYPES } from '../utils/activityLogger';
 
@@ -15,6 +16,20 @@ export function TokenTrustButton({
   const [hasTrustline, setHasTrustline] = useState(false);
   const [checkingTrustline, setCheckingTrustline] = useState(true);
 
+  const getCurrencyHex = (token) => {
+    if (token.currency_hex) return token.currency_hex;
+    if (token.currency_code) {
+      return token.currency_code.length > 3
+        ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+        : token.currency_code;
+    }
+    return null;
+  };
+
+  const getIssuerAddress = (token) => {
+    return token.issuer_address || token.issuer || null;
+  };
+
   useEffect(() => {
     if (connectedWallet && token) {
       checkTrustlineStatus();
@@ -29,7 +44,10 @@ export function TokenTrustButton({
       return;
     }
 
-    if (!token.currency_hex || !token.issuer_address) {
+    const currencyHex = getCurrencyHex(token);
+    const issuerAddress = getIssuerAddress(token);
+
+    if (!currencyHex || !issuerAddress) {
       console.error('Token missing required fields:', token);
       setCheckingTrustline(false);
       return;
@@ -65,8 +83,8 @@ export function TokenTrustButton({
 
       const trustlines = response.result.lines || [];
       const exists = trustlines.some(
-        line => line.currency === token.currency_hex &&
-                line.account === token.issuer_address
+        line => line.currency === currencyHex &&
+                line.account === issuerAddress
       );
 
       setHasTrustline(exists);
@@ -96,7 +114,10 @@ export function TokenTrustButton({
       return;
     }
 
-    if (!token.currency_hex || !token.issuer_address) {
+    const currencyHex = getCurrencyHex(token);
+    const issuerAddress = getIssuerAddress(token);
+
+    if (!currencyHex || !issuerAddress) {
       toast.error('Token missing required information (currency or issuer)');
       return;
     }
@@ -141,8 +162,8 @@ export function TokenTrustButton({
         TransactionType: 'TrustSet',
         Account: xrplWallet.address,
         LimitAmount: {
-          currency: token.currency_hex,
-          issuer: token.issuer_address,
+          currency: currencyHex,
+          issuer: issuerAddress,
           value: '1000000000'
         }
       };
@@ -167,8 +188,8 @@ export function TokenTrustButton({
           details: {
             token: token.name || token.symbol,
             symbol: token.symbol,
-            issuer: token.issuer_address,
-            currency: token.currency_hex
+            issuer: issuerAddress,
+            currency: currencyHex
           }
         });
 
@@ -245,7 +266,10 @@ export function TokenTrustButton({
       return;
     }
 
-    if (!token.currency_hex || !token.issuer_address) {
+    const currencyHex = getCurrencyHex(token);
+    const issuerAddress = getIssuerAddress(token);
+
+    if (!currencyHex || !issuerAddress) {
       toast.error('Token missing required information');
       return;
     }
@@ -290,8 +314,8 @@ export function TokenTrustButton({
         TransactionType: 'TrustSet',
         Account: xrplWallet.address,
         LimitAmount: {
-          currency: token.currency_hex,
-          issuer: token.issuer_address,
+          currency: currencyHex,
+          issuer: issuerAddress,
           value: '0'
         }
       };
@@ -316,8 +340,8 @@ export function TokenTrustButton({
           details: {
             token: token.name || token.symbol,
             symbol: token.symbol,
-            issuer: token.issuer_address,
-            currency: token.currency_hex
+            issuer: issuerAddress,
+            currency: currencyHex
           }
         });
 
