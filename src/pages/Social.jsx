@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../utils/supabase';
 import toast from 'react-hot-toast';
 import { Client, Wallet as XrplWallet } from 'xrpl';
+import TipModal from '../components/TipModal';
 
 const DEV_WALLET = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
 
@@ -32,6 +33,9 @@ export default function Social() {
   const [streamTips, setStreamTips] = useState([]);
   const [totalTips, setTotalTips] = useState(0);
   const [viewingStream, setViewingStream] = useState(null);
+  const [showTipModal, setShowTipModal] = useState(false);
+  const [tipRecipient, setTipRecipient] = useState(null);
+  const [viewerCount, setViewerCount] = useState(0);
 
   const messagesEndRef = useRef(null);
   const dmMessagesEndRef = useRef(null);
@@ -591,102 +595,10 @@ export default function Social() {
     setDmMessages([]);
   };
 
-  const sendTip = async (recipient) => {
+  const openTipModal = (recipient) => {
     setShowUserModal(false);
-
-    const tokenOptions = [
-      { currency: 'XRP', issuer: 'XRP' },
-      ...walletAssets.map(a => ({ currency: a.currency, issuer: a.account }))
-    ];
-
-    const tokenList = tokenOptions.map((t, i) =>
-      `${i + 1}. ${t.currency}${t.currency !== 'XRP' ? ` (${walletAssets.find(a => a.currency === t.currency)?.balance || 'N/A'})` : ''}`
-    ).join('\n');
-
-    const tokenIndex = prompt(`Select token to tip:\n\n${tokenList}\n\nEnter number:`);
-    if (!tokenIndex) return;
-
-    const selectedToken = tokenOptions[parseInt(tokenIndex) - 1];
-    if (!selectedToken) {
-      toast.error('Invalid token selection');
-      return;
-    }
-
-    const amount = prompt(`Enter amount of ${selectedToken.currency} to tip:`);
-    if (!amount || isNaN(parseFloat(amount))) {
-      toast.error('Invalid amount');
-      return;
-    }
-
-    try {
-      const client = new Client(
-        connectedWallet.network === 'mainnet'
-          ? 'wss://xrplcluster.com'
-          : 'wss://s.altnet.rippletest.net:51233'
-      );
-
-      await client.connect();
-      const wallet = XrplWallet.fromSeed(connectedWallet.seed);
-
-      let payment;
-      if (selectedToken.currency === 'XRP') {
-        payment = {
-          TransactionType: 'Payment',
-          Account: wallet.address,
-          Destination: recipient.wallet_address,
-          Amount: String(Math.floor(parseFloat(amount) * 1000000))
-        };
-      } else {
-        payment = {
-          TransactionType: 'Payment',
-          Account: wallet.address,
-          Destination: recipient.wallet_address,
-          Amount: {
-            currency: selectedToken.currency,
-            issuer: selectedToken.issuer,
-            value: amount
-          }
-        };
-      }
-
-      const prepared = await client.autofill(payment);
-      const signed = wallet.sign(prepared);
-      const result = await client.submitAndWait(signed.tx_blob);
-
-      if (result.result.meta.TransactionResult === 'tesSUCCESS') {
-        toast.success(`Sent ${amount} ${selectedToken.currency} to ${recipient.nickname}!`);
-
-        if (currentStream) {
-          await supabase
-            .from('stream_tips')
-            .insert([{
-              stream_id: currentStream.id,
-              from_wallet: connectedWallet.address,
-              from_nickname: nickname,
-              to_wallet: recipient.wallet_address,
-              currency: selectedToken.currency,
-              amount: parseFloat(amount),
-              tx_hash: result.result.hash
-            }]);
-
-          await supabase
-            .from('live_streams')
-            .update({
-              total_tips: parseFloat(totalTips) + parseFloat(amount)
-            })
-            .eq('id', currentStream.id);
-
-          loadStreamTips();
-        }
-      } else {
-        toast.error('Transaction failed');
-      }
-
-      await client.disconnect();
-    } catch (error) {
-      console.error('Error sending tip:', error);
-      toast.error('Failed to send tip');
-    }
+    setTipRecipient(recipient);
+    setShowTipModal(true);
   };
 
   const selectCamera = async () => {
@@ -841,11 +753,79 @@ export default function Social() {
   const viewStream = async (stream) => {
     setViewingStream(stream);
     setActiveTab('viewing');
+    loadStreamDetails(stream.id);
+    joinStream(stream.id);
+  };
+
+  const loadStreamDetails = async (streamId) => {
+    const { data: tips } = await supabase
+      .from('stream_tips')
+      .select('*')
+      .eq('stream_id', streamId)
+      .order('created_at', { ascending: false });
+
+    if (tips) {
+      setStreamTips(tips);
+      const total = tips.reduce((sum, tip) => sum + parseFloat(tip.amount), 0);
+      setTotalTips(total.toFixed(4));
+    }
+
+    const { data: viewers } = await supabase
+      .from('stream_viewers')
+      .select('*')
+      .eq('stream_id', streamId);
+
+    if (viewers) {
+      setViewerCount(viewers.length);
+    }
+  };
+
+  const joinStream = async (streamId) => {
+    if (!connectedWallet) return;
+
+    await supabase
+      .from('stream_viewers')
+      .upsert({
+        stream_id: streamId,
+        viewer_address: connectedWallet.address,
+        last_seen: new Date().toISOString()
+      });
+
+    await supabase
+      .from('live_streams')
+      .update({ viewer_count: viewerCount + 1 })
+      .eq('id', streamId);
   };
 
   const closeStreamView = () => {
+    if (viewingStream && connectedWallet) {
+      leaveStream(viewingStream.id);
+    }
     setViewingStream(null);
+    setStreamTips([]);
+    setTotalTips(0);
+    setViewerCount(0);
     setActiveTab('feeds');
+  };
+
+  const leaveStream = async (streamId) => {
+    if (!connectedWallet) return;
+
+    await supabase
+      .from('stream_viewers')
+      .delete()
+      .eq('stream_id', streamId)
+      .eq('viewer_address', connectedWallet.address);
+
+    const { data: viewers } = await supabase
+      .from('stream_viewers')
+      .select('*')
+      .eq('stream_id', streamId);
+
+    await supabase
+      .from('live_streams')
+      .update({ viewer_count: viewers?.length || 0 })
+      .eq('id', streamId);
   };
 
   const formatTimestamp = (timestamp) => {
@@ -1298,21 +1278,95 @@ export default function Social() {
             <button
               onClick={() => {
                 const user = { wallet_address: viewingStream.wallet_address, nickname: viewingStream.nickname };
-                sendTip(user);
+                openTipModal(user);
               }}
               className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white px-6 py-2 rounded-lg font-bold transition-all"
             >
               💸 Send Tip
             </button>
           </div>
-          <div className="flex-1 bg-black flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-8xl mb-4">📹</div>
-              <div className="text-purple-400 text-xl">Stream Preview</div>
-              <div className="text-purple-500 text-sm mt-2">Live video streaming coming soon</div>
-              <div className="mt-6 bg-purple-900/90 backdrop-blur-xl px-6 py-3 rounded-lg inline-block">
-                <div className="text-purple-200 font-bold text-sm">💸 Total Tips</div>
-                <div className="text-green-400 font-bold text-2xl">{parseFloat(viewingStream.total_tips).toFixed(2)} XRP</div>
+          <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 bg-black flex flex-col">
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-8xl mb-4">📹</div>
+                  <div className="text-purple-400 text-xl">Stream Preview</div>
+                  <div className="text-purple-500 text-sm mt-2">Live video streaming coming soon</div>
+                </div>
+              </div>
+
+              <div className="p-4 bg-purple-900/20 backdrop-blur-xl border-t border-purple-500/20">
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="bg-purple-800/30 rounded-lg p-4 border border-purple-500/20">
+                    <div className="text-purple-400 text-sm mb-1">👥 Viewers</div>
+                    <div className="text-purple-200 text-2xl font-bold">{viewerCount}</div>
+                  </div>
+                  <div className="bg-purple-800/30 rounded-lg p-4 border border-purple-500/20">
+                    <div className="text-purple-400 text-sm mb-1">💸 Total Tips</div>
+                    <div className="text-green-400 text-2xl font-bold">{totalTips}</div>
+                  </div>
+                  <div className="bg-purple-800/30 rounded-lg p-4 border border-purple-500/20">
+                    <div className="text-purple-400 text-sm mb-1">🎁 Tip Count</div>
+                    <div className="text-purple-200 text-2xl font-bold">{streamTips.length}</div>
+                  </div>
+                  <div className="bg-purple-800/30 rounded-lg p-4 border border-purple-500/20">
+                    <div className="text-purple-400 text-sm mb-1">⏱️ Duration</div>
+                    <div className="text-purple-200 text-2xl font-bold">
+                      {Math.floor((new Date() - new Date(viewingStream.started_at)) / 60000)}m
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-96 bg-purple-900/20 backdrop-blur-xl border-l border-purple-500/20 flex flex-col">
+              <div className="p-4 border-b border-purple-500/20">
+                <h3 className="text-xl font-bold text-purple-200">Live Tips 💸</h3>
+                <p className="text-purple-400 text-sm">{streamTips.length} tips received</p>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {streamTips.length === 0 ? (
+                  <div className="text-center py-12">
+                    <div className="text-5xl mb-3">💰</div>
+                    <div className="text-purple-400">No tips yet</div>
+                    <div className="text-purple-500 text-sm mt-1">Be the first to tip!</div>
+                  </div>
+                ) : (
+                  streamTips.map((tip) => (
+                    <div key={tip.id} className="bg-purple-800/30 rounded-lg p-4 border border-purple-500/20">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center text-white font-bold flex-shrink-0">
+                          {tip.from_nickname.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-purple-200 font-bold">{tip.from_nickname}</span>
+                            <span className="text-yellow-400 text-lg">💸</span>
+                          </div>
+                          <div className="text-green-400 font-bold text-lg mb-1">
+                            {parseFloat(tip.amount).toFixed(4)} {tip.currency}
+                          </div>
+                          <div className="text-purple-400 text-xs">
+                            {formatTimestamp(tip.created_at)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="p-4 border-t border-purple-500/20">
+                <button
+                  onClick={() => {
+                    const user = { wallet_address: viewingStream.wallet_address, nickname: viewingStream.nickname };
+                    openTipModal(user);
+                  }}
+                  className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white py-3 rounded-lg font-bold transition-all"
+                >
+                  💸 Send Tip
+                </button>
               </div>
             </div>
           </div>
@@ -1366,7 +1420,7 @@ export default function Social() {
                 💬 Send Direct Message
               </button>
               <button
-                onClick={() => sendTip(selectedUser)}
+                onClick={() => openTipModal(selectedUser)}
                 className="w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white py-3 rounded-lg font-medium transition-all"
               >
                 💸 Send Tip
@@ -1420,6 +1474,21 @@ export default function Social() {
           </div>
         </div>
       )}
+
+      <TipModal
+        isOpen={showTipModal}
+        onClose={() => {
+          setShowTipModal(false);
+          setTipRecipient(null);
+          if (viewingStream) {
+            loadStreamDetails(viewingStream.id);
+          }
+        }}
+        recipient={tipRecipient}
+        connectedWallet={connectedWallet}
+        nickname={nickname}
+        currentStream={viewingStream}
+      />
     </div>
   );
 }
