@@ -133,17 +133,73 @@ export default function MyTokens() {
     }
   };
 
-  const fetchHoldings = async () => {
+  const calculateAnalytics = (tokenHoldings) => {
+    let totalValue = 0;
+    let lpCount = 0;
+    let totalTokenValue = 0;
+    let totalLPValue = 0;
+
+    tokenHoldings.forEach(holding => {
+      totalValue += holding.value;
+      if (holding.isLPToken) {
+        lpCount++;
+        totalLPValue += holding.value;
+      } else {
+        totalTokenValue += holding.value;
+      }
+    });
+
+    const totalValueChange24h = ((Math.random() - 0.3) * 20).toFixed(2);
+    const lpValueChange24h = ((Math.random() - 0.3) * 15).toFixed(2);
+
+    setAnalytics({
+      totalValue: totalValue.toFixed(4),
+      totalTokens: tokenHoldings.length,
+      lpPositions: lpCount,
+      totalValueChange24h: parseFloat(totalValueChange24h),
+      lpValueChange24h: parseFloat(lpValueChange24h)
+    });
+  };
+
+  const fetchHoldings = async (forceRefresh = false) => {
     if (!connectedWallet) return;
 
     console.log('\n💼 Fetching token holdings...');
     setLoading(true);
-    const client = new xrpl.Client('wss://xrplcluster.com');
 
     try {
-      await client.connect();
+      const cacheAge = 30;
+      const { data: cachedData, error: cacheError } = await supabase
+        .from('token_holdings_cache')
+        .select('*, token:meme_tokens(*)')
+        .eq('wallet_address', connectedWallet.address)
+        .gte('last_updated', new Date(Date.now() - cacheAge * 1000).toISOString());
 
-      const response = await client.request({
+      if (!forceRefresh && cachedData && cachedData.length > 0 && !cacheError) {
+        console.log(`✅ Using cached holdings (${cachedData.length} items)`);
+
+        const tokenHoldings = cachedData.map(cache => ({
+          token: cache.token,
+          balance: parseFloat(cache.balance),
+          price: parseFloat(cache.price),
+          value: parseFloat(cache.value),
+          isLPToken: cache.is_lp_token,
+          lpShare: parseFloat(cache.lp_share),
+          priceChange24h: parseFloat(cache.price_change_24h)
+        }));
+
+        setHoldings(tokenHoldings);
+        calculateAnalytics(tokenHoldings);
+        setLoading(false);
+
+        setTimeout(() => fetchHoldings(true), cacheAge * 1000);
+        return;
+      }
+
+      console.log('🔄 Fetching fresh data from XRPL...');
+      const { requestWithRetry } = await import('../utils/xrplClient');
+
+      const response = await requestWithRetry({
         command: 'account_lines',
         account: connectedWallet.address,
         ledger_index: 'validated'
@@ -180,7 +236,7 @@ export default function MyTokens() {
             ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
             : token.currency_code;
 
-          const ammInfoResponse = await client.request({
+          const ammInfoResponse = await requestWithRetry({
             command: 'amm_info',
             asset: { currency: 'XRP' },
             asset2: {
@@ -289,20 +345,31 @@ export default function MyTokens() {
       console.log(`\n✅ Total holdings: ${tokenHoldings.length} (${lpCount} LP positions)`);
       console.log(`💰 Total value: ${totalValue.toFixed(4)} XRP\n`);
 
-      const totalValueChange24h = ((Math.random() - 0.3) * 20).toFixed(2);
-      const lpValueChange24h = ((Math.random() - 0.3) * 15).toFixed(2);
+      await supabase
+        .from('token_holdings_cache')
+        .delete()
+        .eq('wallet_address', connectedWallet.address);
+
+      const cacheRecords = tokenHoldings.map(holding => ({
+        wallet_address: connectedWallet.address,
+        token_id: holding.token.id,
+        balance: holding.balance,
+        price: holding.price,
+        value: holding.value,
+        is_lp_token: holding.isLPToken,
+        lp_share: holding.lpShare,
+        price_change_24h: holding.priceChange24h || 0,
+        last_updated: new Date().toISOString()
+      }));
+
+      if (cacheRecords.length > 0) {
+        await supabase.from('token_holdings_cache').insert(cacheRecords);
+        console.log(`💾 Cached ${cacheRecords.length} holdings`);
+      }
 
       setHoldings(tokenHoldings);
       setPoolsData(ammPools);
-      setAnalytics({
-        totalValue: totalValue.toFixed(4),
-        totalTokens: tokenHoldings.length,
-        lpPositions: lpCount,
-        totalValueChange24h: parseFloat(totalValueChange24h),
-        lpValueChange24h: parseFloat(lpValueChange24h)
-      });
-
-      await client.disconnect();
+      calculateAnalytics(tokenHoldings);
     } catch (error) {
       console.error('Error fetching holdings:', error);
       toast.error('Failed to fetch token holdings');
