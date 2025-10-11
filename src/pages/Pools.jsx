@@ -264,18 +264,39 @@ export default function Pools() {
   const fetchLPBalances = async () => {
     if (!connectedWallet) return;
 
-    const client = new xrpl.Client('wss://xrplcluster.com');
-
     try {
-      await client.connect();
+      console.log('💰 Checking LP balance cache...');
+      const { data: cachedBalances } = await supabase
+        .from('lp_balance_cache')
+        .select('*')
+        .eq('wallet_address', connectedWallet.address)
+        .gte('last_updated', new Date(Date.now() - 30000).toISOString());
 
-      const response = await client.request({
+      if (cachedBalances && cachedBalances.length > 0) {
+        console.log('✅ Using cached LP balances:', cachedBalances.length);
+        const lpBal = {};
+        cachedBalances.forEach(cache => {
+          lpBal[cache.token_id] = {
+            balance: parseFloat(cache.lp_balance),
+            share: parseFloat(cache.lp_share_percentage)
+          };
+        });
+        setLpBalances(lpBal);
+        return;
+      }
+
+      console.log('🔄 Fetching fresh LP balances from XRPL...');
+      const { requestWithRetry } = await import('../utils/xrplClient');
+
+      const response = await requestWithRetry({
         command: 'account_lines',
         account: connectedWallet.address,
         ledger_index: 'validated'
       });
 
       const lpBal = {};
+      const cacheRecords = [];
+
       if (response.result.lines) {
         response.result.lines.forEach(line => {
           const poolData = Object.entries(poolsData).find(
@@ -287,12 +308,29 @@ export default function Pools() {
             const balance = parseFloat(line.balance);
             const share = data.lpTokens > 0 ? (balance / data.lpTokens) * 100 : 0;
             lpBal[tokenId] = { balance, share };
+
+            cacheRecords.push({
+              wallet_address: connectedWallet.address,
+              token_id: tokenId,
+              amm_account_id: line.account,
+              lp_balance: balance,
+              lp_share_percentage: share,
+              last_updated: new Date().toISOString()
+            });
           }
         });
       }
 
+      if (cacheRecords.length > 0) {
+        for (const record of cacheRecords) {
+          await supabase
+            .from('lp_balance_cache')
+            .upsert(record, { onConflict: 'wallet_address,token_id' });
+        }
+        console.log(`💾 Cached ${cacheRecords.length} LP balances`);
+      }
+
       setLpBalances(lpBal);
-      await client.disconnect();
     } catch (error) {
       console.error('Error fetching LP balances:', error);
     }
