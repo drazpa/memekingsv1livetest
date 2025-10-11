@@ -233,16 +233,14 @@ export default function BotTrader() {
 
     try {
       console.log('🔍 Fetching token balances for wallet:', connectedWallet.address);
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
 
-      const accountLines = await client.request({
+      const { requestWithRetry } = await import('../utils/xrplClient');
+
+      const accountLines = await requestWithRetry({
         command: 'account_lines',
         account: connectedWallet.address,
         ledger_index: 'validated'
       });
-
-      await client.disconnect();
 
       console.log('📊 Account has', accountLines.result.lines.length, 'trustlines');
       console.log('🎯 Looking up balances for', tokens.length, 'tokens');
