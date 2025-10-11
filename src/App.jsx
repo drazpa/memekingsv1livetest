@@ -16,6 +16,7 @@ import WalletManagement from './components/WalletManagement';
 import Setup from './pages/Setup';
 import AIChat from './pages/AIChat';
 import Social from './pages/Social';
+import { imageCacheManager } from './utils/imageCache';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -75,9 +76,14 @@ export default function App() {
     window.addEventListener('error', handleError);
     window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
+    const cleanupInterval = setInterval(() => {
+      imageCacheManager.cleanOldEntries();
+    }, 60 * 60 * 1000);
+
     return () => {
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      clearInterval(cleanupInterval);
     };
   }, []);
 

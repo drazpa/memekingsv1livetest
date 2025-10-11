@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
+import { imageCacheManager, extractIpfsHash as extractHash } from '../utils/imageCache';
 
 const IPFS_GATEWAYS = [
   'https://gateway.pinata.cloud/ipfs/',
@@ -7,17 +8,15 @@ const IPFS_GATEWAYS = [
   'https://dweb.link/ipfs/'
 ];
 
-const imageCache = new Map();
-
 function TokenIcon({ token, size = 'md', className = '' }) {
   const cacheKey = `${token.id}-${token.image_url}`;
-  const isCached = imageCache.has(cacheKey);
 
   const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(isCached);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const [currentGatewayIndex, setCurrentGatewayIndex] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const imageUrlRef = useRef(null);
+  const [cachedUrl, setCachedUrl] = useState(null);
 
   const sizeClasses = {
     sm: 'w-8 h-8 min-w-[2rem] min-h-[2rem] text-sm',
@@ -30,39 +29,26 @@ function TokenIcon({ token, size = 'md', className = '' }) {
   const sizeClass = sizeClasses[size] || sizeClasses.md;
 
   useEffect(() => {
-    if (imageCache.has(cacheKey)) {
-      setImageLoaded(true);
-      setImageError(false);
-      return;
-    }
+    const checkCache = async () => {
+      const cached = await imageCacheManager.get(cacheKey);
+      if (cached) {
+        setCachedUrl(cached);
+        setImageLoaded(true);
+        setImageError(false);
+        return;
+      }
 
-    if (imageUrlRef.current !== token.image_url) {
-      setImageError(false);
-      setImageLoaded(false);
-      setCurrentGatewayIndex(0);
-      setRetryCount(0);
-      imageUrlRef.current = token.image_url;
-    }
+      if (imageUrlRef.current !== token.image_url) {
+        setImageError(false);
+        setImageLoaded(false);
+        setCurrentGatewayIndex(0);
+        setRetryCount(0);
+        imageUrlRef.current = token.image_url;
+      }
+    };
+
+    checkCache();
   }, [token.image_url, token.id, cacheKey]);
-
-  const extractIpfsHash = (url) => {
-    if (!url) return null;
-
-    if (url.startsWith('ipfs://')) {
-      return url.replace('ipfs://', '');
-    }
-
-    const ipfsMatch = url.match(/\/ipfs\/([a-zA-Z0-9]+)/);
-    if (ipfsMatch) {
-      return ipfsMatch[1];
-    }
-
-    if (!url.startsWith('http')) {
-      return url;
-    }
-
-    return null;
-  };
 
   const handleImageError = () => {
     console.error('Image load error for token:', token.token_name, 'Gateway:', currentGatewayIndex, 'Retry:', retryCount);
@@ -82,11 +68,13 @@ function TokenIcon({ token, size = 'md', className = '' }) {
   };
 
   if (token.image_url && !imageError) {
-    let imageUrl = token.image_url;
-    const ipfsHash = extractIpfsHash(token.image_url);
+    let imageUrl = cachedUrl || token.image_url;
 
-    if (ipfsHash) {
-      imageUrl = `${IPFS_GATEWAYS[currentGatewayIndex]}${ipfsHash}`;
+    if (!cachedUrl) {
+      const ipfsHash = extractHash(token.image_url);
+      if (ipfsHash) {
+        imageUrl = `${IPFS_GATEWAYS[currentGatewayIndex]}${ipfsHash}`;
+      }
     }
 
     const finalUrl = imageUrl;
@@ -103,12 +91,15 @@ function TokenIcon({ token, size = 'md', className = '' }) {
           src={finalUrl}
           alt={token.token_name}
           className={`${sizeClass} rounded-full object-cover border-2 border-purple-500 ${className} transition-opacity duration-200 ${!imageLoaded ? 'opacity-0' : 'opacity-100'} aspect-square`}
-          onLoad={() => {
-            const cacheKey = `${token.id}-${token.image_url}`;
-            imageCache.set(cacheKey, true);
+          onLoad={async () => {
+            if (!cachedUrl) {
+              await imageCacheManager.set(cacheKey, finalUrl);
+            }
             setImageLoaded(true);
           }}
           onError={handleImageError}
+          loading="lazy"
+          decoding="async"
         />
       </div>
     );
