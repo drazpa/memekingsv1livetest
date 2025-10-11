@@ -59,6 +59,7 @@ class ErrorBoundary extends Component {
 export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedTradeToken, setSelectedTradeToken] = useState(null);
+  const [pageKey, setPageKey] = useState(0);
 
   useEffect(() => {
     const handleError = (event) => {
@@ -82,14 +83,14 @@ export default function App() {
 
   useEffect(() => {
     const handleNavigateToTrade = (event) => {
-      setCurrentPage('trade');
+      handlePageChange('trade');
       if (event.detail) {
         setSelectedTradeToken(event.detail);
       }
     };
 
     const handleNavigateToPage = (event) => {
-      setCurrentPage(event.detail);
+      handlePageChange(event.detail);
       if (event.detail !== 'trade') {
         setSelectedTradeToken(null);
       }
@@ -104,40 +105,45 @@ export default function App() {
     };
   }, []);
 
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    setPageKey(prev => prev + 1);
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard key={pageKey} />;
       case 'memes':
-        return <Memes />;
+        return <Memes key={pageKey} />;
       case 'pools':
-        return <Pools />;
+        return <Pools key={pageKey} />;
       case 'trade':
-        return <Trade preselectedToken={selectedTradeToken} />;
+        return <Trade key={pageKey} preselectedToken={selectedTradeToken} />;
       case 'bottrader':
-        return <BotTrader />;
+        return <BotTrader key={pageKey} />;
       case 'vault':
-        return <Vault />;
+        return <Vault key={pageKey} />;
       case 'mytokens':
-        return <MyTokens />;
+        return <MyTokens key={pageKey} />;
       case 'analytics':
-        return <Analytics />;
+        return <Analytics key={pageKey} />;
       case 'top10':
-        return <Top10 />;
+        return <Top10 key={pageKey} />;
       case 'kingslist':
-        return <KingsList />;
+        return <KingsList key={pageKey} />;
       case 'about':
-        return <About />;
+        return <About key={pageKey} />;
       case 'wallets':
-        return <WalletManagement />;
+        return <WalletManagement key={pageKey} />;
       case 'setup':
-        return <Setup />;
+        return <Setup key={pageKey} />;
       case 'aichat':
-        return <AIChat />;
+        return <AIChat key={pageKey} />;
       case 'social':
-        return <Social />;
+        return <Social key={pageKey} />;
       default:
-        return <Dashboard />;
+        return <Dashboard key={pageKey} />;
     }
   };
 
@@ -168,7 +174,7 @@ export default function App() {
           }}
         />
 
-        <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
+        <Sidebar currentPage={currentPage} onNavigate={handlePageChange} />
 
         <div className="lg:ml-64 pt-20 lg:pt-6 p-3 sm:p-4 md:p-6 lg:p-8">
           <div className="w-full mx-auto">

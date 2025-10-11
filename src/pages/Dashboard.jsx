@@ -93,6 +93,7 @@ export default function Dashboard() {
   const [tokenFilterTab, setTokenFilterTab] = useState('all');
   const [mainTokenTab, setMainTokenTab] = useState('all');
   const [swapDropdownOpen, setSwapDropdownOpen] = useState(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const TOKENS_PER_PAGE = 100;
 
   useEffect(() => {
@@ -1335,6 +1336,26 @@ export default function Dashboard() {
           <p className="text-purple-400 mt-1 text-sm sm:text-base">Meme token factory control center</p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <button
+            onClick={async () => {
+              setIsRefreshing(true);
+              try {
+                await loadTokens();
+                await fetchAllPoolsData(true);
+                toast.success('Dashboard refreshed!');
+              } catch (error) {
+                console.error('Error refreshing:', error);
+                toast.error('Failed to refresh');
+              } finally {
+                setIsRefreshing(false);
+              }
+            }}
+            disabled={isRefreshing}
+            className="btn text-purple-300 px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-medium flex items-center gap-1 sm:gap-2 text-sm sm:text-base flex-1 sm:flex-initial justify-center disabled:opacity-50"
+            title="Refresh Dashboard"
+          >
+            <span className={isRefreshing ? 'animate-spin' : ''}>{isRefreshing ? '⟳' : '🔄'}</span>
+          </button>
           <button
             onClick={async () => {
               if (!connectedWallet) {
