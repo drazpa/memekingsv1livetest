@@ -156,12 +156,34 @@ export default function Vault() {
     if (!connectedWallet || tokens.length === 0) return;
 
     setLoading(true);
-    const client = new xrpl.Client('wss://xrplcluster.com');
 
     try {
-      await client.connect();
+      const { data: cachedHoldings } = await supabase
+        .from('token_holdings_cache')
+        .select('*')
+        .eq('wallet_address', connectedWallet.address)
+        .gte('last_updated', new Date(Date.now() - 30000).toISOString());
 
-      const accountLinesResponse = await client.request({
+      if (cachedHoldings && cachedHoldings.length > 0) {
+        console.log('✅ Using cached token holdings');
+        const balances = {};
+        let totalBalance = 0;
+
+        cachedHoldings.forEach(holding => {
+          balances[holding.token_id] = parseFloat(holding.balance);
+          totalBalance += parseFloat(holding.balance);
+        });
+
+        setTokenBalances(balances);
+        setStats(prev => ({ ...prev, totalBalance }));
+        setLoading(false);
+        return;
+      }
+
+      console.log('🔄 Fetching fresh token holdings...');
+      const { requestWithRetry } = await import('../utils/xrplClient');
+
+      const accountLinesResponse = await requestWithRetry({
         command: 'account_lines',
         account: connectedWallet.address,
         ledger_index: 'validated'
@@ -169,6 +191,7 @@ export default function Vault() {
 
       const balances = {};
       let totalBalance = 0;
+      const holdingsToCache = [];
 
       accountLinesResponse.result.lines.forEach(line => {
         const token = tokens.find(t => {
@@ -185,13 +208,31 @@ export default function Vault() {
           const balance = parseFloat(line.balance);
           balances[token.id] = balance;
           totalBalance += balance;
+
+          holdingsToCache.push({
+            wallet_address: connectedWallet.address,
+            token_id: token.id,
+            balance: balance,
+            last_updated: new Date().toISOString()
+          });
         }
       });
 
       setTokenBalances(balances);
       setStats(prev => ({ ...prev, totalBalance }));
 
-      await client.disconnect();
+      if (holdingsToCache.length > 0) {
+        await supabase
+          .from('token_holdings_cache')
+          .delete()
+          .eq('wallet_address', connectedWallet.address);
+
+        await supabase
+          .from('token_holdings_cache')
+          .insert(holdingsToCache);
+
+        console.log('💾 Cached token holdings');
+      }
     } catch (error) {
       console.error('Error loading balances:', error);
       toast.error('Failed to load token balances');
@@ -387,14 +428,12 @@ export default function Vault() {
         amount: pending
       });
 
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
-
+      const { requestWithRetry, getClient } = await import('../utils/xrplClient');
       const fundWallet = xrpl.Wallet.fromSeed(FUND_SEED);
 
       setClaimProgress(prev => ({ ...prev, step: 2, message: 'Checking trustlines...' }));
 
-      const accountInfo = await client.request({
+      const accountInfo = await requestWithRetry({
         command: 'account_lines',
         account: FUND_ADDRESS,
         ledger_index: 'validated'
@@ -411,6 +450,8 @@ export default function Vault() {
 
       if (!hasTrustline) {
         setClaimProgress(prev => ({ ...prev, step: 3, message: 'Setting up trustline...' }));
+
+        const client = await getClient();
 
         const trustSet = {
           TransactionType: 'TrustSet',
@@ -431,7 +472,7 @@ export default function Vault() {
         }
       }
 
-      const destAccountInfo = await client.request({
+      const destAccountInfo = await requestWithRetry({
         command: 'account_lines',
         account: connectedWallet.address,
         ledger_index: 'validated'
@@ -446,11 +487,12 @@ export default function Vault() {
         setClaimProgress(null);
         toast.error(`Your wallet needs a trustline for ${token.currency_code}. Please set up trustline first.`);
         setClaiming(prev => ({ ...prev, [token.id]: false }));
-        await client.disconnect();
         return;
       }
 
       setClaimProgress(prev => ({ ...prev, step: 4, message: 'Processing claim fee...' }));
+
+      const client = await getClient();
 
       const feePayment = {
         TransactionType: 'Payment',
@@ -525,8 +567,6 @@ export default function Vault() {
       } else {
         throw new Error(`Transaction failed: ${result.result.meta.TransactionResult}`);
       }
-
-      await client.disconnect();
     } catch (error) {
       console.error('Claim error:', error);
       setClaimProgress(null);

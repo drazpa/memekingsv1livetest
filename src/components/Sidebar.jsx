@@ -198,15 +198,15 @@ export default function Sidebar({ currentPage, onNavigate }) {
               <span className="ml-2">{showNetworkDropdown ? '▲' : '▼'}</span>
             </button>
             {showNetworkDropdown && (
-              <div className="absolute left-0 right-0 mt-2 glass rounded-lg border border-purple-500/30 shadow-xl z-50 max-h-64 overflow-y-auto">
+              <div className="absolute left-0 right-0 mt-2 bg-gray-900 rounded-lg border border-purple-500/50 shadow-2xl z-[100] max-h-64 overflow-y-auto">
                 {getAvailableServers().map((server, index) => (
                   <button
                     key={index}
                     onClick={() => handleNetworkChange(index)}
                     className={`w-full text-left px-4 py-3 text-sm transition-colors border-b border-purple-500/20 last:border-b-0 ${
                       selectedNetwork?.url === server.url
-                        ? 'bg-purple-600/40 text-purple-100'
-                        : 'text-purple-300 hover:bg-purple-900/30'
+                        ? 'bg-purple-600 text-white'
+                        : 'text-purple-300 hover:bg-purple-900/60'
                     }`}
                   >
                     {server.name}
