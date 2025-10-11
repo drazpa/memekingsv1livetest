@@ -164,8 +164,6 @@ export default function Pools() {
 
         setPoolsData(poolData);
         setRefreshing(false);
-
-        setTimeout(() => fetchAllPoolsData(true), cacheAge * 1000);
         return;
       }
 

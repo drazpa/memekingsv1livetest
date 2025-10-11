@@ -356,8 +356,6 @@ export default function Dashboard() {
         });
 
         setPoolsData(poolData);
-
-        setTimeout(() => fetchAllPoolsData(true), cacheAge * 1000);
         return;
       }
 

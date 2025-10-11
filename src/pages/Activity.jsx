@@ -27,9 +27,6 @@ export default function Activity() {
   useEffect(() => {
     loadConnectedWallet();
     loadActivities();
-
-    const interval = setInterval(loadActivities, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const loadConnectedWallet = () => {

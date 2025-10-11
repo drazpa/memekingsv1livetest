@@ -872,7 +872,6 @@ export default function Trade({ preselectedToken = null }) {
         });
 
         setRefreshingMarket(false);
-        setTimeout(() => fetchMarketData(true), cacheAge * 1000);
         return;
       }
 

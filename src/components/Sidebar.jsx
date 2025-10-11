@@ -37,7 +37,6 @@ export default function Sidebar({ currentPage, onNavigate }) {
 
   useEffect(() => {
     fetchXRPPrice();
-    const interval = setInterval(fetchXRPPrice, 30000);
     loadConnectedWallet();
 
     const savedServer = loadSavedServer();
@@ -55,7 +54,6 @@ export default function Sidebar({ currentPage, onNavigate }) {
     window.addEventListener('networkChanged', handleNetworkChange);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener('walletConnected', handleWalletChange);
       window.removeEventListener('walletDisconnected', handleWalletChange);
       window.removeEventListener('networkChanged', handleNetworkChange);
@@ -65,8 +63,6 @@ export default function Sidebar({ currentPage, onNavigate }) {
   useEffect(() => {
     if (connectedWallet?.address) {
       fetchWalletBalance();
-      const interval = setInterval(fetchWalletBalance, 10000);
-      return () => clearInterval(interval);
     } else {
       setWalletBalance(0);
     }

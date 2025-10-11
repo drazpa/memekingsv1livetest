@@ -73,12 +73,6 @@ export default function BotTrader() {
   useEffect(() => {
     if (tokens.length > 0) {
       fetchAllPoolsData();
-
-      const poolRefreshInterval = setInterval(() => {
-        fetchAllPoolsData();
-      }, 30000);
-
-      return () => clearInterval(poolRefreshInterval);
     }
   }, [tokens]);
 

@@ -191,8 +191,6 @@ export default function MyTokens() {
         setHoldings(tokenHoldings);
         calculateAnalytics(tokenHoldings);
         setLoading(false);
-
-        setTimeout(() => fetchHoldings(true), cacheAge * 1000);
         return;
       }
 

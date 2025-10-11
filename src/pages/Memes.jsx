@@ -212,8 +212,6 @@ export default function Memes() {
         });
 
         setPoolsData(poolData);
-
-        setTimeout(() => fetchAllPoolsData(true), cacheAge * 1000);
         return;
       }
 

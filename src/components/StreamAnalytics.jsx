@@ -26,8 +26,6 @@ export default function StreamAnalytics() {
 
   useEffect(() => {
     loadAnalytics();
-    const interval = setInterval(loadAnalytics, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const loadAnalytics = async () => {

@@ -101,8 +101,6 @@ export default function Top10() {
 
         setTokens(tokensData);
         setLoading(false);
-
-        setTimeout(() => loadTokensData(true), cacheAge * 1000);
         return;
       }
 
