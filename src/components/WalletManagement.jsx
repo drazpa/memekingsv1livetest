@@ -116,15 +116,13 @@ export default function WalletManagement() {
 
   const updateWalletBalances = async (walletList) => {
     try {
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
-
+      const { requestWithRetry } = await import('../utils/xrplClient');
       const stored = localStorage.getItem('wallets');
       const allWallets = stored ? JSON.parse(stored) : [];
 
       for (const wallet of walletList) {
         try {
-          const accountInfo = await client.request({
+          const accountInfo = await requestWithRetry({
             command: 'account_info',
             account: wallet.address,
             ledger_index: 'validated'
@@ -153,7 +151,6 @@ export default function WalletManagement() {
       }
 
       localStorage.setItem('wallets', JSON.stringify(allWallets));
-      await client.disconnect();
       setWallets([...walletList]);
     } catch (error) {
       console.error('Error updating wallet balances:', error);
@@ -245,13 +242,8 @@ export default function WalletManagement() {
     setGeneratedWallet(null);
 
     try {
-      const client = new xrpl.Client(
-        selectedNetwork === 'mainnet'
-          ? 'wss://xrplcluster.com'
-          : 'wss://s.altnet.rippletest.net:51233'
-      );
-
-      await client.connect();
+      const { getClient } = await import('../utils/xrplClient');
+      const client = await getClient();
       toast.success('Connected to XRPL');
 
       const newWallet = xrpl.Wallet.generate();
@@ -271,7 +263,6 @@ export default function WalletManagement() {
         network: selectedNetwork
       });
 
-      await client.disconnect();
       toast.success('Wallet generated successfully!');
     } catch (error) {
       console.error('Error generating wallet:', error);
@@ -329,13 +320,11 @@ export default function WalletManagement() {
 
     try {
       const wallet = xrpl.Wallet.fromSeed(importSeedInput.trim());
-
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
+      const { requestWithRetry } = await import('../utils/xrplClient');
 
       let balance = 0;
       try {
-        const accountInfo = await client.request({
+        const accountInfo = await requestWithRetry({
           command: 'account_info',
           account: wallet.address,
           ledger_index: 'validated'
@@ -346,8 +335,6 @@ export default function WalletManagement() {
           throw error;
         }
       }
-
-      await client.disconnect();
 
       setImportedWalletData({
         address: wallet.address,

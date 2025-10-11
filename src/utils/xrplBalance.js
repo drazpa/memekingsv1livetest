@@ -1,7 +1,17 @@
 import { requestWithRetry } from './xrplClient';
 
-export async function getXRPBalance(address) {
+const balanceCache = new Map();
+const CACHE_DURATION = 10000;
+
+export async function getXRPBalance(address, useCache = true) {
   if (!address) return 0;
+
+  if (useCache && balanceCache.has(address)) {
+    const cached = balanceCache.get(address);
+    if (Date.now() - cached.timestamp < CACHE_DURATION) {
+      return cached.balance;
+    }
+  }
 
   try {
     const response = await requestWithRetry({
@@ -11,6 +21,12 @@ export async function getXRPBalance(address) {
     });
 
     const balance = parseFloat(response.result.account_data.Balance) / 1000000;
+
+    balanceCache.set(address, {
+      balance,
+      timestamp: Date.now()
+    });
+
     return balance;
   } catch (error) {
     if (error.data?.error === 'actNotFound') {
