@@ -287,8 +287,6 @@ export default function Dashboard() {
   };
 
   const loadTokens = async () => {
-    const client = new xrpl.Client('wss://xrplcluster.com');
-
     try {
       const { data, error } = await supabase
         .from('meme_tokens')
@@ -299,35 +297,27 @@ export default function Dashboard() {
 
       const tokensData = data || [];
 
-      await client.connect();
+      const { data: cachedPools } = await supabase
+        .from('pool_data_cache')
+        .select('*')
+        .gte('last_updated', new Date(Date.now() - 30000).toISOString());
 
-      for (const token of tokensData.filter(t => t.amm_pool_created)) {
-        try {
-          const currencyHex = token.currency_code.length > 3
-            ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
-            : token.currency_code;
+      if (cachedPools && cachedPools.length > 0) {
+        const poolMap = {};
+        cachedPools.forEach(cache => {
+          poolMap[cache.token_id] = cache;
+        });
 
-          const ammInfoResponse = await client.request({
-            command: 'amm_info',
-            asset: { currency: 'XRP' },
-            asset2: {
-              currency: currencyHex,
-              issuer: token.issuer_address
-            },
-            ledger_index: 'validated'
-          });
-
-          if (ammInfoResponse.result.amm) {
-            const amm = ammInfoResponse.result.amm;
-            token.amm_xrp_amount = parseFloat(amm.amount) / 1000000;
-            token.amm_asset_amount = parseFloat(amm.amount2.value);
+        tokensData.forEach(token => {
+          if (token.amm_pool_created) {
+            const cached = poolMap[token.id];
+            if (cached) {
+              token.amm_xrp_amount = parseFloat(cached.xrp_amount);
+              token.amm_asset_amount = parseFloat(cached.token_amount);
+            }
           }
-        } catch (error) {
-          console.error(`Failed to fetch live data for ${token.token_name}:`, error.message);
-        }
+        });
       }
-
-      await client.disconnect();
 
       setTokens(tokensData);
 
