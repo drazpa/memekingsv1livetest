@@ -844,7 +844,9 @@ export default function BotTrader() {
 
           try {
             await executeBotTrade(freshBot);
-
+          } catch (tradeError) {
+            console.error(`Initial trade execution error for bot ${freshBot.name}:`, tradeError);
+          } finally {
             const updatedPoolData = poolsData[token.id];
             if (updatedPoolData) {
               const newAction = determineNextAction(freshBot, updatedPoolData);
@@ -864,7 +866,7 @@ export default function BotTrader() {
                 })
                 .eq('id', freshBot.id);
             }
-          } finally {
+
             executingBots.current.delete(bot.id);
           }
           return;
@@ -882,7 +884,9 @@ export default function BotTrader() {
             setBots(prev => prev.map(b => b.id === bot.id ? { ...b, ...freshBot } : b));
 
             await executeBotTrade(freshBot);
-
+          } catch (tradeError) {
+            console.error(`Trade execution error for bot ${freshBot.name}:`, tradeError);
+          } finally {
             const updatedPoolData = poolsData[token.id];
             if (updatedPoolData) {
               const newAction = determineNextAction(freshBot, updatedPoolData);
@@ -902,7 +906,7 @@ export default function BotTrader() {
                 })
                 .eq('id', freshBot.id);
             }
-          } finally {
+
             executingBots.current.delete(bot.id);
           }
         }
