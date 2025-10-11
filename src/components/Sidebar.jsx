@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getXRPBalance } from '../utils/xrplBalance';
+import { getAvailableServers, getCurrentServer, setManualServer, loadSavedServer } from '../utils/xrplClient';
 
 export default function Sidebar({ currentPage, onNavigate }) {
   const [xrpPrice, setXrpPrice] = useState(null);
@@ -8,16 +9,22 @@ export default function Sidebar({ currentPage, onNavigate }) {
   const [connectedWallet, setConnectedWallet] = useState(null);
   const [walletBalance, setWalletBalance] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [selectedNetwork, setSelectedNetwork] = useState(null);
+  const [showNetworkDropdown, setShowNetworkDropdown] = useState(false);
   const mobileMenuRef = useRef(null);
+  const networkDropdownRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
         setMobileMenuOpen(false);
       }
+      if (networkDropdownRef.current && !networkDropdownRef.current.contains(event.target)) {
+        setShowNetworkDropdown(false);
+      }
     };
 
-    if (mobileMenuOpen) {
+    if (mobileMenuOpen || showNetworkDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside);
     }
@@ -26,21 +33,32 @@ export default function Sidebar({ currentPage, onNavigate }) {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [mobileMenuOpen]);
+  }, [mobileMenuOpen, showNetworkDropdown]);
 
   useEffect(() => {
     fetchXRPPrice();
     const interval = setInterval(fetchXRPPrice, 30000);
     loadConnectedWallet();
 
+    const savedServer = loadSavedServer();
+    if (savedServer) {
+      setSelectedNetwork(savedServer);
+    } else {
+      setSelectedNetwork(getCurrentServer());
+    }
+
     const handleWalletChange = () => loadConnectedWallet();
+    const handleNetworkChange = (event) => setSelectedNetwork(event.detail);
+
     window.addEventListener('walletConnected', handleWalletChange);
     window.addEventListener('walletDisconnected', handleWalletChange);
+    window.addEventListener('networkChanged', handleNetworkChange);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('walletConnected', handleWalletChange);
       window.removeEventListener('walletDisconnected', handleWalletChange);
+      window.removeEventListener('networkChanged', handleNetworkChange);
     };
   }, []);
 
@@ -84,6 +102,17 @@ export default function Sidebar({ currentPage, onNavigate }) {
     } catch (error) {
       console.error('Error fetching XRP price:', error);
       setLoading(false);
+    }
+  };
+
+  const handleNetworkChange = async (index) => {
+    try {
+      await setManualServer(index);
+      const servers = getAvailableServers();
+      setSelectedNetwork(servers[index]);
+      setShowNetworkDropdown(false);
+    } catch (error) {
+      console.error('Error changing network:', error);
     }
   };
 
@@ -155,6 +184,37 @@ export default function Sidebar({ currentPage, onNavigate }) {
               </div>
             </div>
           )}
+
+          <div ref={networkDropdownRef} className="glass rounded-lg p-4 relative">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-purple-300 text-sm font-medium">Network Node</span>
+              <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
+            </div>
+            <button
+              onClick={() => setShowNetworkDropdown(!showNetworkDropdown)}
+              className="w-full flex items-center justify-between text-purple-200 text-sm hover:text-purple-100 transition-colors"
+            >
+              <span className="truncate">{selectedNetwork?.name || 'Loading...'}</span>
+              <span className="ml-2">{showNetworkDropdown ? '▲' : '▼'}</span>
+            </button>
+            {showNetworkDropdown && (
+              <div className="absolute left-0 right-0 mt-2 glass rounded-lg border border-purple-500/30 shadow-xl z-50 max-h-64 overflow-y-auto">
+                {getAvailableServers().map((server, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleNetworkChange(index)}
+                    className={`w-full text-left px-4 py-3 text-sm transition-colors border-b border-purple-500/20 last:border-b-0 ${
+                      selectedNetwork?.url === server.url
+                        ? 'bg-purple-600/40 text-purple-100'
+                        : 'text-purple-300 hover:bg-purple-900/30'
+                    }`}
+                  >
+                    {server.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="glass rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">

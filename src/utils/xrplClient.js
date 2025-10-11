@@ -1,16 +1,18 @@
 import * as xrpl from 'xrpl';
 
 const XRPL_SERVERS = [
-  'wss://xrplcluster.com',
-  'wss://s1.ripple.com',
-  'wss://s2.ripple.com',
-  'wss://xrpl.ws'
+  { url: 'wss://xrplcluster.com', name: 'XRPL Cluster' },
+  { url: 'wss://ancient-stylish-snowflake.xrp-mainnet.quiknode.pro/4e504cf032eb3a85a185ec069480a11363600a96', name: 'MEMEKINGS NODE' },
+  { url: 'wss://s1.ripple.com', name: 'Ripple S1' },
+  { url: 'wss://s2.ripple.com', name: 'Ripple S2' },
+  { url: 'wss://xrpl.ws', name: 'XRPL.ws' }
 ];
 
 let currentServerIndex = 0;
 let sharedClient = null;
 let connectionAttempts = 0;
 const MAX_CONNECTION_ATTEMPTS = 3;
+let manualServerIndex = null;
 
 class XRPLClientManager {
   constructor() {
@@ -37,8 +39,9 @@ class XRPLClientManager {
     this.connecting = true;
 
     try {
-      const server = XRPL_SERVERS[this.serverIndex];
-      this.client = new xrpl.Client(server);
+      const useIndex = manualServerIndex !== null ? manualServerIndex : this.serverIndex;
+      const server = XRPL_SERVERS[useIndex];
+      this.client = new xrpl.Client(server.url);
 
       await Promise.race([
         this.client.connect(),
@@ -47,16 +50,21 @@ class XRPLClientManager {
         )
       ]);
 
+      console.log(`✅ Connected to ${server.name}`);
       this.connecting = false;
       return this.client;
     } catch (error) {
       this.connecting = false;
-      console.error(`Failed to connect to ${XRPL_SERVERS[this.serverIndex]}:`, error.message);
+      const useIndex = manualServerIndex !== null ? manualServerIndex : this.serverIndex;
+      console.error(`Failed to connect to ${XRPL_SERVERS[useIndex].name}:`, error.message);
 
-      const nextServer = this.getNextServer();
-      console.log(`Switching to ${nextServer}`);
-
-      return this.connect();
+      if (manualServerIndex === null) {
+        const nextServer = this.getNextServer();
+        console.log(`Switching to ${nextServer.name}`);
+        return this.connect();
+      } else {
+        throw new Error(`Failed to connect to selected node: ${XRPL_SERVERS[useIndex].name}`);
+      }
     }
   }
 
@@ -152,6 +160,47 @@ export async function autofillWithRetry(transaction, maxRetries = 5) {
   return withRetry(async (client) => {
     return await client.autofill(transaction);
   }, maxRetries);
+}
+
+export function getAvailableServers() {
+  return XRPL_SERVERS;
+}
+
+export function getCurrentServer() {
+  const useIndex = manualServerIndex !== null ? manualServerIndex : clientManager.serverIndex;
+  return XRPL_SERVERS[useIndex];
+}
+
+export async function setManualServer(index) {
+  if (index < 0 || index >= XRPL_SERVERS.length) {
+    throw new Error('Invalid server index');
+  }
+
+  manualServerIndex = index;
+  localStorage.setItem('selectedNodeIndex', index.toString());
+
+  await clientManager.disconnect();
+
+  window.dispatchEvent(new CustomEvent('networkChanged', {
+    detail: XRPL_SERVERS[index]
+  }));
+}
+
+export function clearManualServer() {
+  manualServerIndex = null;
+  localStorage.removeItem('selectedNodeIndex');
+}
+
+export function loadSavedServer() {
+  const saved = localStorage.getItem('selectedNodeIndex');
+  if (saved !== null) {
+    const index = parseInt(saved, 10);
+    if (index >= 0 && index < XRPL_SERVERS.length) {
+      manualServerIndex = index;
+      return XRPL_SERVERS[index];
+    }
+  }
+  return null;
 }
 
 export { XRPL_SERVERS };
