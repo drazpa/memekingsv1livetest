@@ -230,8 +230,35 @@ export default function MyTokens() {
       const ammPools = {};
       const ammAccountsToTokens = {};
 
+      const { data: cachedPools } = await supabase
+        .from('pool_data_cache')
+        .select('*')
+        .gte('last_updated', new Date(Date.now() - 30000).toISOString());
+
+      const poolCacheMap = {};
+      if (cachedPools) {
+        cachedPools.forEach(pool => {
+          poolCacheMap[pool.token_id] = pool;
+        });
+        console.log(`💾 Using cached pool data for ${cachedPools.length} tokens`);
+      }
+
       for (const token of allTokens.filter(t => t.amm_pool_created)) {
         try {
+          if (poolCacheMap[token.id]) {
+            const cachedPool = poolCacheMap[token.id];
+            ammPools[token.id] = {
+              xrpAmount: parseFloat(cachedPool.xrp_amount),
+              tokenAmount: parseFloat(cachedPool.token_amount),
+              lpTokens: parseFloat(cachedPool.lp_tokens),
+              price: parseFloat(cachedPool.price),
+              accountId: cachedPool.account_id
+            };
+            ammAccountsToTokens[cachedPool.account_id] = token.id;
+            console.log(`   ✅ ${token.token_name}: Using cached pool - Price ${cachedPool.price} XRP`);
+            continue;
+          }
+
           const currencyHex = token.currency_code.length > 3
             ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
             : token.currency_code;
@@ -262,7 +289,22 @@ export default function MyTokens() {
             };
 
             ammAccountsToTokens[amm.account] = token.id;
-            console.log(`   ✅ ${token.token_name}: Pool loaded - Price ${price.toFixed(8)} XRP`);
+
+            await supabase
+              .from('pool_data_cache')
+              .upsert({
+                token_id: token.id,
+                xrp_amount: xrpAmount,
+                token_amount: tokenAmount,
+                lp_tokens: lpTokens,
+                price: price,
+                account_id: amm.account,
+                volume_24h: 0,
+                price_change_24h: 0,
+                last_updated: new Date().toISOString()
+              }, { onConflict: 'token_id' });
+
+            console.log(`   ✅ ${token.token_name}: Pool loaded & cached - Price ${price.toFixed(8)} XRP`);
           }
         } catch (error) {
           console.error(`   ❌ ${token.token_name}: Failed to load pool`);
