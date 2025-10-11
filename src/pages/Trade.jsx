@@ -942,10 +942,25 @@ export default function Trade({ preselectedToken = null }) {
       setXrpBalance(balance);
 
       if (selectedToken) {
-        const client = new xrpl.Client('wss://xrplcluster.com');
-        await client.connect();
+        const cached = await supabase
+          .from('token_holdings_cache')
+          .select('*')
+          .eq('wallet_address', connectedWallet.address)
+          .eq('token_id', selectedToken.id)
+          .gte('last_updated', new Date(Date.now() - 30000).toISOString())
+          .maybeSingle();
 
-        const response = await client.request({
+        if (cached.data) {
+          console.log('Using cached token balance:', cached.data.balance);
+          setTokenBalance(cached.data.balance.toString());
+          setLoadingBalance(false);
+          return;
+        }
+
+        const { getClient, requestWithRetry } = await import('../utils/xrplClient');
+        const client = await getClient();
+
+        const response = await requestWithRetry({
           command: 'account_lines',
           account: connectedWallet.address,
           ledger_index: 'validated'
@@ -955,15 +970,45 @@ export default function Trade({ preselectedToken = null }) {
           ? Buffer.from(selectedToken.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
           : selectedToken.currency_code;
 
-        const tokenLine = response.result.lines.find(
-          line => line.account === selectedToken.issuer_address &&
-                  (line.currency === selectedToken.currency_code ||
-                   line.currency === currencyHex ||
-                   line.currency === selectedToken.currency_code.substring(0, 3))
+        console.log('Looking for token:', {
+          currency_code: selectedToken.currency_code,
+          currencyHex,
+          issuer: selectedToken.issuer_address
+        });
+
+        const tokenLine = response.result.lines?.find(
+          line => {
+            const matchesIssuer = line.account === selectedToken.issuer_address;
+            const matchesCurrency =
+              line.currency === selectedToken.currency_code ||
+              line.currency === currencyHex ||
+              line.currency.toUpperCase() === currencyHex.toUpperCase();
+
+            if (matchesIssuer && matchesCurrency) {
+              console.log('Found matching trustline:', line);
+            }
+            return matchesIssuer && matchesCurrency;
+          }
         );
 
-        setTokenBalance(tokenLine ? tokenLine.balance : '0');
-        await client.disconnect();
+        const balance = tokenLine ? tokenLine.balance : '0';
+        console.log('Token balance:', balance);
+        setTokenBalance(balance);
+
+        await supabase
+          .from('token_holdings_cache')
+          .upsert({
+            wallet_address: connectedWallet.address,
+            token_id: selectedToken.id,
+            balance: parseFloat(balance),
+            price: livePrice || 0,
+            value: parseFloat(balance) * (livePrice || 0),
+            is_lp_token: false,
+            last_updated: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'wallet_address,token_id'
+          });
       } else {
         setTokenBalance('0');
       }
@@ -1067,14 +1112,66 @@ export default function Trade({ preselectedToken = null }) {
 
     try {
       setLoadingLpPosition(true);
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
+
+      const cached = await supabase
+        .from('lp_balance_cache')
+        .select('*')
+        .eq('wallet_address', connectedWallet.address)
+        .eq('token_id', selectedToken.id)
+        .gte('last_updated', new Date(Date.now() - 30000).toISOString())
+        .maybeSingle();
+
+      if (cached.data && cached.data.lp_balance > 0) {
+        console.log('Using cached LP position');
+
+        const { getClient, requestWithRetry } = await import('../utils/xrplClient');
+        const client = await getClient();
+
+        const currencyHex = selectedToken.currency_code.length > 3
+          ? Buffer.from(selectedToken.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+          : selectedToken.currency_code;
+
+        const ammInfo = await requestWithRetry({
+          command: 'amm_info',
+          asset: { currency: 'XRP' },
+          asset2: { currency: currencyHex, issuer: selectedToken.issuer_address },
+          ledger_index: 'validated'
+        });
+
+        if (ammInfo?.result?.amm) {
+          const amm = ammInfo.result.amm;
+          const totalLpTokens = parseFloat(amm.lp_token.value);
+          const sharePercentage = (parseFloat(cached.data.lp_balance) / totalLpTokens) * 100;
+
+          const poolXrp = parseFloat(amm.amount) / 1000000;
+          const poolTokens = parseFloat(amm.amount2.value);
+
+          const userXrp = (poolXrp * sharePercentage) / 100;
+          const userTokens = (poolTokens * sharePercentage) / 100;
+          const estimatedValue = userXrp * 2;
+
+          setLpPosition({
+            xrp: userXrp.toFixed(6),
+            tokens: userTokens.toFixed(6),
+            lpTokens: cached.data.lp_balance.toString(),
+            sharePercentage: sharePercentage.toFixed(6),
+            estimatedValue: estimatedValue.toFixed(6),
+            lpTokenCurrency: amm.lp_token.currency,
+            lpTokenIssuer: amm.lp_token.issuer
+          });
+          setLoadingLpPosition(false);
+          return;
+        }
+      }
+
+      const { getClient, requestWithRetry } = await import('../utils/xrplClient');
+      const client = await getClient();
 
       const currencyHex = selectedToken.currency_code.length > 3
         ? Buffer.from(selectedToken.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
         : selectedToken.currency_code;
 
-      const ammInfo = await client.request({
+      const ammInfo = await requestWithRetry({
         command: 'amm_info',
         asset: { currency: 'XRP' },
         asset2: { currency: currencyHex, issuer: selectedToken.issuer_address },
@@ -1083,7 +1180,7 @@ export default function Trade({ preselectedToken = null }) {
 
       if (!ammInfo?.result?.amm) {
         setLpPosition(null);
-        await client.disconnect();
+        setLoadingLpPosition(false);
         return;
       }
 
@@ -1091,13 +1188,13 @@ export default function Trade({ preselectedToken = null }) {
       const lpTokenCurrency = amm.lp_token.currency;
       const lpTokenIssuer = amm.lp_token.issuer;
 
-      const accountLines = await client.request({
+      const accountLines = await requestWithRetry({
         command: 'account_lines',
         account: connectedWallet.address,
         ledger_index: 'validated'
       });
 
-      const lpTokenLine = accountLines.result.lines.find(
+      const lpTokenLine = accountLines.result.lines?.find(
         line => line.currency === lpTokenCurrency && line.account === lpTokenIssuer
       );
 
@@ -1122,11 +1219,28 @@ export default function Trade({ preselectedToken = null }) {
           lpTokenCurrency,
           lpTokenIssuer
         });
+
+        await supabase
+          .from('lp_balance_cache')
+          .upsert({
+            wallet_address: connectedWallet.address,
+            token_id: selectedToken.id,
+            amm_account_id: amm.account,
+            lp_balance: userLpTokens,
+            lp_share_percentage: sharePercentage,
+            last_updated: new Date().toISOString()
+          }, {
+            onConflict: 'wallet_address,token_id'
+          });
       } else {
         setLpPosition(null);
-      }
 
-      await client.disconnect();
+        await supabase
+          .from('lp_balance_cache')
+          .delete()
+          .eq('wallet_address', connectedWallet.address)
+          .eq('token_id', selectedToken.id);
+      }
     } catch (error) {
       console.error('Error fetching LP position:', error);
       setLpPosition(null);
