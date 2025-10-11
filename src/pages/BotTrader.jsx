@@ -819,7 +819,7 @@ export default function BotTrader() {
       })
       .eq('id', bot.id);
 
-    const executeAndSchedule = async () => {
+    const checkAndExecute = async () => {
       try {
         const { data: freshBot } = await supabase
           .from('trading_bots')
@@ -831,37 +831,71 @@ export default function BotTrader() {
           return;
         }
 
-        setBots(prev => prev.map(b => b.id === bot.id ? { ...b, ...freshBot } : b));
+        if (!freshBot.next_trade_time) {
+          console.log(`Bot ${freshBot.name} has no next_trade_time, executing immediately`);
+          await executeBotTrade(freshBot);
 
-        await executeBotTrade(freshBot);
+          const updatedPoolData = poolsData[token.id];
+          if (updatedPoolData) {
+            const newAction = determineNextAction(freshBot, updatedPoolData);
+            setNextTradeActions(prev => ({ ...prev, [freshBot.id]: newAction }));
 
-        const updatedPoolData = poolsData[token.id];
-        if (updatedPoolData) {
-          const newAction = determineNextAction(freshBot, updatedPoolData);
-          setNextTradeActions(prev => ({ ...prev, [freshBot.id]: newAction }));
+            const nextTime = Date.now() + (freshBot.interval * 60 * 1000);
+            setNextTradeTimes(prev => ({ ...prev, [freshBot.id]: nextTime }));
 
-          const nextTime = Date.now() + (freshBot.interval * 60 * 1000);
-          setNextTradeTimes(prev => ({ ...prev, [freshBot.id]: nextTime }));
+            await supabase
+              .from('trading_bots')
+              .update({
+                next_trade_time: new Date(nextTime).toISOString(),
+                next_action: newAction.action,
+                next_token_amount: newAction.tokenAmount,
+                next_xrp_amount: newAction.xrpAmount,
+                next_price: newAction.estimatedPrice
+              })
+              .eq('id', freshBot.id);
+          }
+          return;
+        }
 
-          await supabase
-            .from('trading_bots')
-            .update({
-              next_trade_time: new Date(nextTime).toISOString(),
-              next_action: newAction.action,
-              next_token_amount: newAction.tokenAmount,
-              next_xrp_amount: newAction.xrpAmount,
-              next_price: newAction.estimatedPrice
-            })
-            .eq('id', freshBot.id);
+        const nextTradeTime = new Date(freshBot.next_trade_time).getTime();
+        const now = Date.now();
+
+        if (now >= nextTradeTime) {
+          console.log(`⏰ Time to execute trade for bot ${freshBot.name}`);
+          setBots(prev => prev.map(b => b.id === bot.id ? { ...b, ...freshBot } : b));
+
+          await executeBotTrade(freshBot);
+
+          const updatedPoolData = poolsData[token.id];
+          if (updatedPoolData) {
+            const newAction = determineNextAction(freshBot, updatedPoolData);
+            setNextTradeActions(prev => ({ ...prev, [freshBot.id]: newAction }));
+
+            const nextTime = Date.now() + (freshBot.interval * 60 * 1000);
+            setNextTradeTimes(prev => ({ ...prev, [freshBot.id]: nextTime }));
+
+            await supabase
+              .from('trading_bots')
+              .update({
+                next_trade_time: new Date(nextTime).toISOString(),
+                next_action: newAction.action,
+                next_token_amount: newAction.tokenAmount,
+                next_xrp_amount: newAction.xrpAmount,
+                next_price: newAction.estimatedPrice
+              })
+              .eq('id', freshBot.id);
+          }
         }
       } catch (error) {
         console.error(`Error in bot ${bot.name}:`, error);
       }
     };
 
+    checkAndExecute();
+
     const interval = setInterval(() => {
-      executeAndSchedule();
-    }, bot.interval * 60 * 1000);
+      checkAndExecute();
+    }, 5000);
 
     botIntervals.current[bot.id] = interval;
 
