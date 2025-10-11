@@ -185,6 +185,26 @@ export default function Sidebar({ currentPage, onNavigate }) {
             </div>
           )}
 
+          <div className="glass rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-purple-300 text-sm font-medium">XRP/USD</span>
+              {!loading && xrpPrice && (
+                <span className={`text-xs font-medium ${xrpPrice.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {xrpPrice.change >= 0 ? '↑' : '↓'} {Math.abs(xrpPrice.change).toFixed(2)}%
+                </span>
+              )}
+            </div>
+            {loading ? (
+              <div className="text-purple-400 text-lg animate-pulse">Loading...</div>
+            ) : xrpPrice ? (
+              <div className="text-2xl font-bold text-purple-200">
+                ${xrpPrice.price.toFixed(4)}
+              </div>
+            ) : (
+              <div className="text-purple-400 text-sm">Unable to load</div>
+            )}
+          </div>
+
           <div ref={networkDropdownRef} className="glass rounded-lg p-4 relative">
             <div className="flex items-center justify-between mb-2">
               <span className="text-purple-300 text-sm font-medium">Network Node</span>
@@ -213,26 +233,6 @@ export default function Sidebar({ currentPage, onNavigate }) {
                   </button>
                 ))}
               </div>
-            )}
-          </div>
-
-          <div className="glass rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-purple-300 text-sm font-medium">XRP/USD</span>
-              {!loading && xrpPrice && (
-                <span className={`text-xs font-medium ${xrpPrice.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {xrpPrice.change >= 0 ? '↑' : '↓'} {Math.abs(xrpPrice.change).toFixed(2)}%
-                </span>
-              )}
-            </div>
-            {loading ? (
-              <div className="text-purple-400 text-lg animate-pulse">Loading...</div>
-            ) : xrpPrice ? (
-              <div className="text-2xl font-bold text-purple-200">
-                ${xrpPrice.price.toFixed(4)}
-              </div>
-            ) : (
-              <div className="text-purple-400 text-sm">Unable to load</div>
             )}
           </div>
         </div>
