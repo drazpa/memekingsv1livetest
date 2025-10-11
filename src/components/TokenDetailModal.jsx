@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createChart } from 'lightweight-charts';
 import * as xrpl from 'xrpl';
 import TokenIcon from './TokenIcon';
+import { supabase } from '../utils/supabase';
 
 export default function TokenDetailModal({ token, onClose }) {
   const priceChartContainerRef = useRef(null);
@@ -43,21 +44,31 @@ export default function TokenDetailModal({ token, onClose }) {
 
     const fetchLivePrice = async () => {
       try {
-        const client = new xrpl.Client('wss://xrplcluster.com');
-        await client.connect();
+        const { data: cachedPool } = await supabase
+          .from('pool_data_cache')
+          .select('*')
+          .eq('token_id', token.id)
+          .gte('last_updated', new Date(Date.now() - 30000).toISOString())
+          .maybeSingle();
+
+        if (cachedPool) {
+          const price = parseFloat(cachedPool.price);
+          setLivePrice(price);
+          return;
+        }
+
+        const { requestWithRetry } = await import('../utils/xrplClient');
 
         const currencyHex = token.currency_code.length > 3
           ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
           : token.currency_code;
 
-        const ammInfo = await client.request({
+        const ammInfo = await requestWithRetry({
           command: 'amm_info',
           asset: { currency: 'XRP' },
           asset2: { currency: currencyHex, issuer: token.issuer_address },
           ledger_index: 'validated'
         });
-
-        await client.disconnect();
 
         if (ammInfo?.result?.amm) {
           const amm = ammInfo.result.amm;
@@ -84,14 +95,47 @@ export default function TokenDetailModal({ token, onClose }) {
     }
 
     try {
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
+      const { data: cachedPool } = await supabase
+        .from('pool_data_cache')
+        .select('*')
+        .eq('token_id', token.id)
+        .gte('last_updated', new Date(Date.now() - 30000).toISOString())
+        .maybeSingle();
+
+      if (cachedPool) {
+        console.log('✅ Using cached pool data for modal');
+        const xrpAmount = parseFloat(cachedPool.xrp_amount);
+        const tokenAmount = parseFloat(cachedPool.token_amount);
+        const price = parseFloat(cachedPool.price);
+
+        setLivePoolData({
+          xrpAmount,
+          tokenAmount,
+          price,
+          lpTokens: parseFloat(cachedPool.lp_tokens || 0),
+          accountId: cachedPool.account_id
+        });
+
+        setLivePrice(price);
+
+        if (token.amm_xrp_amount && token.amm_asset_amount) {
+          const oldPrice = token.amm_xrp_amount / token.amm_asset_amount;
+          const change = ((price - oldPrice) / oldPrice) * 100;
+          setPriceChange24h(change);
+        }
+
+        setLoading(false);
+        return;
+      }
+
+      console.log('🔄 Fetching fresh pool data for modal...');
+      const { requestWithRetry } = await import('../utils/xrplClient');
 
       const currencyHex = token.currency_code.length > 3
         ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
         : token.currency_code;
 
-      const ammInfoResponse = await client.request({
+      const ammInfoResponse = await requestWithRetry({
         command: 'amm_info',
         asset: { currency: 'XRP' },
         asset2: {
@@ -122,9 +166,23 @@ export default function TokenDetailModal({ token, onClose }) {
           const change = ((price - oldPrice) / oldPrice) * 100;
           setPriceChange24h(change);
         }
-      }
 
-      await client.disconnect();
+        await supabase
+          .from('pool_data_cache')
+          .upsert({
+            token_id: token.id,
+            xrp_amount: xrpAmount,
+            token_amount: tokenAmount,
+            lp_tokens: parseFloat(amm.lp_token?.value || 0),
+            price: price,
+            account_id: amm.account,
+            volume_24h: 0,
+            price_change_24h: 0,
+            last_updated: new Date().toISOString()
+          }, { onConflict: 'token_id' });
+
+        console.log('💾 Cached pool data from modal');
+      }
     } catch (error) {
       console.error('Error fetching live pool data:', error);
     } finally {
