@@ -409,28 +409,53 @@ export default function BotTrader() {
 
   const fetchPoolData = async (token) => {
     try {
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
+      const { data: cachedPool } = await supabase
+        .from('pool_data_cache')
+        .select('*')
+        .eq('token_id', token.id)
+        .gte('last_updated', new Date(Date.now() - 30000).toISOString())
+        .maybeSingle();
+
+      if (cachedPool) {
+        return {
+          amm_xrp_amount: parseFloat(cachedPool.xrp_amount),
+          amm_asset_amount: parseFloat(cachedPool.token_amount),
+          price: parseFloat(cachedPool.price)
+        };
+      }
+
+      const { requestWithRetry } = await import('../utils/xrplClient');
 
       const currencyHex = token.currency_code.length > 3
         ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
         : token.currency_code;
 
-      const ammInfoRequest = {
+      const ammInfo = await requestWithRetry({
         command: 'amm_info',
         asset: { currency: 'XRP' },
         asset2: { currency: currencyHex, issuer: token.issuer_address },
         ledger_index: 'validated'
-      };
-
-      const ammInfo = await client.request(ammInfoRequest);
-      await client.disconnect();
+      });
 
       if (ammInfo?.result?.amm) {
         const amm = ammInfo.result.amm;
         const amm_xrp_amount = parseFloat(amm.amount) / 1000000;
         const amm_asset_amount = parseFloat(amm.amount2.value);
         const price = amm_xrp_amount / amm_asset_amount;
+
+        await supabase
+          .from('pool_data_cache')
+          .upsert({
+            token_id: token.id,
+            xrp_amount: amm_xrp_amount,
+            token_amount: amm_asset_amount,
+            lp_tokens: parseFloat(amm.lp_token?.value || 0),
+            price: price,
+            account_id: amm.account,
+            volume_24h: 0,
+            price_change_24h: 0,
+            last_updated: new Date().toISOString()
+          }, { onConflict: 'token_id' });
 
         return {
           amm_xrp_amount,
@@ -613,8 +638,8 @@ export default function BotTrader() {
         });
 
         try {
-          client = new xrpl.Client('wss://xrplcluster.com');
-          await client.connect();
+          const { getClient } = await import('../utils/xrplClient');
+          client = await getClient();
 
           const wallet = xrpl.Wallet.fromSeed(connectedWallet.seed);
 
@@ -637,13 +662,7 @@ export default function BotTrader() {
           if (result.result.meta.TransactionResult !== 'tesSUCCESS') {
             throw new Error(`Payment failed: ${result.result.meta.TransactionResult}`);
           }
-
-          await client.disconnect();
-          client = null;
         } catch (paymentError) {
-          if (client && client.isConnected()) {
-            await client.disconnect();
-          }
           throw new Error(paymentError.message || 'Payment processing failed');
         }
       }
@@ -1246,10 +1265,9 @@ export default function BotTrader() {
       const currentPrice = poolData.price;
       const estimatedTokenAmount = xrpAmount / currentPrice;
 
-      client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
+      const { requestWithRetry } = await import('../utils/xrplClient');
 
-      const accountInfo = await client.request({
+      const accountInfo = await requestWithRetry({
         command: 'account_info',
         account: connectedWallet.address,
         ledger_index: 'validated'
@@ -1270,7 +1288,6 @@ export default function BotTrader() {
             ...prev,
             [bot.id]: `⚠️ Need ${shortfall.toFixed(2)} more XRP (have ${availableXRP.toFixed(2)}, need ${maxXRPNeeded.toFixed(2)})`
           }));
-          await client.disconnect();
           return;
         }
       } else {
@@ -1280,7 +1297,7 @@ export default function BotTrader() {
 
         let currentTokenBalance = 0;
         try {
-          const accountLines = await client.request({
+          const accountLines = await requestWithRetry({
             command: 'account_lines',
             account: connectedWallet.address,
             ledger_index: 'validated'
@@ -1307,7 +1324,6 @@ export default function BotTrader() {
             ...prev,
             [bot.id]: `⚠️ Need ${formatToken(shortfall)} more ${token.token_name} (have ${formatToken(currentTokenBalance)}, need ${formatToken(tokenNeeded)})`
           }));
-          await client.disconnect();
           return;
         }
       }
@@ -1356,6 +1372,9 @@ export default function BotTrader() {
           }
         };
       }
+
+      const { getClient } = await import('../utils/xrplClient');
+      client = await getClient();
 
       const prepared = await client.autofill(payment);
       const signed = wallet.sign(prepared);
@@ -1422,8 +1441,6 @@ export default function BotTrader() {
         throw new Error(`Transaction failed: ${result.result.meta.TransactionResult}`);
       }
 
-      await client.disconnect();
-
     } catch (error) {
       console.error(`Bot ${bot.name} trade error:`, error);
 
@@ -1443,7 +1460,7 @@ export default function BotTrader() {
         console.log(`📊 Slippage issue - Current: ${bot.slippage}%, Action: ${isBuy ? 'BUY' : 'SELL'}`);
       } else if (errorMessage.includes('tecUNFUNDED_PAYMENT') || errorMessage.includes('tecUNFUNDED')) {
         try {
-          const accountInfo = await client.request({
+          const accountInfo = await requestWithRetry({
             command: 'account_info',
             account: connectedWallet.address,
             ledger_index: 'validated'
@@ -1500,10 +1517,6 @@ export default function BotTrader() {
         });
       } catch (dbError) {
         console.error('Error logging failed trade:', dbError);
-      }
-
-      if (client && client.isConnected()) {
-        await client.disconnect();
       }
     }
   };
