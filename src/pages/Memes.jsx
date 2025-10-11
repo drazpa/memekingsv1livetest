@@ -187,10 +187,38 @@ export default function Memes() {
     }
   };
 
-  const fetchAllPoolsData = async () => {
+  const fetchAllPoolsData = async (forceRefresh = false) => {
     try {
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
+      const cacheAge = 30;
+      const { data: cachedPools, error: cacheError } = await supabase
+        .from('pool_data_cache')
+        .select('*')
+        .gte('last_updated', new Date(Date.now() - cacheAge * 1000).toISOString());
+
+      if (!forceRefresh && cachedPools && cachedPools.length > 0 && !cacheError) {
+        console.log(`✅ Using cached pool data (${cachedPools.length} pools)`);
+
+        const poolData = {};
+        cachedPools.forEach(cache => {
+          poolData[cache.token_id] = {
+            xrpAmount: parseFloat(cache.xrp_amount),
+            tokenAmount: parseFloat(cache.token_amount),
+            lpTokens: parseFloat(cache.lp_tokens),
+            price: parseFloat(cache.price),
+            accountId: cache.account_id,
+            volume24h: parseFloat(cache.volume_24h || 0),
+            priceChange24h: parseFloat(cache.price_change_24h || 0)
+          };
+        });
+
+        setPoolsData(poolData);
+
+        setTimeout(() => fetchAllPoolsData(true), cacheAge * 1000);
+        return;
+      }
+
+      console.log('🔄 Fetching fresh pool data from XRPL...');
+      const { requestWithRetry } = await import('../utils/xrplClient');
 
       const poolData = {};
       for (const token of tokens) {
@@ -201,7 +229,7 @@ export default function Memes() {
             ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
             : token.currency_code;
 
-          const ammInfoResponse = await client.request({
+          const ammInfoResponse = await requestWithRetry({
             command: 'amm_info',
             asset: { currency: 'XRP' },
             asset2: {
@@ -230,8 +258,28 @@ export default function Memes() {
         }
       }
 
+      const cacheRecords = Object.entries(poolData).map(([tokenId, data]) => ({
+        token_id: tokenId,
+        xrp_amount: data.xrpAmount,
+        token_amount: data.tokenAmount,
+        lp_tokens: data.lpTokens,
+        price: data.price,
+        account_id: data.accountId,
+        volume_24h: 0,
+        price_change_24h: 0,
+        last_updated: new Date().toISOString()
+      }));
+
+      if (cacheRecords.length > 0) {
+        for (const record of cacheRecords) {
+          await supabase
+            .from('pool_data_cache')
+            .upsert(record, { onConflict: 'token_id' });
+        }
+        console.log(`💾 Cached ${cacheRecords.length} pools`);
+      }
+
       setPoolsData(poolData);
-      await client.disconnect();
     } catch (error) {
       console.error('Error fetching pools data:', error);
     }

@@ -136,12 +136,41 @@ export default function Pools() {
     }
   };
 
-  const fetchAllPoolsData = async () => {
+  const fetchAllPoolsData = async (forceRefresh = false) => {
     setRefreshing(true);
-    const client = new xrpl.Client('wss://xrplcluster.com');
 
     try {
-      await client.connect();
+      const cacheAge = 30;
+      const { data: cachedPools, error: cacheError } = await supabase
+        .from('pool_data_cache')
+        .select('*')
+        .gte('last_updated', new Date(Date.now() - cacheAge * 1000).toISOString());
+
+      if (!forceRefresh && cachedPools && cachedPools.length > 0 && !cacheError) {
+        console.log(`✅ Using cached pool data (${cachedPools.length} pools)`);
+
+        const poolData = {};
+        cachedPools.forEach(cache => {
+          poolData[cache.token_id] = {
+            xrpAmount: parseFloat(cache.xrp_amount),
+            tokenAmount: parseFloat(cache.token_amount),
+            lpTokens: parseFloat(cache.lp_tokens),
+            price: parseFloat(cache.price),
+            accountId: cache.account_id,
+            volume24h: parseFloat(cache.volume_24h || 0),
+            priceChange24h: parseFloat(cache.price_change_24h || 0)
+          };
+        });
+
+        setPoolsData(poolData);
+        setRefreshing(false);
+
+        setTimeout(() => fetchAllPoolsData(true), cacheAge * 1000);
+        return;
+      }
+
+      console.log('🔄 Fetching fresh pool data from XRPL...');
+      const { requestWithRetry } = await import('../utils/xrplClient');
       const poolData = {};
 
       for (const token of tokens) {
@@ -156,7 +185,7 @@ export default function Pools() {
             issuer: token.issuer_address
           });
 
-          const ammInfoResponse = await client.request({
+          const ammInfoResponse = await requestWithRetry({
             command: 'amm_info',
             asset: { currency: 'XRP' },
             asset2: {
@@ -178,18 +207,6 @@ export default function Pools() {
             const fees24h = volume24h * (tradingFee / 100);
             const apr = xrpAmount > 0 ? ((fees24h * 365) / xrpAmount) * 100 : 0;
 
-            let contributors = 0;
-            try {
-              const accountInfoResponse = await client.request({
-                command: 'account_info',
-                account: amm.account,
-                ledger_index: 'validated'
-              });
-              contributors = accountInfoResponse.result.account_data?.OwnerCount || 0;
-            } catch (e) {
-              console.log(`Could not fetch contributors for ${token.token_name}`);
-            }
-
             poolData[token.id] = {
               xrpAmount,
               tokenAmount,
@@ -200,8 +217,7 @@ export default function Pools() {
               volume24h,
               fees24h,
               apr,
-              auctionSlot,
-              contributors
+              auctionSlot
             };
 
             console.log(`Found pool for ${token.token_name}:`, poolData[token.id]);
@@ -214,9 +230,31 @@ export default function Pools() {
         }
       }
 
+      const cacheRecords = Object.entries(poolData)
+        .filter(([_, data]) => data !== null)
+        .map(([tokenId, data]) => ({
+          token_id: tokenId,
+          xrp_amount: data.xrpAmount,
+          token_amount: data.tokenAmount,
+          lp_tokens: data.lpTokens,
+          price: data.price,
+          account_id: data.accountId,
+          volume_24h: data.volume24h || 0,
+          price_change_24h: 0,
+          last_updated: new Date().toISOString()
+        }));
+
+      if (cacheRecords.length > 0) {
+        for (const record of cacheRecords) {
+          await supabase
+            .from('pool_data_cache')
+            .upsert(record, { onConflict: 'token_id' });
+        }
+        console.log(`💾 Cached ${cacheRecords.length} pools`);
+      }
+
       setPoolsData(poolData);
       console.log('All pool data loaded:', poolData);
-      await client.disconnect();
     } catch (error) {
       console.error('Error fetching pools data:', error);
       toast.error(`Failed to fetch pool data: ${error.message}`);
