@@ -1304,23 +1304,29 @@ export default function BotTrader() {
         }
       }
 
-      const strategy = bot.strategy || BOT_STRATEGIES.BALANCED;
-      const buyProb = (bot.trade_mode || 50) / 100;
+      if (bot.next_action) {
+        isBuy = bot.next_action === 'BUY';
+        console.log(`Bot ${bot.name}: Using pre-determined action: ${bot.next_action}`);
+      } else {
+        const strategy = bot.strategy || BOT_STRATEGIES.BALANCED;
+        const buyProb = (bot.trade_mode || 50) / 100;
 
-      switch (strategy) {
-        case BOT_STRATEGIES.ACCUMULATE:
-          isBuy = Math.random() < 0.8;
-          break;
-        case BOT_STRATEGIES.DISTRIBUTE:
-          isBuy = Math.random() < 0.2;
-          break;
-        default:
-          isBuy = Math.random() < buyProb;
+        switch (strategy) {
+          case BOT_STRATEGIES.ACCUMULATE:
+            isBuy = Math.random() < 0.8;
+            break;
+          case BOT_STRATEGIES.DISTRIBUTE:
+            isBuy = Math.random() < 0.2;
+            break;
+          default:
+            isBuy = Math.random() < buyProb;
+        }
+        console.log(`Bot ${bot.name}: Randomly determined action: ${isBuy ? 'BUY' : 'SELL'}`);
       }
 
-      const xrpAmount = getRandomAmount(bot.min_amount, bot.max_amount);
+      const xrpAmount = bot.next_xrp_amount || getRandomAmount(bot.min_amount, bot.max_amount);
       const currentPrice = poolData.price;
-      const estimatedTokenAmount = xrpAmount / currentPrice;
+      const estimatedTokenAmount = bot.next_token_amount || (xrpAmount / currentPrice);
 
       const { requestWithRetry } = await import('../utils/xrplClient');
 
