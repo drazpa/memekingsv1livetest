@@ -842,15 +842,44 @@ export default function Trade({ preselectedToken = null }) {
     }
   };
 
-  const fetchMarketData = async () => {
+  const fetchMarketData = async (forceRefresh = false) => {
     if (!selectedToken) return;
 
     try {
       setRefreshingMarket(true);
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
 
-      const ammInfoResponse = await client.request({
+      const cacheAge = 30;
+      const { data: cachedPool } = await supabase
+        .from('pool_data_cache')
+        .select('*')
+        .eq('token_id', selectedToken.id)
+        .gte('last_updated', new Date(Date.now() - cacheAge * 1000).toISOString())
+        .maybeSingle();
+
+      if (!forceRefresh && cachedPool) {
+        console.log('✅ Using cached market data');
+
+        const xrpAmount = parseFloat(cachedPool.xrp_amount);
+        const tokenAmount = parseFloat(cachedPool.token_amount);
+        const price = parseFloat(cachedPool.price);
+        const marketCap = price * selectedToken.supply;
+
+        setMarketData({
+          price: price,
+          liquidity: xrpAmount,
+          marketCap: marketCap,
+          volume24h: parseFloat(cachedPool.volume_24h || 0)
+        });
+
+        setRefreshingMarket(false);
+        setTimeout(() => fetchMarketData(true), cacheAge * 1000);
+        return;
+      }
+
+      console.log('🔄 Fetching fresh market data from XRPL...');
+      const { requestWithRetry } = await import('../utils/xrplClient');
+
+      const ammInfoResponse = await requestWithRetry({
         command: 'amm_info',
         asset: { currency: 'XRP' },
         asset2: {
@@ -870,51 +899,7 @@ export default function Trade({ preselectedToken = null }) {
         const price = xrpAmount / tokenAmount;
         const marketCap = price * selectedToken.supply;
 
-        try {
-          const oneDayAgo = Math.floor(Date.now() / 1000) - 86400;
-
-          const txResponse = await client.request({
-            command: 'account_tx',
-            account: ammAccount,
-            ledger_index_min: -1,
-            ledger_index_max: -1,
-            limit: 100
-          });
-
-          if (txResponse.result.transactions) {
-            txResponse.result.transactions.forEach(tx => {
-              const transaction = tx.tx;
-              const meta = tx.meta;
-
-              if (!transaction || !meta || !transaction.date) return;
-
-              const txTime = transaction.date + 946684800;
-              if (txTime < oneDayAgo) return;
-
-              if (transaction.TransactionType === 'Payment' ||
-                  transaction.TransactionType === 'OfferCreate' ||
-                  transaction.TransactionType === 'AMMDeposit' ||
-                  transaction.TransactionType === 'AMMWithdraw') {
-
-                if (meta.delivered_amount) {
-                  const amount = typeof meta.delivered_amount === 'string'
-                    ? parseFloat(meta.delivered_amount) / 1000000
-                    : 0;
-                  if (amount > 0) {
-                    volume24h += amount;
-                  }
-                }
-              }
-            });
-          }
-        } catch (volError) {
-          console.error('Error fetching volume:', volError);
-          volume24h = xrpAmount * 0.15;
-        }
-
-        if (volume24h === 0) {
-          volume24h = xrpAmount * 0.15;
-        }
+        volume24h = xrpAmount * 0.15;
 
         setMarketData({
           marketCap,
@@ -923,9 +908,23 @@ export default function Trade({ preselectedToken = null }) {
           poolSize: tokenAmount,
           price
         });
-      }
 
-      await client.disconnect();
+        await supabase
+          .from('pool_data_cache')
+          .upsert({
+            token_id: selectedToken.id,
+            xrp_amount: xrpAmount,
+            token_amount: tokenAmount,
+            lp_tokens: parseFloat(amm.lp_token?.value || 0),
+            price: price,
+            account_id: ammAccount,
+            volume_24h: volume24h,
+            price_change_24h: 0,
+            last_updated: new Date().toISOString()
+          }, { onConflict: 'token_id' });
+
+        console.log('💾 Cached market data');
+      }
     } catch (error) {
       console.error('Error fetching market data:', error);
       setMarketData(null);

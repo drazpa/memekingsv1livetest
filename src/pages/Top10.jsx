@@ -60,11 +60,16 @@ export default function Top10() {
     return (tradeSize / token.amm_xrp_amount) * 100;
   };
 
-  const loadTokensData = async () => {
+  const loadTokensData = async (forceRefresh = false) => {
     setLoading(true);
-    const client = new xrpl.Client('wss://xrplcluster.com');
 
     try {
+      const cacheAge = 30;
+      const { data: cachedPools, error: cacheError } = await supabase
+        .from('pool_data_cache')
+        .select('*')
+        .gte('last_updated', new Date(Date.now() - cacheAge * 1000).toISOString());
+
       const { data, error } = await supabase
         .from('meme_tokens')
         .select('*')
@@ -75,7 +80,34 @@ export default function Top10() {
 
       const tokensData = data || [];
 
-      await client.connect();
+      if (!forceRefresh && cachedPools && cachedPools.length > 0 && !cacheError) {
+        console.log(`✅ Using cached pool data (${cachedPools.length} pools)`);
+
+        const poolMap = {};
+        cachedPools.forEach(cache => {
+          poolMap[cache.token_id] = cache;
+        });
+
+        tokensData.forEach(token => {
+          const cached = poolMap[token.id];
+          if (cached) {
+            token.amm_xrp_amount = parseFloat(cached.xrp_amount);
+            token.amm_asset_amount = parseFloat(cached.token_amount);
+            token.live_price = parseFloat(cached.price);
+            token.volume_24h = parseFloat(cached.volume_24h || 0);
+            token.value_24h = token.amm_xrp_amount * (Math.random() * 2);
+          }
+        });
+
+        setTokens(tokensData);
+        setLoading(false);
+
+        setTimeout(() => loadTokensData(true), cacheAge * 1000);
+        return;
+      }
+
+      console.log('🔄 Fetching fresh pool data from XRPL...');
+      const { requestWithRetry } = await import('../utils/xrplClient');
 
       for (const token of tokensData) {
         try {
@@ -88,7 +120,7 @@ export default function Top10() {
             issuer: token.issuer_address
           });
 
-          const ammInfoResponse = await client.request({
+          const ammInfoResponse = await requestWithRetry({
             command: 'amm_info',
             asset: { currency: 'XRP' },
             asset2: {
@@ -112,6 +144,20 @@ export default function Top10() {
 
             token.volume_24h = token.volume_24h || Math.random() * 10000;
             token.value_24h = token.value_24h || currentXRP * (Math.random() * 2);
+
+            await supabase
+              .from('pool_data_cache')
+              .upsert({
+                token_id: token.id,
+                xrp_amount: currentXRP,
+                token_amount: currentAsset,
+                lp_tokens: parseFloat(amm.lp_token?.value || 0),
+                price: currentPrice,
+                account_id: amm.account,
+                volume_24h: token.volume_24h || 0,
+                price_change_24h: 0,
+                last_updated: new Date().toISOString()
+              }, { onConflict: 'token_id' });
           } else {
             console.log(`  ✗ No AMM pool found for ${token.token_name}`);
           }
@@ -120,7 +166,7 @@ export default function Top10() {
         }
       }
 
-      await client.disconnect();
+      console.log('💾 Cached all pool data');
       setTokens(tokensData);
     } catch (error) {
       console.error('Error loading tokens:', error);
