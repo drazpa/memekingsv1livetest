@@ -299,18 +299,40 @@ export default function BotTrader() {
     }
   };
 
-  const fetchAllPoolsData = async () => {
-    const tokensToFetch = tokens.filter(token =>
-      !poolsData[token.id] && !fetchingPools.current.has(token.id)
-    );
-
-    if (tokensToFetch.length === 0) return;
-
-    tokensToFetch.forEach(token => fetchingPools.current.add(token.id));
-
+  const fetchAllPoolsData = async (forceRefresh = false) => {
     try {
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
+      const cacheAge = 30;
+      const { data: cachedPools, error: cacheError } = await supabase
+        .from('pool_data_cache')
+        .select('*')
+        .gte('last_updated', new Date(Date.now() - cacheAge * 1000).toISOString());
+
+      if (!forceRefresh && cachedPools && cachedPools.length > 0 && !cacheError) {
+        console.log(`✅ Using cached pool data (${cachedPools.length} pools)`);
+
+        const poolData = {};
+        cachedPools.forEach(cache => {
+          poolData[cache.token_id] = {
+            amm_xrp_amount: parseFloat(cache.xrp_amount),
+            amm_asset_amount: parseFloat(cache.token_amount),
+            price: parseFloat(cache.price)
+          };
+        });
+
+        setPoolsData(poolData);
+        return;
+      }
+
+      const tokensToFetch = tokens.filter(token =>
+        !poolsData[token.id] && !fetchingPools.current.has(token.id)
+      );
+
+      if (tokensToFetch.length === 0) return;
+
+      tokensToFetch.forEach(token => fetchingPools.current.add(token.id));
+
+      console.log('🔄 Fetching fresh pool data from XRPL...');
+      const { requestWithRetry } = await import('../utils/xrplClient');
 
       const poolPromises = tokensToFetch.map(async (token) => {
         try {
@@ -318,7 +340,7 @@ export default function BotTrader() {
             ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
             : token.currency_code;
 
-          const ammInfo = await client.request({
+          const ammInfo = await requestWithRetry({
             command: 'amm_info',
             asset: { currency: 'XRP' },
             asset2: { currency: currencyHex, issuer: token.issuer_address },
@@ -346,7 +368,29 @@ export default function BotTrader() {
       });
 
       const results = await Promise.all(poolPromises);
-      await client.disconnect();
+
+      const cacheRecords = results
+        .filter(({ poolData }) => poolData !== null)
+        .map(({ tokenId, poolData }) => ({
+          token_id: tokenId,
+          xrp_amount: poolData.amm_xrp_amount,
+          token_amount: poolData.amm_asset_amount,
+          lp_tokens: 0,
+          price: poolData.price,
+          account_id: '',
+          volume_24h: 0,
+          price_change_24h: 0,
+          last_updated: new Date().toISOString()
+        }));
+
+      if (cacheRecords.length > 0) {
+        for (const record of cacheRecords) {
+          await supabase
+            .from('pool_data_cache')
+            .upsert(record, { onConflict: 'token_id' });
+        }
+        console.log(`💾 Cached ${cacheRecords.length} pools`);
+      }
 
       setPoolsData(prev => {
         const updated = { ...prev };
@@ -359,7 +403,7 @@ export default function BotTrader() {
       });
     } catch (error) {
       console.error('Error in fetchAllPoolsData:', error);
-      tokensToFetch.forEach(token => fetchingPools.current.delete(token.id));
+      tokens.forEach(token => fetchingPools.current.delete(token.id));
     }
   };
 
