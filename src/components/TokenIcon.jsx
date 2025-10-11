@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { imageCacheManager, extractIpfsHash as extractHash } from '../utils/imageCache';
+import { imageCacheManager, extractIpfsHash as extractHash, normalizeImageUrl } from '../utils/imageCache';
 
 const IPFS_GATEWAYS = [
   'https://gateway.pinata.cloud/ipfs/',
@@ -9,14 +9,14 @@ const IPFS_GATEWAYS = [
 ];
 
 function TokenIcon({ token, size = 'md', className = '' }) {
-  const cacheKey = `${token.id}-${token.image_url}`;
+  const cacheKey = `token-img-${token.id}`;
 
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [currentGatewayIndex, setCurrentGatewayIndex] = useState(0);
   const [retryCount, setRetryCount] = useState(0);
   const imageUrlRef = useRef(null);
-  const [cachedUrl, setCachedUrl] = useState(null);
+  const [currentUrl, setCurrentUrl] = useState(null);
 
   const sizeClasses = {
     sm: 'w-8 h-8 min-w-[2rem] min-h-[2rem] text-sm',
@@ -29,10 +29,15 @@ function TokenIcon({ token, size = 'md', className = '' }) {
   const sizeClass = sizeClasses[size] || sizeClasses.md;
 
   useEffect(() => {
-    const checkCache = async () => {
+    if (!token.image_url) {
+      setImageError(true);
+      return;
+    }
+
+    const loadImage = async () => {
       const cached = await imageCacheManager.get(cacheKey);
       if (cached) {
-        setCachedUrl(cached);
+        setCurrentUrl(cached);
         setImageLoaded(true);
         setImageError(false);
         return;
@@ -44,41 +49,49 @@ function TokenIcon({ token, size = 'md', className = '' }) {
         setCurrentGatewayIndex(0);
         setRetryCount(0);
         imageUrlRef.current = token.image_url;
+
+        let imageUrl = normalizeImageUrl(token.image_url);
+
+        if (imageUrl.includes('gateway.pinata.cloud') || imageUrl.includes('ipfs.io') || imageUrl.includes('cloudflare-ipfs.com') || imageUrl.includes('dweb.link')) {
+          setCurrentUrl(imageUrl);
+        } else {
+          const ipfsHash = extractHash(token.image_url);
+          if (ipfsHash) {
+            imageUrl = `${IPFS_GATEWAYS[0]}${ipfsHash}`;
+          }
+          setCurrentUrl(imageUrl);
+        }
       }
     };
 
-    checkCache();
+    loadImage();
   }, [token.image_url, token.id, cacheKey]);
 
   const handleImageError = () => {
-    console.error('Image load error for token:', token.token_name, 'Gateway:', currentGatewayIndex, 'Retry:', retryCount);
+    console.error('Image load error for token:', token.token_name, 'URL:', currentUrl, 'Gateway:', currentGatewayIndex, 'Retry:', retryCount);
 
-    if (currentGatewayIndex < IPFS_GATEWAYS.length - 1) {
+    const ipfsHash = extractHash(token.image_url);
+
+    if (ipfsHash && currentGatewayIndex < IPFS_GATEWAYS.length - 1) {
       console.log('Trying next gateway...');
-      setCurrentGatewayIndex(prev => prev + 1);
+      const nextGateway = currentGatewayIndex + 1;
+      setCurrentGatewayIndex(nextGateway);
+      setCurrentUrl(`${IPFS_GATEWAYS[nextGateway]}${ipfsHash}`);
       setRetryCount(0);
-    } else if (retryCount < 2) {
-      console.log('Retrying current gateway...');
+    } else if (retryCount < 1) {
+      console.log('Retrying from first gateway...');
       setRetryCount(prev => prev + 1);
-      setCurrentGatewayIndex(0);
+      if (ipfsHash) {
+        setCurrentGatewayIndex(0);
+        setCurrentUrl(`${IPFS_GATEWAYS[0]}${ipfsHash}`);
+      }
     } else {
       console.error('All gateways failed for:', token.token_name);
       setImageError(true);
     }
   };
 
-  if (token.image_url && !imageError) {
-    let imageUrl = cachedUrl || token.image_url;
-
-    if (!cachedUrl) {
-      const ipfsHash = extractHash(token.image_url);
-      if (ipfsHash) {
-        imageUrl = `${IPFS_GATEWAYS[currentGatewayIndex]}${ipfsHash}`;
-      }
-    }
-
-    const finalUrl = imageUrl;
-
+  if (currentUrl && !imageError) {
     return (
       <div className={`relative inline-block ${sizeClass} flex-shrink-0`}>
         {!imageLoaded && (
@@ -88,18 +101,17 @@ function TokenIcon({ token, size = 'md', className = '' }) {
         )}
         <img
           key={`${token.id}-${currentGatewayIndex}-${retryCount}`}
-          src={finalUrl}
+          src={currentUrl}
           alt={token.token_name}
           className={`${sizeClass} rounded-full object-cover border-2 border-purple-500 ${className} transition-opacity duration-200 ${!imageLoaded ? 'opacity-0' : 'opacity-100'} aspect-square`}
           onLoad={async () => {
-            if (!cachedUrl) {
-              await imageCacheManager.set(cacheKey, finalUrl);
-            }
+            await imageCacheManager.set(cacheKey, currentUrl);
             setImageLoaded(true);
           }}
           onError={handleImageError}
           loading="lazy"
           decoding="async"
+          crossOrigin="anonymous"
         />
       </div>
     );

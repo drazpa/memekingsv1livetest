@@ -186,9 +186,24 @@ export const extractIpfsHash = (url) => {
     return ipfsMatch[1];
   }
 
+  const ipfsHashMatch = url.match(/\/(Qm[a-zA-Z0-9]{44}|bafyb[a-zA-Z0-9]{50,})/);
+  if (ipfsHashMatch) {
+    return ipfsHashMatch[1];
+  }
+
   if (!url.startsWith('http')) {
     return url;
   }
 
   return null;
+};
+
+export const normalizeImageUrl = (url) => {
+  if (!url) return null;
+
+  if (url.startsWith('http://')) {
+    return url.replace('http://', 'https://');
+  }
+
+  return url;
 };
