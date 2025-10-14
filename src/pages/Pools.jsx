@@ -19,10 +19,13 @@ export default function Pools() {
   const [sortBy, setSortBy] = useState('liquidity');
   const [poolFilter, setPoolFilter] = useState('all');
   const [favorites, setFavorites] = useState([]);
+  const [xrpUsdPrice, setXrpUsdPrice] = useState(0);
+  const [swapDropdownOpen, setSwapDropdownOpen] = useState(null);
 
   useEffect(() => {
     loadTokens();
     loadConnectedWallet();
+    fetchXrpUsdPrice();
 
     const unsubscribe = onTokenUpdate(() => {
       loadTokens();
@@ -42,13 +45,13 @@ export default function Pools() {
   }, []);
 
   useEffect(() => {
-    if (tokens.length > 0) {
+    if (tokens.length > 0 && Object.keys(poolsData).length === 0) {
       fetchAllPoolsData();
     }
   }, [tokens]);
 
   useEffect(() => {
-    if (connectedWallet && Object.keys(poolsData).length > 0) {
+    if (connectedWallet && Object.keys(poolsData).length > 0 && Object.keys(lpBalances).length === 0) {
       fetchLPBalances();
     }
   }, [connectedWallet, poolsData]);
@@ -65,6 +68,16 @@ export default function Pools() {
       setConnectedWallet(JSON.parse(stored));
     } else {
       setConnectedWallet(null);
+    }
+  };
+
+  const fetchXrpUsdPrice = async () => {
+    try {
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd');
+      const data = await response.json();
+      setXrpUsdPrice(data.ripple?.usd || 0);
+    } catch (error) {
+      console.error('Error fetching XRP/USD price:', error);
     }
   };
 
@@ -398,7 +411,10 @@ export default function Pools() {
           </div>
           <div className="text-right">
             <div className="flex items-center justify-end gap-2">
-              <div className="text-2xl font-bold text-purple-200">{livePrice.toFixed(8)}</div>
+              <div>
+                <div className="text-2xl font-bold text-purple-200">{livePrice.toFixed(8)}</div>
+                <div className="text-green-400 text-xs">${(livePrice * xrpUsdPrice).toFixed(6)}</div>
+              </div>
               {token.amm_pool_created && (
                 <span className={`text-xs font-medium px-2 py-1 rounded ${
                   parseFloat(calculate24hChange(token)) >= 0
@@ -419,10 +435,12 @@ export default function Pools() {
               <div className="glass rounded-lg p-4">
                 <div className="text-purple-400 text-xs mb-1">XRP Liquidity</div>
                 <div className="text-lg font-bold text-purple-200">{poolData.xrpAmount.toFixed(2)}</div>
+                <div className="text-green-400 text-xs">${(poolData.xrpAmount * xrpUsdPrice).toFixed(2)}</div>
               </div>
               <div className="glass rounded-lg p-4">
-                <div className="text-purple-400 text-xs mb-1">Token Liquidity</div>
-                <div className="text-lg font-bold text-purple-200">{poolData.tokenAmount.toFixed(0)}</div>
+                <div className="text-purple-400 text-xs mb-1">24h Volume</div>
+                <div className="text-lg font-bold text-purple-200">{poolData.volume24h ? poolData.volume24h.toFixed(2) : '0'}</div>
+                <div className="text-green-400 text-xs">${(poolData.volume24h * xrpUsdPrice).toFixed(2)}</div>
               </div>
               <div className="glass rounded-lg p-4">
                 <div className="text-purple-400 text-xs mb-1">LP Tokens</div>
@@ -449,30 +467,67 @@ export default function Pools() {
                     <div className="text-green-200 font-bold">
                       ~{(poolData.xrpAmount * lpBalance.share / 100).toFixed(4)} XRP
                     </div>
+                    <div className="text-green-400 text-xs">${((poolData.xrpAmount * lpBalance.share / 100) * xrpUsdPrice).toFixed(2)}</div>
                     <div className="text-green-300 text-xs">Your Share Value</div>
                   </div>
                 </div>
               </div>
             )}
 
-            <div className="flex gap-2">
-              <a
-                href={`https://xmagnetic.org/amm/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 btn-primary text-center py-2 rounded-lg text-sm"
-              >
-                🏊 AMM Pool →
-              </a>
+            <div className="relative swap-dropdown">
               <button
-                onClick={() => {
-                  localStorage.setItem('selectedTradeToken', JSON.stringify(token));
-                  window.dispatchEvent(new CustomEvent('navigateToTrade', { detail: token }));
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSwapDropdownOpen(swapDropdownOpen === token.id ? null : token.id);
                 }}
-                className="flex-1 btn-secondary text-center py-2 rounded-lg text-sm"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 rounded-lg shadow-md shadow-blue-500/50 hover:shadow-blue-500/70 flex items-center justify-center gap-2"
               >
                 💱 Swap
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
+
+              {swapDropdownOpen === token.id && (
+                <div className="absolute top-full left-0 right-0 mt-2 glass bg-gradient-to-br from-purple-900/95 to-purple-800/95 border border-purple-500/30 rounded-lg shadow-xl z-[9999] overflow-hidden">
+                  <button
+                    onClick={() => {
+                      setSwapDropdownOpen(null);
+                      localStorage.setItem('selectedTradeToken', JSON.stringify(token));
+                      window.dispatchEvent(new CustomEvent('navigateToTrade', { detail: token }));
+                    }}
+                    className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3 border-b border-purple-500/30"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-300">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-purple-100 font-medium">Trade Page</div>
+                      <div className="text-purple-300 text-xs">Swap on MEMEKINGS</div>
+                    </div>
+                  </button>
+
+                  <a
+                    href={`https://xmagnetic.org/dex/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3"
+                    onClick={() => setSwapDropdownOpen(null)}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-300">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-purple-100 font-medium">Magnetic Link</div>
+                      <div className="text-purple-300 text-xs">Trade on xMagnetic</div>
+                    </div>
+                  </a>
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -497,7 +552,7 @@ export default function Pools() {
       <tr className="border-t border-purple-500/20 hover:bg-purple-900/20">
         <td className="px-4 py-3">
           <div className="flex items-center gap-3">
-            <TokenIcon token={token} size="3xl" />
+            <TokenIcon token={token} size="md" />
             <div className="flex items-center gap-2">
               <div>
                 <div className="font-bold text-purple-200">{token.token_name}/XRP</div>
@@ -513,27 +568,27 @@ export default function Pools() {
           </div>
         </td>
         <td className="px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div>
-              <div className="text-purple-200 font-bold">{livePrice.toFixed(8)}</div>
-              <div className="text-purple-400 text-xs">XRP</div>
-            </div>
-            {token.amm_pool_created && (
-              <span className={`text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
-                parseFloat(calculate24hChange(token)) >= 0
-                  ? 'text-green-300 bg-green-500/10'
-                  : 'text-red-300 bg-red-500/10'
-              }`}>
-                {parseFloat(calculate24hChange(token)) >= 0 ? '+' : ''}{calculate24hChange(token)}%
-              </span>
-            )}
-          </div>
+          <div className="text-purple-200 font-bold">{livePrice.toFixed(8)} XRP</div>
+          <div className="text-green-400 text-xs">${(livePrice * xrpUsdPrice).toFixed(6)}</div>
         </td>
-        <td className="px-4 py-3 text-purple-200 font-bold">
-          {poolData ? `${poolData.xrpAmount.toFixed(2)} XRP` : 'Loading...'}
+        <td className="px-4 py-3">
+          {token.amm_pool_created && (
+            <span className={`text-sm font-bold px-2 py-1 rounded ${
+              parseFloat(calculate24hChange(token)) >= 0
+                ? 'text-green-300 bg-green-500/10'
+                : 'text-red-300 bg-red-500/10'
+            }`}>
+              {parseFloat(calculate24hChange(token)) >= 0 ? '+' : ''}{calculate24hChange(token)}%
+            </span>
+          )}
         </td>
-        <td className="px-4 py-3 text-purple-300">
-          {poolData && poolData.volume24h > 0 ? `${poolData.volume24h.toFixed(2)} XRP` : '0 XRP'}
+        <td className="px-4 py-3">
+          <div className="text-purple-200 font-bold">{poolData ? `${poolData.xrpAmount.toFixed(2)} XRP` : 'Loading...'}</div>
+          <div className="text-green-400 text-xs">${(poolData.xrpAmount * xrpUsdPrice).toFixed(2)}</div>
+        </td>
+        <td className="px-4 py-3">
+          <div className="text-purple-200 font-bold">{poolData && poolData.volume24h > 0 ? `${poolData.volume24h.toFixed(2)} XRP` : '0 XRP'}</div>
+          <div className="text-green-400 text-xs">${(poolData.volume24h * xrpUsdPrice).toFixed(2)}</div>
         </td>
         <td className="px-4 py-3">
           {poolData && poolData.apr > 0 ? (
@@ -558,34 +613,69 @@ export default function Pools() {
         <td className="px-4 py-3">
           {lpBalance ? (
             <div>
-              <div className="text-green-200 font-medium">{lpBalance.balance.toFixed(4)}</div>
-              <div className="text-green-400 text-xs">{lpBalance.share.toFixed(2)}%</div>
+              <div className="text-green-200 font-bold">{(poolData.xrpAmount * lpBalance.share / 100).toFixed(4)} XRP</div>
+              <div className="text-green-400 text-xs">${((poolData.xrpAmount * lpBalance.share / 100) * xrpUsdPrice).toFixed(2)}</div>
+              <div className="text-green-300 text-xs">{lpBalance.share.toFixed(2)}% share</div>
             </div>
           ) : (
             <span className="text-purple-500">-</span>
           )}
         </td>
         <td className="px-4 py-3">
-          <div className="flex gap-1">
-            <a
-              href={`https://xmagnetic.org/amm/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary text-white text-xs px-2 py-1 rounded"
-              title="AMM Pool"
-            >
-              🏊 AMM
-            </a>
+          <div className="relative swap-dropdown">
             <button
-              onClick={() => {
-                localStorage.setItem('selectedTradeToken', JSON.stringify(token));
-                window.dispatchEvent(new CustomEvent('navigateToTrade', { detail: token }));
+              onClick={(e) => {
+                e.stopPropagation();
+                setSwapDropdownOpen(swapDropdownOpen === token.id ? null : token.id);
               }}
-              className="btn-secondary text-white text-xs px-2 py-1 rounded"
-              title="Swap"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold text-xs px-3 py-2 rounded shadow-md shadow-blue-500/50 hover:shadow-blue-500/70 flex items-center gap-1"
             >
-              💱
+              💱 Swap
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
             </button>
+
+            {swapDropdownOpen === token.id && (
+              <div className="absolute top-full left-0 mt-2 w-64 glass bg-gradient-to-br from-purple-900/95 to-purple-800/95 border border-purple-500/30 rounded-lg shadow-xl z-[9999] overflow-hidden">
+                <button
+                  onClick={() => {
+                    setSwapDropdownOpen(null);
+                    localStorage.setItem('selectedTradeToken', JSON.stringify(token));
+                    window.dispatchEvent(new CustomEvent('navigateToTrade', { detail: token }));
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3 border-b border-purple-500/30"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-300">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-purple-100 font-medium">Trade Page</div>
+                    <div className="text-purple-300 text-xs">Swap on MEMEKINGS</div>
+                  </div>
+                </button>
+
+                <a
+                  href={`https://xmagnetic.org/dex/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3"
+                  onClick={() => setSwapDropdownOpen(null)}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-300">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-purple-100 font-medium">Magnetic Link</div>
+                    <div className="text-purple-300 text-xs">Trade on xMagnetic</div>
+                  </div>
+                </a>
+              </div>
+            )}
           </div>
         </td>
       </tr>
@@ -675,6 +765,9 @@ export default function Pools() {
           >
             <option value="liquidity">Sort by Liquidity</option>
             <option value="volume">Sort by Volume</option>
+            <option value="change24h">Sort by 24h %</option>
+            <option value="price">Sort by Price</option>
+            <option value="apr">Sort by APR</option>
             <option value="name">Sort by Name</option>
           </select>
         </div>
@@ -693,7 +786,13 @@ export default function Pools() {
                 if (sortBy === 'liquidity') {
                   return (poolsData[b.id]?.xrpAmount || 0) - (poolsData[a.id]?.xrpAmount || 0);
                 } else if (sortBy === 'volume') {
-                  return (poolsData[b.id]?.tokenAmount || 0) - (poolsData[a.id]?.tokenAmount || 0);
+                  return (poolsData[b.id]?.volume24h || 0) - (poolsData[a.id]?.volume24h || 0);
+                } else if (sortBy === 'change24h') {
+                  return parseFloat(calculate24hChange(b)) - parseFloat(calculate24hChange(a));
+                } else if (sortBy === 'price') {
+                  return getLivePrice(b) - getLivePrice(a);
+                } else if (sortBy === 'apr') {
+                  return (poolsData[b.id]?.apr || 0) - (poolsData[a.id]?.apr || 0);
                 } else {
                   return a.token_name.localeCompare(b.token_name);
                 }
@@ -707,15 +806,16 @@ export default function Pools() {
             <table className="w-full">
               <thead className="bg-purple-900/30">
                 <tr>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Pool</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Live Price</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Liquidity</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">24h Volume</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">APR (1 year)</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-100" onClick={() => setSortBy('name')}>Pool</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-100" onClick={() => setSortBy('price')}>Live Price</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-100" onClick={() => setSortBy('change24h')}>24h %</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-100" onClick={() => setSortBy('liquidity')}>Liquidity</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-100" onClick={() => setSortBy('volume')}>24h Volume</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-100" onClick={() => setSortBy('apr')}>APR (1 year)</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">24h Fees</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">LP Tokens</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Contributors</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Your LP</th>
+                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Your Share</th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -732,7 +832,13 @@ export default function Pools() {
                     if (sortBy === 'liquidity') {
                       return (poolsData[b.id]?.xrpAmount || 0) - (poolsData[a.id]?.xrpAmount || 0);
                     } else if (sortBy === 'volume') {
-                      return (poolsData[b.id]?.tokenAmount || 0) - (poolsData[a.id]?.tokenAmount || 0);
+                      return (poolsData[b.id]?.volume24h || 0) - (poolsData[a.id]?.volume24h || 0);
+                    } else if (sortBy === 'change24h') {
+                      return parseFloat(calculate24hChange(b)) - parseFloat(calculate24hChange(a));
+                    } else if (sortBy === 'price') {
+                      return getLivePrice(b) - getLivePrice(a);
+                    } else if (sortBy === 'apr') {
+                      return (poolsData[b.id]?.apr || 0) - (poolsData[a.id]?.apr || 0);
                     } else {
                       return a.token_name.localeCompare(b.token_name);
                     }
