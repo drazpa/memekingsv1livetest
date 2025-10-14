@@ -1686,6 +1686,18 @@ export default function BotTrader() {
           </span>
         </td>
         <td className="px-4 py-3">
+          {(() => {
+            const netPL = (parseFloat(bot.total_xrp_received || 0) - parseFloat(bot.total_xrp_spent || 0));
+            return (
+              <span className={`text-sm font-bold ${
+                netPL >= 0 ? 'text-green-400' : 'text-red-400'
+              }`}>
+                {netPL >= 0 ? '+' : ''}{netPL.toFixed(4)} XRP
+              </span>
+            );
+          })()}
+        </td>
+        <td className="px-4 py-3">
           {bot.status === 'running' && nextTradeTime ? (
             <span className="text-sm text-blue-300">
               {minutes}m {seconds}s
@@ -2371,6 +2383,7 @@ export default function BotTrader() {
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Total Trades</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">XRP Earned</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">XRP Spent</th>
+                      <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Net P/L</th>
                       <th className="px-4 py-3 text-left text-sm font-semibold text-blue-200">Next Trade</th>
                       <th className="px-4 py-3 text-right text-sm font-semibold text-blue-200">Actions</th>
                     </tr>

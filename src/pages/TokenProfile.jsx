@@ -98,11 +98,11 @@ export default function TokenProfile({ tokenSlug }) {
         .from('pool_data_cache')
         .select('*')
         .eq('token_id', token.id)
-        .order('cached_at', { ascending: false })
+        .order('last_updated', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (cache && (Date.now() - new Date(cache.cached_at).getTime() < 30000)) {
+      if (cache && (Date.now() - new Date(cache.last_updated).getTime() < 120000)) {
         setPoolData({
           xrpAmount: parseFloat(cache.xrp_amount),
           tokenAmount: parseFloat(cache.token_amount),
@@ -167,7 +167,7 @@ export default function TokenProfile({ tokenSlug }) {
           fees_24h: fees24h,
           apr: apr,
           contributors: 0,
-          cached_at: new Date().toISOString()
+          last_updated: new Date().toISOString()
         }, { onConflict: 'token_id' });
 
         if (connectedWallet) {
