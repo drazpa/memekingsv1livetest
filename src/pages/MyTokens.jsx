@@ -515,9 +515,9 @@ export default function MyTokens() {
           <div className="flex items-center gap-2 mt-2">
             <span className="text-purple-500 text-xs">Your tokens</span>
             <span className={`text-xs font-bold ${
-              analytics.userTokensChange24h >= 0 ? 'text-green-400' : 'text-red-400'
+              (analytics.userTokensChange24h || 0) >= 0 ? 'text-green-400' : 'text-red-400'
             }`}>
-              {analytics.userTokensChange24h >= 0 ? '+' : ''}{analytics.userTokensChange24h.toFixed(2)}% 24h
+              {(analytics.userTokensChange24h || 0) >= 0 ? '+' : ''}{(analytics.userTokensChange24h || 0).toFixed(2)}% 24h
             </span>
           </div>
         </div>

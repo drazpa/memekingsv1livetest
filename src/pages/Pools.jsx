@@ -19,7 +19,7 @@ export default function Pools() {
   const [sortBy, setSortBy] = useState('liquidity');
   const [poolFilter, setPoolFilter] = useState('all');
   const [favorites, setFavorites] = useState([]);
-  const [xrpUsdPrice, setXrpUsdPrice] = useState(0);
+  const [xrpUsdPrice, setXrpUsdPrice] = useState(2.50);
   const [swapDropdownOpen, setSwapDropdownOpen] = useState(null);
 
   useEffect(() => {
@@ -75,9 +75,10 @@ export default function Pools() {
     try {
       const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd');
       const data = await response.json();
-      setXrpUsdPrice(data.ripple?.usd || 0);
+      setXrpUsdPrice(data.ripple?.usd || 2.50);
     } catch (error) {
       console.error('Error fetching XRP/USD price:', error);
+      setXrpUsdPrice(2.50);
     }
   };
 
@@ -439,8 +440,8 @@ export default function Pools() {
               </div>
               <div className="glass rounded-lg p-4">
                 <div className="text-purple-400 text-xs mb-1">24h Volume</div>
-                <div className="text-lg font-bold text-purple-200">{poolData.volume24h ? poolData.volume24h.toFixed(2) : '0'}</div>
-                <div className="text-green-400 text-xs">${(poolData.volume24h * xrpUsdPrice).toFixed(2)}</div>
+                <div className="text-lg font-bold text-purple-200">{poolData.volume24h ? poolData.volume24h.toFixed(2) : '0'} XRP</div>
+                <div className="text-green-400 text-xs">${((poolData.volume24h || 0) * xrpUsdPrice).toFixed(2)}</div>
               </div>
               <div className="glass rounded-lg p-4">
                 <div className="text-purple-400 text-xs mb-1">LP Tokens</div>
@@ -584,11 +585,11 @@ export default function Pools() {
         </td>
         <td className="px-4 py-3">
           <div className="text-purple-200 font-bold">{poolData ? `${poolData.xrpAmount.toFixed(2)} XRP` : 'Loading...'}</div>
-          <div className="text-green-400 text-xs">${(poolData.xrpAmount * xrpUsdPrice).toFixed(2)}</div>
+          <div className="text-green-400 text-xs">${(poolData ? poolData.xrpAmount * xrpUsdPrice : 0).toFixed(2)}</div>
         </td>
         <td className="px-4 py-3">
           <div className="text-purple-200 font-bold">{poolData && poolData.volume24h > 0 ? `${poolData.volume24h.toFixed(2)} XRP` : '0 XRP'}</div>
-          <div className="text-green-400 text-xs">${(poolData.volume24h * xrpUsdPrice).toFixed(2)}</div>
+          <div className="text-green-400 text-xs">${((poolData?.volume24h || 0) * xrpUsdPrice).toFixed(2)}</div>
         </td>
         <td className="px-4 py-3">
           {poolData && poolData.apr > 0 ? (
@@ -614,7 +615,7 @@ export default function Pools() {
           {lpBalance ? (
             <div>
               <div className="text-green-200 font-bold">{(poolData.xrpAmount * lpBalance.share / 100).toFixed(4)} XRP</div>
-              <div className="text-green-400 text-xs">${((poolData.xrpAmount * lpBalance.share / 100) * xrpUsdPrice).toFixed(2)}</div>
+              <div className="text-green-400 text-xs">${(poolData && poolData.xrpAmount ? (poolData.xrpAmount * lpBalance.share / 100) * xrpUsdPrice : 0).toFixed(2)}</div>
               <div className="text-green-300 text-xs">{lpBalance.share.toFixed(2)}% share</div>
             </div>
           ) : (
