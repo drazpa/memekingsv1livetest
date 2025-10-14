@@ -101,9 +101,13 @@ export default function Dashboard() {
   const TOKENS_PER_PAGE = 100;
 
   useEffect(() => {
-    loadTokens();
-    loadConnectedWallet();
-    fetchXrpUsdPrice();
+    const initialize = async () => {
+      await loadTokens();
+      await loadCachedPoolData();
+      loadConnectedWallet();
+      fetchXrpUsdPrice();
+    };
+    initialize();
     const interval = setInterval(() => {
       loadTokens();
       fetchXrpUsdPrice();
@@ -140,6 +144,16 @@ export default function Dashboard() {
     if (tokens.length > 0 && Object.keys(poolsData).length === 0) {
       fetchAllPoolsData();
     }
+  }, [tokens]);
+
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      if (tokens.length > 0) {
+        fetchAllPoolsData(false);
+      }
+    }, 300000);
+
+    return () => clearInterval(refreshInterval);
   }, [tokens]);
 
   useEffect(() => {
@@ -380,9 +394,65 @@ export default function Dashboard() {
     }
   };
 
+  const loadCachedPoolData = async () => {
+    try {
+      const { data: cachedPools, error } = await supabase
+        .from('pool_data_cache')
+        .select('*');
+
+      if (!error && cachedPools && cachedPools.length > 0) {
+        const poolData = {};
+        cachedPools.forEach(cache => {
+          poolData[cache.token_id] = {
+            xrpAmount: parseFloat(cache.xrp_amount),
+            tokenAmount: parseFloat(cache.token_amount),
+            lpTokens: parseFloat(cache.lp_tokens),
+            price: parseFloat(cache.price),
+            accountId: cache.account_id,
+            volume24h: parseFloat(cache.volume_24h || 0),
+            priceChange24h: parseFloat(cache.price_change_24h || 0)
+          };
+        });
+        setPoolsData(poolData);
+        console.log(`⚡ Dashboard: Loaded ${cachedPools.length} pools from cache instantly`);
+      }
+    } catch (error) {
+      console.error('Error loading cached pool data:', error);
+    }
+  };
+
+  const fetch24hVolumes = async (tokenIds) => {
+    try {
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+      const { data, error } = await supabase
+        .from('trade_history')
+        .select('token_id, xrp_amount')
+        .in('token_id', tokenIds)
+        .gte('created_at', twentyFourHoursAgo);
+
+      if (error) throw error;
+
+      const volumeByToken = {};
+      tokenIds.forEach(id => volumeByToken[id] = 0);
+
+      if (data && data.length > 0) {
+        data.forEach(trade => {
+          const volume = parseFloat(trade.xrp_amount || 0);
+          volumeByToken[trade.token_id] = (volumeByToken[trade.token_id] || 0) + volume;
+        });
+      }
+
+      return volumeByToken;
+    } catch (error) {
+      console.error('Error fetching 24h volumes:', error);
+      return {};
+    }
+  };
+
   const fetchAllPoolsData = async (forceRefresh = false) => {
     try {
-      const cacheAge = 30;
+      const cacheAge = 300;
       const { data: cachedPools, error: cacheError } = await supabase
         .from('pool_data_cache')
         .select('*')
@@ -398,7 +468,9 @@ export default function Dashboard() {
             tokenAmount: parseFloat(cache.token_amount),
             lpTokens: parseFloat(cache.lp_tokens),
             price: parseFloat(cache.price),
-            accountId: cache.account_id
+            accountId: cache.account_id,
+            volume24h: parseFloat(cache.volume_24h || 0),
+            priceChange24h: parseFloat(cache.price_change_24h || 0)
           };
         });
 
@@ -409,6 +481,9 @@ export default function Dashboard() {
       console.log('🔄 Fetching fresh pool data from XRPL...');
       const { requestWithRetry } = await import('../utils/xrplClient');
       const poolData = {};
+
+      const poolTokens = tokens.filter(t => t.amm_pool_created);
+      const volumeData = await fetch24hVolumes(poolTokens.map(t => t.id));
 
       for (const token of tokens) {
         if (!token.amm_pool_created) continue;
@@ -434,12 +509,15 @@ export default function Dashboard() {
             const tokenAmount = parseFloat(amm.amount2.value);
             const lpTokens = parseFloat(amm.lp_token?.value || 0);
 
+            const volume24h = volumeData[token.id] || 0;
+
             poolData[token.id] = {
               xrpAmount,
               tokenAmount,
               lpTokens,
               price: xrpAmount / tokenAmount,
-              accountId: amm.account
+              accountId: amm.account,
+              volume24h
             };
           }
         } catch (error) {
@@ -454,7 +532,7 @@ export default function Dashboard() {
         lp_tokens: data.lpTokens,
         price: data.price,
         account_id: data.accountId,
-        volume_24h: 0,
+        volume_24h: data.volume24h || 0,
         price_change_24h: 0,
         last_updated: new Date().toISOString()
       }));

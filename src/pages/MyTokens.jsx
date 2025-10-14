@@ -203,7 +203,7 @@ export default function MyTokens() {
     setLoading(true);
 
     try {
-      const cacheAge = 30;
+      const cacheAge = 300;
       const { data: cachedData, error: cacheError } = await supabase
         .from('token_holdings_cache')
         .select('*, token:meme_tokens(*)')
@@ -274,7 +274,7 @@ export default function MyTokens() {
       const { data: cachedPools } = await supabase
         .from('pool_data_cache')
         .select('*')
-        .gte('last_updated', new Date(Date.now() - (5 * 60 * 1000)).toISOString());
+        .gte('last_updated', new Date(Date.now() - 300 * 1000).toISOString());
 
       const poolCacheMap = {};
       if (cachedPools) {
