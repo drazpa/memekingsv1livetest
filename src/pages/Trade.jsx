@@ -1722,7 +1722,7 @@ export default function Trade({ preselectedToken = null }) {
           tokenId: selectedToken.id
         });
 
-        await supabase.from('trade_history').insert([{
+        const tradeRecord = {
           token_id: selectedToken.id,
           trader_address: connectedWallet.address,
           trade_type: tradeType,
@@ -1732,7 +1732,20 @@ export default function Trade({ preselectedToken = null }) {
           tx_hash: txHash,
           slippage: parseFloat(slippage),
           platform_fee: feeResult.waived ? 0 : feeResult.fee
-        }]);
+        };
+
+        console.log('Inserting trade record:', tradeRecord);
+
+        const { data: tradeData, error: tradeError } = await supabase
+          .from('trade_history')
+          .insert([tradeRecord])
+          .select();
+
+        if (tradeError) {
+          console.error('Error saving trade to history:', tradeError);
+        } else {
+          console.log('Trade saved successfully:', tradeData);
+        }
 
         updateTradeStep(2, 'success', { description: 'Trade completed successfully' });
         setCurrentTradeStep(3);

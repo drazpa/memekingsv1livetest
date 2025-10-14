@@ -4,10 +4,9 @@ import { XRPScanLink } from './XRPScanLink';
 
 export default function TradeHistory({ tokenId, connectedWallet }) {
   const [myTrades, setMyTrades] = useState([]);
-  const [poolTrades, setPoolTrades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [xrpUsdPrice, setXrpUsdPrice] = useState(0);
-  const [activeTab, setActiveTab] = useState('my');
+  const [displayLimit, setDisplayLimit] = useState(3);
 
   useEffect(() => {
     fetchXrpPrice();
@@ -51,23 +50,13 @@ export default function TradeHistory({ tokenId, connectedWallet }) {
           .eq('token_id', tokenId)
           .eq('trader_address', connectedWallet.address)
           .order('created_at', { ascending: false })
-          .limit(3);
+          .limit(100);
 
         if (myError) throw myError;
         setMyTrades(myTradesData || []);
       } else {
         setMyTrades([]);
       }
-
-      const { data: poolTradesData, error: poolError } = await supabase
-        .from('trade_history')
-        .select('*')
-        .eq('token_id', tokenId)
-        .order('created_at', { ascending: false })
-        .limit(3);
-
-      if (poolError) throw poolError;
-      setPoolTrades(poolTradesData || []);
     } catch (error) {
       console.error('Error fetching trade history:', error);
     } finally {
@@ -94,7 +83,7 @@ export default function TradeHistory({ tokenId, connectedWallet }) {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const renderTradeTable = (trades, showTrader = true) => {
+  const renderTradeTable = (trades) => {
     if (trades.length === 0) {
       return (
         <div className="text-center py-8 text-purple-400">
@@ -104,67 +93,70 @@ export default function TradeHistory({ tokenId, connectedWallet }) {
       );
     }
 
+    const tradesToDisplay = trades.slice(0, displayLimit);
+
     return (
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-purple-400 border-b border-purple-500/20">
-            <tr>
-              <th className="text-left py-2 px-2">Type</th>
-              {showTrader && <th className="text-left py-2 px-2">Trader</th>}
-              <th className="text-right py-2 px-2">Token Amount</th>
-              <th className="text-right py-2 px-2">XRP Amount</th>
-              <th className="text-right py-2 px-2">Price</th>
-              <th className="text-right py-2 px-2">Time</th>
-              <th className="text-right py-2 px-2">Tx</th>
-            </tr>
-          </thead>
-          <tbody>
-            {trades.map((trade) => (
-              <tr key={trade.id} className="border-b border-purple-500/10 hover:bg-purple-900/20">
-                <td className="py-3 px-2">
-                  <span className={`px-2 py-1 rounded text-xs font-bold ${
-                    trade.trade_type === 'buy'
-                      ? 'bg-green-500/20 text-green-300'
-                      : 'bg-red-500/20 text-red-300'
-                  }`}>
-                    {trade.trade_type === 'buy' ? '🟢 BUY' : '🔴 SELL'}
-                  </span>
-                </td>
-                {showTrader && (
-                  <td className="py-3 px-2">
-                    <div className="font-mono text-purple-200">{formatAddress(trade.trader_address)}</div>
-                  </td>
-                )}
-                <td className="py-3 px-2 text-right">
+      <div className="space-y-3">
+        <div className="max-h-[400px] overflow-y-auto space-y-2">
+          {tradesToDisplay.map((trade) => (
+            <div key={trade.id} className="glass rounded-lg p-3 hover:bg-purple-900/20 transition-all">
+              <div className="flex items-center justify-between mb-2">
+                <span className={`px-3 py-1 rounded-lg text-xs font-bold ${
+                  trade.trade_type === 'buy'
+                    ? 'bg-green-500/20 text-green-300'
+                    : 'bg-red-500/20 text-red-300'
+                }`}>
+                  {trade.trade_type === 'buy' ? '🟢 BUY' : '🔴 SELL'}
+                </span>
+                <span className="text-xs text-purple-400">{formatTime(trade.created_at)}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <div className="text-purple-400 text-xs">Token Amount</div>
                   <div className="text-purple-200 font-medium">
                     {parseFloat(trade.token_amount).toLocaleString(undefined, {
                       minimumFractionDigits: 0,
                       maximumFractionDigits: 2
                     })}
                   </div>
-                </td>
-                <td className="py-3 px-2 text-right">
+                </div>
+                <div className="text-right">
+                  <div className="text-purple-400 text-xs">XRP Amount</div>
                   <div className="text-purple-200 font-medium">{parseFloat(trade.xrp_amount).toFixed(4)} XRP</div>
                   <div className="text-green-400 text-xs">${(parseFloat(trade.xrp_amount) * xrpUsdPrice).toFixed(2)}</div>
-                </td>
-                <td className="py-3 px-2 text-right">
-                  <div className="text-purple-200">{parseFloat(trade.price).toFixed(8)}</div>
-                  <div className="text-purple-400 text-xs">XRP</div>
-                </td>
-                <td className="py-3 px-2 text-right text-purple-400">
-                  {formatTime(trade.created_at)}
-                </td>
-                <td className="py-3 px-2 text-right">
+                </div>
+                <div>
+                  <div className="text-purple-400 text-xs">Price</div>
+                  <div className="text-purple-200">{parseFloat(trade.price).toFixed(8)} XRP</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-purple-400 text-xs">Transaction</div>
                   {trade.tx_hash ? (
                     <XRPScanLink type="tx" value={trade.tx_hash} network="mainnet" className="text-xs" />
                   ) : (
                     <span className="text-purple-500">-</span>
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {trades.length > displayLimit && (
+          <button
+            onClick={() => setDisplayLimit(prev => prev + 10)}
+            className="w-full py-2 rounded-lg glass hover:bg-purple-500/20 text-purple-300 text-sm font-medium transition-all"
+          >
+            Load More ({trades.length - displayLimit} remaining)
+          </button>
+        )}
+        {displayLimit > 3 && (
+          <button
+            onClick={() => setDisplayLimit(3)}
+            className="w-full py-2 rounded-lg glass hover:bg-purple-500/20 text-purple-400 text-xs transition-all"
+          >
+            Show Less
+          </button>
+        )}
       </div>
     );
   };
@@ -182,58 +174,20 @@ export default function TradeHistory({ tokenId, connectedWallet }) {
 
   return (
     <div className="glass rounded-lg p-4">
-      <h3 className="text-lg font-bold text-purple-200 mb-4">Trade History</h3>
-
-      <div className="flex gap-2 mb-4">
-        <button
-          onClick={() => setActiveTab('my')}
-          className={`px-4 py-2 rounded-lg font-medium transition-all ${
-            activeTab === 'my'
-              ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-              : 'glass text-purple-300 hover:text-purple-200'
-          }`}
-        >
-          My Trades ({myTrades.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('pool')}
-          className={`px-4 py-2 rounded-lg font-medium transition-all ${
-            activeTab === 'pool'
-              ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white'
-              : 'glass text-purple-300 hover:text-purple-200'
-          }`}
-        >
-          Pool Trades ({poolTrades.length})
-        </button>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-bold text-purple-200">My Trades</h3>
+        {myTrades.length > 0 && (
+          <span className="text-sm text-purple-400">{myTrades.length} total</span>
+        )}
       </div>
 
-      {activeTab === 'my' ? (
-        <>
-          {!connectedWallet ? (
-            <div className="text-center py-8 text-purple-400">
-              <div className="text-4xl mb-2">🔒</div>
-              <div>Connect wallet to view your trades</div>
-            </div>
-          ) : (
-            <>
-              {renderTradeTable(myTrades, false)}
-              {myTrades.length === 3 && (
-                <div className="text-center mt-3 text-sm text-purple-400">
-                  Showing latest 3 trades
-                </div>
-              )}
-            </>
-          )}
-        </>
+      {!connectedWallet ? (
+        <div className="text-center py-8 text-purple-400">
+          <div className="text-4xl mb-2">🔒</div>
+          <div>Connect wallet to view your trades</div>
+        </div>
       ) : (
-        <>
-          {renderTradeTable(poolTrades, true)}
-          {poolTrades.length === 3 && (
-            <div className="text-center mt-3 text-sm text-purple-400">
-              Showing latest 3 trades
-            </div>
-          )}
-        </>
+        renderTradeTable(myTrades)
       )}
     </div>
   );
