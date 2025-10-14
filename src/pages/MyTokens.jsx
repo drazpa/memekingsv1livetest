@@ -213,15 +213,23 @@ export default function MyTokens() {
       if (!forceRefresh && cachedData && cachedData.length > 0 && !cacheError) {
         console.log(`✅ Using cached holdings (${cachedData.length} items)`);
 
-        const tokenHoldings = cachedData.map(cache => ({
-          token: cache.token,
-          balance: parseFloat(cache.balance),
-          price: parseFloat(cache.price),
-          value: parseFloat(cache.value),
-          isLPToken: cache.is_lp_token,
-          lpShare: parseFloat(cache.lp_share),
-          priceChange24h: parseFloat(cache.price_change_24h)
-        }));
+        const tokenHoldings = cachedData.map(cache => {
+          const balance = parseFloat(cache.balance);
+          const supplyPercent = cache.token?.supply && parseFloat(cache.token.supply) > 0
+            ? (balance / parseFloat(cache.token.supply)) * 100
+            : 0;
+
+          return {
+            token: cache.token,
+            balance,
+            price: parseFloat(cache.price),
+            value: parseFloat(cache.value),
+            isLPToken: cache.is_lp_token,
+            lpShare: parseFloat(cache.lp_share),
+            priceChange24h: parseFloat(cache.price_change_24h),
+            supplyPercentage: supplyPercent
+          };
+        });
 
         setHoldings(tokenHoldings);
         calculateAnalytics(tokenHoldings);
@@ -370,13 +378,18 @@ export default function MyTokens() {
             totalLPValue += lpValue;
             lpCount++;
 
+            const supplyPercent = token.supply && parseFloat(token.supply) > 0
+              ? (balance / parseFloat(token.supply)) * 100
+              : 0;
+
             tokenHoldings.push({
               token,
               balance,
               price: pool.price,
               value: lpValue,
               isLPToken: true,
-              lpShare: (balance / pool.lpTokens) * 100
+              lpShare: (balance / pool.lpTokens) * 100,
+              supplyPercentage: supplyPercent
             });
             console.log(`   💎 LP: ${token.token_name} - ${balance.toFixed(4)} tokens (${lpValue.toFixed(4)} XRP)`);
             continue;
@@ -401,6 +414,9 @@ export default function MyTokens() {
           totalTokenValue += value;
 
           const priceChange24h = ((Math.random() - 0.3) * 20).toFixed(2);
+          const supplyPercent = token.supply && parseFloat(token.supply) > 0
+            ? (balance / parseFloat(token.supply)) * 100
+            : 0;
 
           tokenHoldings.push({
             token,
@@ -409,7 +425,8 @@ export default function MyTokens() {
             value,
             isLPToken: false,
             lpShare: 0,
-            priceChange24h: parseFloat(priceChange24h)
+            priceChange24h: parseFloat(priceChange24h),
+            supplyPercentage: supplyPercent
           });
           console.log(`   🪙 Token: ${token.token_name} - ${balance.toFixed(4)} tokens (${value.toFixed(4)} XRP)`);
         } else {
