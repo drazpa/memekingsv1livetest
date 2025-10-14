@@ -35,6 +35,8 @@ export default function MyTokens() {
   const [xrpPrice, setXrpPrice] = useState(2.50);
   const [tokenFilterTab, setTokenFilterTab] = useState('all');
   const [userCreatedTokens, setUserCreatedTokens] = useState([]);
+  const [lastFetchTime, setLastFetchTime] = useState(0);
+  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
 
   useEffect(() => {
     loadConnectedWallet();
@@ -55,22 +57,40 @@ export default function MyTokens() {
     const unsubscribe = onTokenUpdate(() => {
       const stored = localStorage.getItem('connectedWallet');
       if (stored) {
-        fetchHoldings();
+        const timeSinceLastFetch = Date.now() - lastFetchTime;
+        if (timeSinceLastFetch > 30000) {
+          fetchHoldings();
+        }
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [lastFetchTime]);
 
   useEffect(() => {
-    if (connectedWallet) {
+    if (connectedWallet && !hasLoadedInitialData) {
+      loadCachedDataInstantly();
       fetchHoldings();
       loadFavorites();
       loadUserCreatedTokens();
+      setHasLoadedInitialData(true);
     }
   }, [connectedWallet]);
+
+  useEffect(() => {
+    if (connectedWallet && hasLoadedInitialData) {
+      const refreshInterval = setInterval(() => {
+        const timeSinceLastFetch = Date.now() - lastFetchTime;
+        if (timeSinceLastFetch > 300000) {
+          fetchHoldings(false);
+        }
+      }, 60000);
+
+      return () => clearInterval(refreshInterval);
+    }
+  }, [connectedWallet, hasLoadedInitialData, lastFetchTime]);
 
   useEffect(() => {
     fetchXRPPrice();
@@ -163,6 +183,45 @@ export default function MyTokens() {
     }
   };
 
+  const loadCachedDataInstantly = async () => {
+    if (!connectedWallet) return;
+
+    try {
+      const { data: cachedData, error } = await supabase
+        .from('token_holdings_cache')
+        .select('*, token:meme_tokens(*)')
+        .eq('wallet_address', connectedWallet.address)
+        .order('last_updated', { ascending: false });
+
+      if (!error && cachedData && cachedData.length > 0) {
+        console.log(`⚡ MyTokens: Loaded ${cachedData.length} holdings from cache instantly`);
+
+        const tokenHoldings = cachedData.map(cache => {
+          const balance = parseFloat(cache.balance);
+          const supplyPercent = cache.token?.supply && parseFloat(cache.token.supply) > 0
+            ? (balance / parseFloat(cache.token.supply)) * 100
+            : 0;
+
+          return {
+            token: cache.token,
+            balance,
+            price: parseFloat(cache.price),
+            value: parseFloat(cache.value),
+            isLPToken: cache.is_lp_token,
+            lpShare: parseFloat(cache.lp_share),
+            priceChange24h: parseFloat(cache.price_change_24h),
+            supplyPercentage: supplyPercent
+          };
+        });
+
+        setHoldings(tokenHoldings);
+        calculateAnalytics(tokenHoldings);
+      }
+    } catch (error) {
+      console.error('Error loading cached holdings:', error);
+    }
+  };
+
   const calculateAnalytics = (tokenHoldings) => {
     let totalValue = 0;
     let lpCount = 0;
@@ -199,6 +258,12 @@ export default function MyTokens() {
   const fetchHoldings = async (forceRefresh = false) => {
     if (!connectedWallet) return;
 
+    const timeSinceLastFetch = Date.now() - lastFetchTime;
+    if (!forceRefresh && timeSinceLastFetch < 300000 && holdings.length > 0) {
+      console.log('⏭️ Skipping fetch - data is fresh (less than 5 minutes old)');
+      return;
+    }
+
     console.log('\n💼 Fetching token holdings...');
     setLoading(true);
 
@@ -234,6 +299,7 @@ export default function MyTokens() {
         setHoldings(tokenHoldings);
         calculateAnalytics(tokenHoldings);
         setLoading(false);
+        setLastFetchTime(Date.now());
         return;
       }
 
@@ -462,6 +528,7 @@ export default function MyTokens() {
       setHoldings(tokenHoldings);
       setPoolsData(ammPools);
       calculateAnalytics(tokenHoldings);
+      setLastFetchTime(Date.now());
     } catch (error) {
       console.error('Error fetching holdings:', error);
       toast.error('Failed to fetch token holdings');
