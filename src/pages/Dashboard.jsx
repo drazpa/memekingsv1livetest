@@ -1248,10 +1248,10 @@ export default function Dashboard() {
         <div className="relative swap-dropdown" onClick={(e) => { e.stopPropagation(); }}>
           <button
             onClick={() => setSwapDropdownOpen(swapDropdownOpen === token.id ? null : token.id)}
-            className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold text-xs px-3 py-2 rounded-lg text-center shadow-lg transition-all duration-300 flex items-center justify-center gap-2"
+            className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold text-xs px-3 py-2 rounded-lg text-center shadow-lg transition-all duration-300 flex items-center justify-center gap-1.5"
           >
             <span>💱 Swap</span>
-            <svg className={`w-4 h-4 transition-transform ${swapDropdownOpen === token.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-3.5 h-3.5 transition-transform ${swapDropdownOpen === token.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>

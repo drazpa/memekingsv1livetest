@@ -31,6 +31,7 @@ export default function MyTokens() {
   const [favorites, setFavorites] = useState([]);
   const [showLPTokens, setShowLPTokens] = useState(true);
   const [xrpPrice, setXrpPrice] = useState(2.50);
+  const [tokenFilterTab, setTokenFilterTab] = useState('all');
 
   useEffect(() => {
     loadConnectedWallet();
@@ -147,6 +148,8 @@ export default function MyTokens() {
     let lpCount = 0;
     let totalTokenValue = 0;
     let totalLPValue = 0;
+    let userTokensCreated = 0;
+    let userTokensChange = 0;
 
     tokenHoldings.forEach(holding => {
       totalValue += holding.value;
@@ -156,17 +159,26 @@ export default function MyTokens() {
       } else {
         totalTokenValue += holding.value;
       }
+      if (connectedWallet && holding.token.issuer_address === connectedWallet.address) {
+        userTokensCreated++;
+        if (holding.priceChange24h) {
+          userTokensChange += holding.priceChange24h;
+        }
+      }
     });
 
     const totalValueChange24h = ((Math.random() - 0.3) * 20).toFixed(2);
     const lpValueChange24h = ((Math.random() - 0.3) * 15).toFixed(2);
+    const userTokensChange24h = userTokensCreated > 0 ? (userTokensChange / userTokensCreated) : 0;
 
     setAnalytics({
       totalValue: totalValue.toFixed(4),
       totalTokens: tokenHoldings.length,
       lpPositions: lpCount,
       totalValueChange24h: parseFloat(totalValueChange24h),
-      lpValueChange24h: parseFloat(lpValueChange24h)
+      lpValueChange24h: parseFloat(lpValueChange24h),
+      userTokensCreated,
+      userTokensChange24h
     });
   };
 
@@ -466,7 +478,7 @@ export default function MyTokens() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="glass rounded-lg p-6">
           <div className="text-purple-400 text-sm mb-2">Total Portfolio Value</div>
           <div className="text-3xl font-bold text-purple-200">{analytics.totalValue} XRP</div>
@@ -497,6 +509,18 @@ export default function MyTokens() {
             </span>
           </div>
         </div>
+        <div className="glass rounded-lg p-6">
+          <div className="text-purple-400 text-sm mb-2">User Tokens Created</div>
+          <div className="text-3xl font-bold text-purple-200">{analytics.userTokensCreated}</div>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-purple-500 text-xs">Your tokens</span>
+            <span className={`text-xs font-bold ${
+              analytics.userTokensChange24h >= 0 ? 'text-green-400' : 'text-red-400'
+            }`}>
+              {analytics.userTokensChange24h >= 0 ? '+' : ''}{analytics.userTokensChange24h.toFixed(2)}% 24h
+            </span>
+          </div>
+        </div>
       </div>
 
       {loading ? (
@@ -506,14 +530,37 @@ export default function MyTokens() {
         </div>
       ) : holdings.length > 0 ? (
         <>
-          <div className="glass rounded-lg p-4 flex flex-wrap gap-4 items-center">
-            <input
-              type="text"
-              placeholder="🔍 Search tokens..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 min-w-[200px] bg-purple-900/30 border border-purple-500/30 rounded-lg px-4 py-2 text-purple-200 placeholder-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
+          <div className="glass rounded-lg p-4">
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button
+                onClick={() => setTokenFilterTab('all')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  tokenFilterTab === 'all'
+                    ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg'
+                    : 'bg-purple-900/30 text-purple-300 hover:bg-purple-900/50'
+                }`}
+              >
+                All Tokens
+              </button>
+              <button
+                onClick={() => setTokenFilterTab('user')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  tokenFilterTab === 'user'
+                    ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg'
+                    : 'bg-purple-900/30 text-purple-300 hover:bg-purple-900/50'
+                }`}
+              >
+                User Tokens
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-4 items-center">
+              <input
+                type="text"
+                placeholder="🔍 Search tokens..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 min-w-[200px] bg-purple-900/30 border border-purple-500/30 rounded-lg px-4 py-2 text-purple-200 placeholder-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
             <button
               onClick={() => setShowLPTokens(!showLPTokens)}
               className="bg-purple-900/30 border border-purple-500/30 rounded-lg px-4 py-2 text-purple-200 hover:bg-purple-900/50 transition-colors whitespace-nowrap"
@@ -542,6 +589,7 @@ export default function MyTokens() {
             >
               {sortOrder === 'asc' ? '↑' : '↓'}
             </button>
+            </div>
           </div>
 
           <div className="glass rounded-lg overflow-hidden">
@@ -628,6 +676,7 @@ export default function MyTokens() {
                   {holdings
                     .filter(holding => {
                       if (!showLPTokens && holding.isLPToken) return false;
+                      if (tokenFilterTab === 'user' && connectedWallet && holding.token.issuer_address !== connectedWallet.address) return false;
                       if (!searchQuery) return true;
                       const search = searchQuery.toLowerCase();
                       return holding.token.token_name.toLowerCase().includes(search) ||
