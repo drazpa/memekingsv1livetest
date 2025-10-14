@@ -523,6 +523,7 @@ export default function Trade({ preselectedToken = null }) {
           top: 0.1,
           bottom: 0.1,
         },
+        minimumWidth: window.innerWidth < 640 ? 70 : 80,
       },
       timeScale: {
         borderColor: 'rgba(139, 92, 246, 0.3)',
@@ -714,6 +715,7 @@ export default function Trade({ preselectedToken = null }) {
           top: 0.1,
           bottom: 0.1,
         },
+        minimumWidth: window.innerWidth < 640 ? 70 : 80,
       },
       timeScale: {
         borderColor: 'rgba(139, 92, 246, 0.3)',

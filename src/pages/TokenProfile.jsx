@@ -517,12 +517,12 @@ export default function TokenProfile({ tokenSlug }) {
             {connectedWallet && (
               <div className="glass rounded-lg p-4 text-center min-w-[200px] bg-purple-500/10 border border-purple-500/30">
                 <div className="text-purple-400 text-sm mb-1">Your Holdings</div>
-                <div className="text-xl font-bold text-purple-200">{userBalance !== null ? userBalance.toFixed(4) : '0.0000'}</div>
-                <div className="text-purple-400 text-xs">{token.currency_code}</div>
-                <div className="text-green-400 text-sm mt-1">
+                <div className="text-lg sm:text-xl font-bold text-purple-200 truncate">{userBalance !== null ? userBalance.toFixed(4) : '0.0000'}</div>
+                <div className="text-purple-400 text-xs truncate">{token.currency_code}</div>
+                <div className="text-green-400 text-sm mt-1 truncate">
                   {((userBalance || 0) * parseFloat(calculatePrice())).toFixed(4)} XRP
                 </div>
-                <div className="text-green-400 text-xs">
+                <div className="text-green-400 text-xs truncate">
                   ${((userBalance || 0) * parseFloat(calculatePrice()) * xrpUsdPrice).toFixed(2)}
                 </div>
                 <div className="flex gap-2 mt-3">
@@ -616,7 +616,7 @@ export default function TokenProfile({ tokenSlug }) {
         </div>
       )}
 
-      <div className="flex gap-2 md:gap-3 mb-6 flex-wrap justify-center items-center">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex gap-2 mb-6 justify-center items-stretch">
         <TokenTrustButton
           token={token}
           connectedWallet={connectedWallet}
@@ -629,7 +629,7 @@ export default function TokenProfile({ tokenSlug }) {
         <div className="relative swap-dropdown">
           <button
             onClick={() => setSwapDropdownOpen(!swapDropdownOpen)}
-            className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold px-4 md:px-6 py-2 md:py-3 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2 text-sm md:text-base"
+            className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold px-3 py-2.5 rounded-lg shadow-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm whitespace-nowrap"
           >
             <span>💱 Swap</span>
             <svg className={`w-4 h-4 transition-transform ${swapDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -654,16 +654,16 @@ export default function TokenProfile({ tokenSlug }) {
 
         <button
           onClick={() => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'dashboard' }))}
-          className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold px-4 md:px-6 py-2 md:py-3 rounded-lg shadow-lg transition-all duration-300 text-sm md:text-base"
+          className="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold px-3 py-2.5 rounded-lg shadow-lg transition-all duration-300 text-sm whitespace-nowrap"
         >
           ← Back
         </button>
 
         <button
           onClick={copyProfileLink}
-          className="bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-bold px-4 md:px-6 py-2 md:py-3 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2 text-sm md:text-base"
+          className="w-full col-span-2 sm:col-span-1 bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-bold px-3 py-2.5 rounded-lg shadow-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm whitespace-nowrap"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
           </svg>
           Share Link
@@ -671,9 +671,9 @@ export default function TokenProfile({ tokenSlug }) {
 
         <button
           onClick={tweetToken}
-          className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold px-4 md:px-6 py-2 md:py-3 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2 text-sm md:text-base"
+          className="w-full col-span-2 sm:col-span-1 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold px-3 py-2.5 rounded-lg shadow-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm whitespace-nowrap"
         >
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
             <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
           </svg>
           Share on X
@@ -684,7 +684,7 @@ export default function TokenProfile({ tokenSlug }) {
             href={`https://twitter.com/${token.twitter_handle.replace('@', '')}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold px-4 md:px-6 py-2 md:py-3 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2 text-sm md:text-base"
+            className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold px-3 py-2.5 rounded-lg shadow-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm whitespace-nowrap"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
@@ -694,7 +694,7 @@ export default function TokenProfile({ tokenSlug }) {
         ) : (
           <button
             disabled
-            className="bg-gray-600 text-gray-400 font-bold px-4 md:px-6 py-2 md:py-3 rounded-lg shadow-lg cursor-not-allowed opacity-50 flex items-center gap-2 text-sm md:text-base"
+            className="w-full bg-gray-600 text-gray-400 font-bold px-3 py-2.5 rounded-lg shadow-lg cursor-not-allowed opacity-50 flex items-center justify-center gap-2 text-sm whitespace-nowrap"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
@@ -708,7 +708,7 @@ export default function TokenProfile({ tokenSlug }) {
             href={token.website_url.startsWith('http') ? token.website_url : `https://${token.website_url}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold px-4 md:px-6 py-2 md:py-3 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2 text-sm md:text-base"
+            className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold px-3 py-2.5 rounded-lg shadow-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm whitespace-nowrap"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
@@ -718,7 +718,7 @@ export default function TokenProfile({ tokenSlug }) {
         ) : (
           <button
             disabled
-            className="bg-gray-600 text-gray-400 font-bold px-4 md:px-6 py-2 md:py-3 rounded-lg shadow-lg cursor-not-allowed opacity-50 flex items-center gap-2 text-sm md:text-base"
+            className="w-full bg-gray-600 text-gray-400 font-bold px-3 py-2.5 rounded-lg shadow-lg cursor-not-allowed opacity-50 flex items-center justify-center gap-2 text-sm whitespace-nowrap"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
