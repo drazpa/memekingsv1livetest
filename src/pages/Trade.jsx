@@ -93,6 +93,7 @@ export default function Trade({ preselectedToken = null }) {
   const [depositTokenAmount, setDepositTokenAmount] = useState('');
   const [depositing, setDepositing] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
+  const [depositMode, setDepositMode] = useState('both');
   const priceChartContainerRef = useRef(null);
   const volumeChartContainerRef = useRef(null);
   const priceChartInstanceRef = useRef(null);
@@ -1294,9 +1295,21 @@ export default function Trade({ preselectedToken = null }) {
       return;
     }
 
-    if (!depositAmount || !depositTokenAmount || parseFloat(depositAmount) <= 0 || parseFloat(depositTokenAmount) <= 0) {
-      toast.error('Enter valid amounts for both XRP and tokens');
-      return;
+    if (depositMode === 'both') {
+      if (!depositAmount || !depositTokenAmount || parseFloat(depositAmount) <= 0 || parseFloat(depositTokenAmount) <= 0) {
+        toast.error('Enter valid amounts for both XRP and tokens');
+        return;
+      }
+    } else if (depositMode === 'xrp') {
+      if (!depositAmount || parseFloat(depositAmount) <= 0) {
+        toast.error('Enter valid XRP amount');
+        return;
+      }
+    } else if (depositMode === 'token') {
+      if (!depositTokenAmount || parseFloat(depositTokenAmount) <= 0) {
+        toast.error('Enter valid token amount');
+        return;
+      }
     }
 
     try {
@@ -1315,15 +1328,28 @@ export default function Trade({ preselectedToken = null }) {
         TransactionType: 'AMMDeposit',
         Account: connectedWallet.address,
         Asset: { currency: 'XRP' },
-        Asset2: { currency: currencyHex, issuer: selectedToken.issuer_address },
-        Amount: xrpl.xrpToDrops(depositAmount),
-        Amount2: {
+        Asset2: { currency: currencyHex, issuer: selectedToken.issuer_address }
+      };
+
+      if (depositMode === 'both') {
+        depositTx.Amount = xrpl.xrpToDrops(depositAmount);
+        depositTx.Amount2 = {
           currency: currencyHex,
           issuer: selectedToken.issuer_address,
           value: depositTokenAmount
-        },
-        Flags: 1048576
-      };
+        };
+        depositTx.Flags = 1048576;
+      } else if (depositMode === 'xrp') {
+        depositTx.Amount = xrpl.xrpToDrops(depositAmount);
+        depositTx.Flags = 0x00010000;
+      } else if (depositMode === 'token') {
+        depositTx.Amount2 = {
+          currency: currencyHex,
+          issuer: selectedToken.issuer_address,
+          value: depositTokenAmount
+        };
+        depositTx.Flags = 0x00020000;
+      }
 
       console.log('Deposit TX:', depositTx);
 
@@ -1413,9 +1439,16 @@ export default function Trade({ preselectedToken = null }) {
           currency: lpPosition.lpTokenCurrency,
           issuer: lpPosition.lpTokenIssuer,
           value: withdrawAmount
-        },
-        Flags: 1048576
+        }
       };
+
+      if (withdrawMode === 'both') {
+        withdrawTx.Flags = 1048576;
+      } else if (withdrawMode === 'xrp') {
+        withdrawTx.Flags = 0x00010000;
+      } else if (withdrawMode === 'token') {
+        withdrawTx.Flags = 0x00020000;
+      }
 
       console.log('Withdraw TX:', withdrawTx);
 
@@ -2664,40 +2697,88 @@ export default function Trade({ preselectedToken = null }) {
                         <h4 className="font-bold text-purple-200 mb-3">Deposit to Pool</h4>
 
                         <div>
-                          <label className="block text-purple-300 mb-2">XRP Amount</label>
-                          <input
-                            type="number"
-                            value={depositAmount}
-                            onChange={(e) => setDepositAmount(e.target.value)}
-                            placeholder="0.00"
-                            step="0.000001"
-                            className="input w-full text-purple-200 text-lg"
-                          />
-                          <div className="flex justify-between text-xs text-purple-400 mt-1">
-                            <div>Balance: {xrpBalance.toFixed(4)} XRP</div>
-                            <div className="text-green-400">${(xrpBalance * xrpUsdPrice).toFixed(2)} USD</div>
-                          </div>
+                          <label className="block text-purple-300 mb-2">Deposit Mode</label>
+                          <select
+                            value={depositMode}
+                            onChange={(e) => {
+                              setDepositMode(e.target.value);
+                              if (e.target.value === 'xrp') setDepositTokenAmount('');
+                              if (e.target.value === 'token') setDepositAmount('');
+                            }}
+                            className="input w-full text-purple-200"
+                          >
+                            <option value="both">Both Assets</option>
+                            <option value="xrp">XRP Only</option>
+                            <option value="token">{selectedToken.token_name} Only</option>
+                          </select>
                         </div>
 
-                        <div>
-                          <label className="block text-purple-300 mb-2">{selectedToken.token_name} Amount</label>
-                          <input
-                            type="number"
-                            value={depositTokenAmount}
-                            onChange={(e) => setDepositTokenAmount(e.target.value)}
-                            placeholder="0.00"
-                            step="0.000001"
-                            className="input w-full text-purple-200 text-lg"
-                          />
-                          <div className="flex justify-between text-xs text-purple-400 mt-1">
-                            <div>Balance: {parseFloat(tokenBalance).toFixed(4)} {selectedToken.token_name}</div>
-                            <div className="text-green-400">≈ {(parseFloat(tokenBalance) * currentPrice).toFixed(4)} XRP</div>
+                        {(depositMode === 'both' || depositMode === 'xrp') && (
+                          <div>
+                            <label className="block text-purple-300 mb-2">XRP Amount</label>
+                            <input
+                              type="number"
+                              value={depositAmount}
+                              onChange={(e) => {
+                                setDepositAmount(e.target.value);
+                                if (depositMode === 'both' && e.target.value && currentPrice) {
+                                  const tokenEst = (parseFloat(e.target.value) / currentPrice).toFixed(6);
+                                  setDepositTokenAmount(tokenEst);
+                                }
+                              }}
+                              placeholder="0.00"
+                              step="0.000001"
+                              className="input w-full text-purple-200 text-lg"
+                            />
+                            <div className="flex justify-between text-xs text-purple-400 mt-1">
+                              <div>Balance: {xrpBalance.toFixed(4)} XRP</div>
+                              <div className="text-green-400">${(xrpBalance * xrpUsdPrice).toFixed(2)} USD</div>
+                            </div>
+                            {depositMode === 'xrp' && depositAmount && currentPrice && (
+                              <div className="text-xs text-purple-300 mt-1">
+                                ≈ {(parseFloat(depositAmount) / currentPrice).toFixed(4)} {selectedToken.token_name} equivalent
+                              </div>
+                            )}
                           </div>
-                        </div>
+                        )}
+
+                        {(depositMode === 'both' || depositMode === 'token') && (
+                          <div>
+                            <label className="block text-purple-300 mb-2">{selectedToken.token_name} Amount</label>
+                            <input
+                              type="number"
+                              value={depositTokenAmount}
+                              onChange={(e) => {
+                                setDepositTokenAmount(e.target.value);
+                                if (depositMode === 'both' && e.target.value && currentPrice) {
+                                  const xrpEst = (parseFloat(e.target.value) * currentPrice).toFixed(6);
+                                  setDepositAmount(xrpEst);
+                                }
+                              }}
+                              placeholder="0.00"
+                              step="0.000001"
+                              className="input w-full text-purple-200 text-lg"
+                            />
+                            <div className="flex justify-between text-xs text-purple-400 mt-1">
+                              <div>Balance: {parseFloat(tokenBalance).toFixed(4)} {selectedToken.token_name}</div>
+                              <div className="text-green-400">≈ {(parseFloat(tokenBalance) * currentPrice).toFixed(4)} XRP</div>
+                            </div>
+                            {depositMode === 'token' && depositTokenAmount && currentPrice && (
+                              <div className="text-xs text-purple-300 mt-1">
+                                ≈ {(parseFloat(depositTokenAmount) * currentPrice).toFixed(4)} XRP equivalent
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         <button
                           onClick={executeDeposit}
-                          disabled={!depositAmount || !depositTokenAmount || parseFloat(depositAmount) <= 0 || parseFloat(depositTokenAmount) <= 0 || depositing}
+                          disabled={
+                            depositing ||
+                            (depositMode === 'both' && (!depositAmount || !depositTokenAmount || parseFloat(depositAmount) <= 0 || parseFloat(depositTokenAmount) <= 0)) ||
+                            (depositMode === 'xrp' && (!depositAmount || parseFloat(depositAmount) <= 0)) ||
+                            (depositMode === 'token' && (!depositTokenAmount || parseFloat(depositTokenAmount) <= 0))
+                          }
                           className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                         >
                           {depositing ? 'Depositing...' : '💰 Deposit to Pool'}
@@ -2770,16 +2851,19 @@ export default function Trade({ preselectedToken = null }) {
 
                         <div>
                           <label className="block text-purple-300 mb-2">Withdrawn asset</label>
-                          <div className="glass rounded-lg p-3 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <TokenIcon token={selectedToken} size="sm" />
-                              <span className="text-2xl">✕</span>
-                              <span className="text-purple-200">Both</span>
-                            </div>
-                            <span className="text-purple-400">→</span>
-                          </div>
+                          <select
+                            value={withdrawMode}
+                            onChange={(e) => setWithdrawMode(e.target.value)}
+                            className="input w-full text-purple-200"
+                          >
+                            <option value="both">Both Assets</option>
+                            <option value="xrp">XRP Only</option>
+                            <option value="token">{selectedToken.token_name} Only</option>
+                          </select>
                           <div className="text-xs text-purple-400 mt-1">
-                            Withdrawing both XRP and {selectedToken.token_name}
+                            {withdrawMode === 'both' && `Withdrawing both XRP and ${selectedToken.token_name}`}
+                            {withdrawMode === 'xrp' && 'Withdrawing XRP only'}
+                            {withdrawMode === 'token' && `Withdrawing ${selectedToken.token_name} only`}
                           </div>
                         </div>
 
