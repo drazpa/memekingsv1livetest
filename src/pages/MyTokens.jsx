@@ -35,8 +35,7 @@ export default function MyTokens() {
   const [xrpPrice, setXrpPrice] = useState(2.50);
   const [tokenFilterTab, setTokenFilterTab] = useState('all');
   const [userCreatedTokens, setUserCreatedTokens] = useState([]);
-  const [lastFetchTime, setLastFetchTime] = useState(0);
-  const [hasLoadedInitialData, setHasLoadedInitialData] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     loadConnectedWallet();
@@ -55,60 +54,36 @@ export default function MyTokens() {
 
   useEffect(() => {
     const unsubscribe = onTokenUpdate(() => {
-      const stored = localStorage.getItem('connectedWallet');
-      if (stored) {
-        const timeSinceLastFetch = Date.now() - lastFetchTime;
-        if (timeSinceLastFetch > 30000) {
-          fetchHoldings();
-        }
+      if (connectedWallet && isInitialized) {
+        fetchHoldings(false);
       }
     });
 
     return () => {
       unsubscribe();
     };
-  }, [lastFetchTime]);
+  }, []);
 
   useEffect(() => {
-    if (connectedWallet && !hasLoadedInitialData) {
+    if (connectedWallet && !isInitialized) {
       console.log('🚀 Initializing MyTokens page...');
+      setIsInitialized(true);
+
       const initialize = async () => {
         try {
-          console.log('1️⃣ Loading cached data...');
           await loadCachedDataInstantly();
-
-          console.log('2️⃣ Fetching fresh holdings...');
-          await fetchHoldings();
-
-          console.log('3️⃣ Loading favorites...');
+          await fetchHoldings(false);
           await loadFavorites();
-
-          console.log('4️⃣ Loading user created tokens...');
           await loadUserCreatedTokens();
-
-          console.log('✅ Initialization complete');
-          setHasLoadedInitialData(true);
         } catch (error) {
           console.error('❌ Initialization error:', error);
           setLoading(false);
         }
       };
+
       initialize();
     }
-  }, [connectedWallet, hasLoadedInitialData]);
-
-  useEffect(() => {
-    if (connectedWallet && hasLoadedInitialData) {
-      const refreshInterval = setInterval(() => {
-        const timeSinceLastFetch = Date.now() - lastFetchTime;
-        if (timeSinceLastFetch > 300000) {
-          fetchHoldings(false);
-        }
-      }, 60000);
-
-      return () => clearInterval(refreshInterval);
-    }
-  }, [connectedWallet, hasLoadedInitialData, lastFetchTime]);
+  }, [connectedWallet]);
 
   useEffect(() => {
     fetchXRPPrice();
@@ -291,18 +266,13 @@ export default function MyTokens() {
       return;
     }
 
-    const timeSinceLastFetch = Date.now() - lastFetchTime;
-    if (!forceRefresh && timeSinceLastFetch < 300000 && holdings.length > 0) {
-      console.log('⏭️ Skipping fetch - data is fresh (less than 5 minutes old)');
+    if (!forceRefresh && holdings.length > 0) {
+      console.log('⏭️ Skipping fetch - using existing data');
       setLoading(false);
       return;
     }
 
-    console.log('\n💼 Fetching token holdings...', {
-      forceRefresh,
-      timeSinceLastFetch,
-      holdingsLength: holdings.length
-    });
+    console.log('\n💼 Fetching token holdings...');
     setLoading(true);
 
     try {
@@ -337,7 +307,6 @@ export default function MyTokens() {
         setHoldings(tokenHoldings);
         calculateAnalytics(tokenHoldings);
         setLoading(false);
-        setLastFetchTime(Date.now());
         return;
       }
 
@@ -571,7 +540,6 @@ export default function MyTokens() {
       setHoldings(tokenHoldings);
       setPoolsData(ammPools);
       calculateAnalytics(tokenHoldings);
-      setLastFetchTime(Date.now());
     } catch (error) {
       console.error('❌ Error fetching holdings:', error);
       toast.error('Failed to fetch token holdings: ' + error.message);
