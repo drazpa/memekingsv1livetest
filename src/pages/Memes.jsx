@@ -27,10 +27,17 @@ export default function Memes() {
     return window.innerWidth < 768 ? 'grid' : 'list';
   });
   const [sortBy, setSortBy] = useState('newest');
+  const [sortOrder, setSortOrder] = useState('desc');
   const [favorites, setFavorites] = useState([]);
   const [connectedWallet, setConnectedWallet] = useState(null);
   const [poolsData, setPoolsData] = useState({});
   const [lpBalances, setLpBalances] = useState({});
+  const [xrpUsdPrice, setXrpUsdPrice] = useState(0);
+  const [volumeHistory, setVolumeHistory] = useState({});
+  const [priceHistory, setPriceHistory] = useState({});
+  const [lpHistory, setLpHistory] = useState({});
+  const [marketCapHistory, setMarketCapHistory] = useState({});
+  const [liquidityHistory, setLiquidityHistory] = useState({});
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordAction, setPasswordAction] = useState('add');
   const [password, setPassword] = useState('');
@@ -91,6 +98,82 @@ export default function Memes() {
       loadFavorites();
     }
   }, [connectedWallet]);
+
+  useEffect(() => {
+    const fetchXrpPrice = async () => {
+      try {
+        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd');
+        const data = await response.json();
+        setXrpUsdPrice(data.ripple.usd);
+      } catch (error) {
+        console.error('Error fetching XRP price:', error);
+      }
+    };
+
+    fetchXrpPrice();
+    const interval = setInterval(fetchXrpPrice, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (tokens.length > 0 && Object.keys(poolsData).length > 0) {
+      const newVolumeHistory = {};
+      const newPriceHistory = {};
+      const newLpHistory = {};
+      const newMarketCapHistory = {};
+      const newLiquidityHistory = {};
+
+      tokens.forEach(token => {
+        if (token.amm_pool_created && poolsData[token.id]) {
+          const volume = parseFloat(calculateVolume(token));
+          const price = parseFloat(calculatePrice(token));
+          const lp = parseFloat(lpBalances[token.id]) || 0;
+          const marketCap = parseFloat(calculateMarketCap(token));
+          const liquidity = token.amm_xrp_amount || 0;
+
+          if (!volumeHistory[token.id]) newVolumeHistory[token.id] = volume;
+          if (!priceHistory[token.id]) newPriceHistory[token.id] = price;
+          if (!lpHistory[token.id]) newLpHistory[token.id] = lp;
+          if (!marketCapHistory[token.id]) newMarketCapHistory[token.id] = marketCap;
+          if (!liquidityHistory[token.id]) newLiquidityHistory[token.id] = liquidity;
+        }
+      });
+
+      if (Object.keys(newVolumeHistory).length > 0) {
+        setVolumeHistory(prev => ({ ...prev, ...newVolumeHistory }));
+        setPriceHistory(prev => ({ ...prev, ...newPriceHistory }));
+        setLpHistory(prev => ({ ...prev, ...newLpHistory }));
+        setMarketCapHistory(prev => ({ ...prev, ...newMarketCapHistory }));
+        setLiquidityHistory(prev => ({ ...prev, ...newLiquidityHistory }));
+      }
+
+      const interval = setInterval(() => {
+        const updatedVolumeHistory = {};
+        const updatedPriceHistory = {};
+        const updatedLpHistory = {};
+        const updatedMarketCapHistory = {};
+        const updatedLiquidityHistory = {};
+
+        tokens.forEach(token => {
+          if (token.amm_pool_created && poolsData[token.id]) {
+            updatedVolumeHistory[token.id] = parseFloat(calculateVolume(token));
+            updatedPriceHistory[token.id] = parseFloat(calculatePrice(token));
+            updatedLpHistory[token.id] = parseFloat(lpBalances[token.id]) || 0;
+            updatedMarketCapHistory[token.id] = parseFloat(calculateMarketCap(token));
+            updatedLiquidityHistory[token.id] = token.amm_xrp_amount || 0;
+          }
+        });
+
+        setVolumeHistory(updatedVolumeHistory);
+        setPriceHistory(updatedPriceHistory);
+        setLpHistory(updatedLpHistory);
+        setMarketCapHistory(updatedMarketCapHistory);
+        setLiquidityHistory(updatedLiquidityHistory);
+      }, 60000);
+
+      return () => clearInterval(interval);
+    }
+  }, [tokens, poolsData, lpBalances]);
 
   const loadConnectedWallet = () => {
     const stored = localStorage.getItem('connectedWallet');
@@ -1080,6 +1163,54 @@ export default function Memes() {
     return change.toFixed(2);
   };
 
+  const calculateVolume = (token) => {
+    const poolData = poolsData[token.id];
+    if (poolData) {
+      return (poolData.xrpAmount * 0.15).toFixed(2);
+    }
+    return token.amm_pool_created ? ((token.amm_xrp_amount || 0) * 0.15).toFixed(2) : '0';
+  };
+
+  const calculatePercentChange = (current, previous) => {
+    if (!current || !previous || previous === 0) return '0.00';
+    const change = ((current - previous) / previous) * 100;
+    return change.toFixed(2);
+  };
+
+  const calculateVolumeChange = (token) => {
+    const currentVolume = parseFloat(calculateVolume(token));
+    return calculatePercentChange(currentVolume, volumeHistory[token.id]);
+  };
+
+  const calculatePriceChange = (token) => {
+    const currentPrice = parseFloat(calculatePrice(token));
+    return calculatePercentChange(currentPrice, priceHistory[token.id]);
+  };
+
+  const calculateLpChange = (token) => {
+    const currentLp = parseFloat(lpBalances[token.id]) || 0;
+    return calculatePercentChange(currentLp, lpHistory[token.id]);
+  };
+
+  const calculateMarketCapChange = (token) => {
+    const currentMarketCap = parseFloat(calculateMarketCap(token));
+    return calculatePercentChange(currentMarketCap, marketCapHistory[token.id]);
+  };
+
+  const calculateLiquidityChange = (token) => {
+    const currentLiquidity = token.amm_xrp_amount || 0;
+    return calculatePercentChange(currentLiquidity, liquidityHistory[token.id]);
+  };
+
+  const handleColumnSort = (column) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('desc');
+    }
+  };
+
   const tweetToken = (token) => {
     const price = calculatePrice(token);
     const marketCap = calculateMarketCap(token);
@@ -1116,28 +1247,65 @@ export default function Memes() {
       return matchesSearch && matchesFilter && matchesCategory;
     })
     .sort((a, b) => {
+      let comparison = 0;
+
       switch (sortBy) {
         case 'newest':
-          return new Date(b.created_at) - new Date(a.created_at);
+          comparison = new Date(b.created_at) - new Date(a.created_at);
+          break;
         case 'oldest':
-          return new Date(a.created_at) - new Date(b.created_at);
+          comparison = new Date(a.created_at) - new Date(b.created_at);
+          break;
+        case 'name':
+          comparison = a.token_name.localeCompare(b.token_name);
+          break;
         case 'name-asc':
-          return a.token_name.localeCompare(b.token_name);
+          comparison = a.token_name.localeCompare(b.token_name);
+          break;
         case 'name-desc':
-          return b.token_name.localeCompare(a.token_name);
+          comparison = b.token_name.localeCompare(a.token_name);
+          break;
+        case 'category':
+          comparison = (a.category || '').localeCompare(b.category || '');
+          break;
+        case 'days':
+          comparison = calculateDaysOnMarket(b.created_at) - calculateDaysOnMarket(a.created_at);
+          break;
         case 'supply-high':
-          return b.supply - a.supply;
+          comparison = b.supply - a.supply;
+          break;
         case 'supply-low':
-          return a.supply - b.supply;
+          comparison = a.supply - b.supply;
+          break;
+        case 'price':
+          comparison = calculatePrice(b) - calculatePrice(a);
+          break;
         case 'price-high':
-          return calculatePrice(b) - calculatePrice(a);
+          comparison = calculatePrice(b) - calculatePrice(a);
+          break;
         case 'price-low':
-          return calculatePrice(a) - calculatePrice(b);
+          comparison = calculatePrice(a) - calculatePrice(b);
+          break;
+        case 'volume':
+          comparison = parseFloat(calculateVolume(b)) - parseFloat(calculateVolume(a));
+          break;
+        case 'lp':
+          comparison = (lpBalances[b.id]?.balance || 0) - (lpBalances[a.id]?.balance || 0);
+          break;
         case 'marketcap':
-          return calculateMarketCap(b) - calculateMarketCap(a);
+          comparison = calculateMarketCap(b) - calculateMarketCap(a);
+          break;
+        case 'liquidity':
+          comparison = (poolsData[b.id]?.xrpAmount || b.amm_xrp_amount || 0) - (poolsData[a.id]?.xrpAmount || a.amm_xrp_amount || 0);
+          break;
+        case 'status':
+          comparison = (b.amm_pool_created ? 1 : 0) - (a.amm_pool_created ? 1 : 0);
+          break;
         default:
-          return 0;
+          comparison = 0;
       }
+
+      return sortOrder === 'asc' ? -comparison : comparison;
     });
 
   const TokenCard = ({ token }) => {
@@ -1205,41 +1373,116 @@ export default function Memes() {
           <>
             <div className="flex justify-between items-center">
               <span className="text-purple-400 text-xs">Live Price</span>
-              <div className="flex items-center gap-2">
-                <span className="text-green-400 text-sm font-bold">{getLivePrice(token).toFixed(8)} XRP</span>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                  parseFloat(calculate24hChange(token)) >= 0
-                    ? 'text-green-300 bg-green-500/10'
-                    : 'text-red-300 bg-red-500/10'
-                }`}>
-                  {parseFloat(calculate24hChange(token)) >= 0 ? '+' : ''}{calculate24hChange(token)}%
-                </span>
+              <div className="text-right">
+                <div className="flex items-center gap-2 justify-end">
+                  <span className="text-green-400 text-sm font-bold">{getLivePrice(token).toFixed(8)} XRP</span>
+                  {priceHistory[token.id] && (
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                      parseFloat(calculatePriceChange(token)) >= 0
+                        ? 'text-green-300 bg-green-500/10'
+                        : 'text-red-300 bg-red-500/10'
+                    }`}>
+                      {parseFloat(calculatePriceChange(token)) >= 0 ? '+' : ''}{calculatePriceChange(token)}%
+                    </span>
+                  )}
+                </div>
+                <div className="text-green-400 text-xs">
+                  ${(getLivePrice(token) * xrpUsdPrice).toFixed(6)}
+                </div>
               </div>
             </div>
 
             <div className="flex justify-between items-center">
               <span className="text-purple-400 text-xs">Market Cap (Live)</span>
-              <span className="text-purple-200 text-sm font-bold">{calculateMarketCap(token).toFixed(2)} XRP</span>
+              <div className="text-right">
+                <div className="flex items-center gap-2 justify-end">
+                  <span className="text-purple-200 text-sm font-bold">{calculateMarketCap(token).toFixed(2)} XRP</span>
+                  {marketCapHistory[token.id] && (
+                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                      parseFloat(calculateMarketCapChange(token)) >= 0
+                        ? 'text-green-300 bg-green-500/10'
+                        : 'text-red-300 bg-red-500/10'
+                    }`}>
+                      {parseFloat(calculateMarketCapChange(token)) >= 0 ? '+' : ''}{calculateMarketCapChange(token)}%
+                    </span>
+                  )}
+                </div>
+                <div className="text-green-400 text-xs">
+                  ${(calculateMarketCap(token) * xrpUsdPrice).toFixed(2)}
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-between items-center">
               <span className="text-purple-400 text-xs">Liquidity (XRP)</span>
-              <span className="text-purple-200 text-sm font-bold">{poolsData[token.id]?.xrpAmount ? poolsData[token.id].xrpAmount.toFixed(2) : token.amm_xrp_amount} XRP</span>
+              <div className="text-right">
+                <div className="flex items-center gap-2 justify-end">
+                  <span className="text-purple-200 text-sm font-bold">
+                    {poolsData[token.id]?.xrpAmount ? poolsData[token.id].xrpAmount.toFixed(2) : (token.amm_xrp_amount || 0).toFixed(2)} XRP
+                  </span>
+                  {liquidityHistory[token.id] && (
+                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                      parseFloat(calculateLiquidityChange(token)) >= 0
+                        ? 'text-green-300 bg-green-500/10'
+                        : 'text-red-300 bg-red-500/10'
+                    }`}>
+                      {parseFloat(calculateLiquidityChange(token)) >= 0 ? '+' : ''}{calculateLiquidityChange(token)}%
+                    </span>
+                  )}
+                </div>
+                <div className="text-green-400 text-xs">
+                  ${((poolsData[token.id]?.xrpAmount || token.amm_xrp_amount || 0) * xrpUsdPrice).toFixed(2)}
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-between items-center">
               <span className="text-purple-400 text-xs">Volume 24h</span>
-              <span className="text-purple-200 text-sm font-bold">
-                {token.amm_pool_created ? `${((poolsData[token.id]?.xrpAmount || token.amm_xrp_amount || 0) * 0.15).toFixed(2)} XRP` : '-'}
-              </span>
+              <div className="text-right">
+                <div className="flex items-center gap-2 justify-end">
+                  <span className="text-purple-200 text-sm font-bold">
+                    {token.amm_pool_created ? `${calculateVolume(token)} XRP` : '-'}
+                  </span>
+                  {token.amm_pool_created && volumeHistory[token.id] && (
+                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                      parseFloat(calculateVolumeChange(token)) >= 0
+                        ? 'text-green-300 bg-green-500/10'
+                        : 'text-red-300 bg-red-500/10'
+                    }`}>
+                      {parseFloat(calculateVolumeChange(token)) >= 0 ? '+' : ''}{calculateVolumeChange(token)}%
+                    </span>
+                  )}
+                </div>
+                {token.amm_pool_created && (
+                  <div className="text-green-400 text-xs">
+                    ${(parseFloat(calculateVolume(token)) * xrpUsdPrice).toFixed(2)}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-between items-center pt-2 border-t border-purple-500/20">
               <span className="text-purple-400 text-xs">Your LP</span>
               {lpBalances[token.id] ? (
                 <div className="text-right">
-                  <div className="text-green-400 text-sm font-bold">{lpBalances[token.id].balance.toFixed(4)}</div>
-                  <div className="text-green-500 text-xs">{lpBalances[token.id].share.toFixed(2)}%</div>
+                  <div className="flex items-center gap-2 justify-end">
+                    <div>
+                      <div className="text-green-400 text-sm font-bold">{lpBalances[token.id].balance.toFixed(4)}</div>
+                      <div className="text-green-500 text-xs">{lpBalances[token.id].share.toFixed(2)}%</div>
+                    </div>
+                    {lpHistory[token.id] && lpHistory[token.id] > 0 && (
+                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                        parseFloat(calculateLpChange(token)) >= 0
+                          ? 'text-green-300 bg-green-500/10'
+                          : 'text-red-300 bg-red-500/10'
+                      }`}>
+                        {parseFloat(calculateLpChange(token)) >= 0 ? '+' : ''}{calculateLpChange(token)}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-green-400 text-xs">
+                    ${(lpBalances[token.id].balance * getLivePrice(token) * 2 * xrpUsdPrice).toFixed(2)}
+                  </div>
                 </div>
               ) : (
                 <span className="text-purple-500 text-sm font-bold">-</span>
@@ -1340,37 +1583,116 @@ export default function Memes() {
         </span>
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div>
-            <div className="text-purple-200 font-bold">{getLivePrice(token).toFixed(8)}</div>
-            <div className="text-purple-400 text-xs">XRP</div>
+        <div>
+          <div className="flex items-center gap-2">
+            <div>
+              <div className="text-purple-200 font-bold">{getLivePrice(token).toFixed(8)}</div>
+              <div className="text-purple-400 text-xs">XRP</div>
+            </div>
+            {token.amm_pool_created && priceHistory[token.id] && (
+              <span className={`text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
+                parseFloat(calculatePriceChange(token)) >= 0
+                  ? 'text-green-300 bg-green-500/10'
+                  : 'text-red-300 bg-red-500/10'
+              }`}>
+                {parseFloat(calculatePriceChange(token)) >= 0 ? '+' : ''}{calculatePriceChange(token)}%
+              </span>
+            )}
           </div>
-          {token.amm_pool_created && (
-            <span className={`text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
-              parseFloat(calculate24hChange(token)) >= 0
-                ? 'text-green-300 bg-green-500/10'
-                : 'text-red-300 bg-red-500/10'
-            }`}>
-              {parseFloat(calculate24hChange(token)) >= 0 ? '+' : ''}{calculate24hChange(token)}%
-            </span>
-          )}
+          <div className="text-green-400 text-xs">
+            ${(getLivePrice(token) * xrpUsdPrice).toFixed(6)}
+          </div>
         </div>
       </td>
-      <td className="px-4 py-3 text-purple-300">
-        {token.amm_pool_created ? `${((poolsData[token.id]?.xrpAmount || token.amm_xrp_amount || 0) * 0.15).toFixed(2)} XRP` : '-'}
+      <td className="px-4 py-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-purple-300">
+              {token.amm_pool_created ? `${calculateVolume(token)} XRP` : '-'}
+            </span>
+            {token.amm_pool_created && volumeHistory[token.id] && (
+              <span className={`text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
+                parseFloat(calculateVolumeChange(token)) >= 0
+                  ? 'text-green-300 bg-green-500/10'
+                  : 'text-red-300 bg-red-500/10'
+              }`}>
+                {parseFloat(calculateVolumeChange(token)) >= 0 ? '+' : ''}{calculateVolumeChange(token)}%
+              </span>
+            )}
+          </div>
+          {token.amm_pool_created && (
+            <div className="text-green-400 text-xs">
+              ${(parseFloat(calculateVolume(token)) * xrpUsdPrice).toFixed(2)}
+            </div>
+          )}
+        </div>
       </td>
       <td className="px-4 py-3">
         {lpBalances[token.id] ? (
           <div>
-            <div className="text-green-200 font-medium">{lpBalances[token.id].balance.toFixed(4)}</div>
-            <div className="text-green-400 text-xs">{lpBalances[token.id].share.toFixed(2)}%</div>
+            <div className="flex items-center gap-2">
+              <div>
+                <div className="text-green-200 font-medium">{lpBalances[token.id].balance.toFixed(4)}</div>
+                <div className="text-green-400 text-xs">{lpBalances[token.id].share.toFixed(2)}%</div>
+              </div>
+              {lpHistory[token.id] && lpHistory[token.id] > 0 && (
+                <span className={`text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
+                  parseFloat(calculateLpChange(token)) >= 0
+                    ? 'text-green-300 bg-green-500/10'
+                    : 'text-red-300 bg-red-500/10'
+                }`}>
+                  {parseFloat(calculateLpChange(token)) >= 0 ? '+' : ''}{calculateLpChange(token)}%
+                </span>
+              )}
+            </div>
+            <div className="text-green-400 text-xs">
+              ${(lpBalances[token.id].balance * getLivePrice(token) * 2 * xrpUsdPrice).toFixed(2)}
+            </div>
           </div>
         ) : (
           <span className="text-purple-500">-</span>
         )}
       </td>
-      <td className="px-4 py-3 text-purple-200">{calculateMarketCap(token).toFixed(2)} XRP</td>
-      <td className="px-4 py-3 text-purple-200 font-bold">{poolsData[token.id]?.xrpAmount ? `${poolsData[token.id].xrpAmount.toFixed(2)} XRP` : `${token.amm_xrp_amount || 0} XRP`}</td>
+      <td className="px-4 py-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-purple-200">{calculateMarketCap(token).toFixed(2)} XRP</span>
+            {marketCapHistory[token.id] && (
+              <span className={`text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
+                parseFloat(calculateMarketCapChange(token)) >= 0
+                  ? 'text-green-300 bg-green-500/10'
+                  : 'text-red-300 bg-red-500/10'
+              }`}>
+                {parseFloat(calculateMarketCapChange(token)) >= 0 ? '+' : ''}{calculateMarketCapChange(token)}%
+              </span>
+            )}
+          </div>
+          <div className="text-green-400 text-xs">
+            ${(calculateMarketCap(token) * xrpUsdPrice).toFixed(2)}
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-purple-200 font-bold">
+              {poolsData[token.id]?.xrpAmount ? `${poolsData[token.id].xrpAmount.toFixed(2)} XRP` : `${(token.amm_xrp_amount || 0).toFixed(2)} XRP`}
+            </span>
+            {liquidityHistory[token.id] && (
+              <span className={`text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
+                parseFloat(calculateLiquidityChange(token)) >= 0
+                  ? 'text-green-300 bg-green-500/10'
+                  : 'text-red-300 bg-red-500/10'
+              }`}>
+                {parseFloat(calculateLiquidityChange(token)) >= 0 ? '+' : ''}{calculateLiquidityChange(token)}%
+              </span>
+            )}
+          </div>
+          <div className="text-green-400 text-xs">
+            ${((poolsData[token.id]?.xrpAmount || token.amm_xrp_amount || 0) * xrpUsdPrice).toFixed(2)}
+          </div>
+        </div>
+      </td>
       <td className="px-4 py-3">
         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
           token.amm_pool_created
@@ -1565,15 +1887,69 @@ export default function Memes() {
             <table className="w-full">
               <thead className="bg-purple-900/30">
                 <tr>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Token</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Category</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Days</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Live Price</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Volume 24h</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Your LP</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Market Cap</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Liquidity (XRP)</th>
-                  <th className="text-left px-4 py-3 text-purple-300 font-medium">Status</th>
+                  <th
+                    className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                    onDoubleClick={() => handleColumnSort('name')}
+                    title="Double-click to sort"
+                  >
+                    Token {sortBy === 'name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th
+                    className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                    onDoubleClick={() => handleColumnSort('category')}
+                    title="Double-click to sort"
+                  >
+                    Category {sortBy === 'category' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th
+                    className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                    onDoubleClick={() => handleColumnSort('days')}
+                    title="Double-click to sort"
+                  >
+                    Days {sortBy === 'days' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th
+                    className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                    onDoubleClick={() => handleColumnSort('price')}
+                    title="Double-click to sort"
+                  >
+                    Live Price {sortBy === 'price' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th
+                    className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                    onDoubleClick={() => handleColumnSort('volume')}
+                    title="Double-click to sort"
+                  >
+                    Volume 24h {sortBy === 'volume' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th
+                    className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                    onDoubleClick={() => handleColumnSort('lp')}
+                    title="Double-click to sort"
+                  >
+                    Your LP {sortBy === 'lp' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th
+                    className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                    onDoubleClick={() => handleColumnSort('marketcap')}
+                    title="Double-click to sort"
+                  >
+                    Market Cap {sortBy === 'marketcap' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th
+                    className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                    onDoubleClick={() => handleColumnSort('liquidity')}
+                    title="Double-click to sort"
+                  >
+                    Liquidity (XRP) {sortBy === 'liquidity' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th
+                    className="text-left px-4 py-3 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                    onDoubleClick={() => handleColumnSort('status')}
+                    title="Double-click to sort"
+                  >
+                    Status {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th className="text-left px-4 py-3 text-purple-300 font-medium">Actions</th>
                 </tr>
               </thead>
