@@ -2108,7 +2108,8 @@ export default function BotTrader() {
         totalTokensSpent: 0,
         netProfitXrp: 0,
         netProfitUsd: 0,
-        winRate: 0
+        winRate: 0,
+        totalCreationFees: 0
       };
     }
 
@@ -2133,6 +2134,9 @@ export default function BotTrader() {
     const successfulTrades = bots.reduce((acc, bot) => acc + (bot.successful_trades || 0), 0);
     const winRate = stats.totalTrades > 0 ? (successfulTrades / stats.totalTrades) * 100 : 0;
 
+    const isReceiverWallet = connectedWallet?.address === BOT_FEE_RECEIVER;
+    const totalCreationFees = isReceiverWallet ? 0 : bots.length * BOT_CREATION_FEE;
+
     return {
       totalBots: bots.length,
       activeBots,
@@ -2143,9 +2147,10 @@ export default function BotTrader() {
       totalTokensSpent: stats.totalTokensSpent,
       netProfitXrp,
       netProfitUsd,
-      winRate
+      winRate,
+      totalCreationFees
     };
-  }, [bots, xrpUsdPrice]);
+  }, [bots, xrpUsdPrice, connectedWallet]);
 
   return (
     <div className="space-y-6">
@@ -2163,7 +2168,7 @@ export default function BotTrader() {
       </div>
 
       {connectedWallet && bots.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="glass rounded-lg p-4 border border-blue-500/30">
             <div className="text-blue-400 text-sm mb-1">🤖 Total Bots</div>
             <div className="text-3xl font-bold text-blue-200">{calculateGlobalStats.totalBots}</div>
@@ -2180,8 +2185,16 @@ export default function BotTrader() {
             </div>
           </div>
 
+          <div className="glass rounded-lg p-4 border border-yellow-500/30">
+            <div className="text-yellow-400 text-sm mb-1">💳 Creation Fees</div>
+            <div className="text-3xl font-bold text-yellow-200">{calculateGlobalStats.totalCreationFees} XRP</div>
+            <div className="text-yellow-400 text-sm mt-1">
+              {connectedWallet?.address === BOT_FEE_RECEIVER ? 'FREE (Owner)' : `${bots.length} bots × ${BOT_CREATION_FEE}`}
+            </div>
+          </div>
+
           <div className="glass rounded-lg p-4 border border-cyan-500/30">
-            <div className="text-cyan-400 text-sm mb-1">💰 XRP Spent on Bots</div>
+            <div className="text-cyan-400 text-sm mb-1">💰 Trading Spent</div>
             <div className="text-3xl font-bold text-cyan-200">{calculateGlobalStats.totalXrpSpent.toFixed(2)}</div>
             <div className="text-green-400 text-sm mt-1">
               ${(calculateGlobalStats.totalXrpSpent * xrpUsdPrice).toFixed(2)}

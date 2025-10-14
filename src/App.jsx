@@ -18,6 +18,7 @@ import AIChat from './pages/AIChat';
 import Social from './pages/Social';
 import TokenProfile from './pages/TokenProfile';
 import { imageCacheManager } from './utils/imageCache';
+import { startGlobalBotExecutor, stopGlobalBotExecutor } from './utils/botExecutor';
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -82,10 +83,40 @@ export default function App() {
       imageCacheManager.cleanOldEntries();
     }, 60 * 60 * 1000);
 
+    const checkWalletAndStartBots = () => {
+      const walletData = localStorage.getItem('connectedWallet');
+      if (walletData) {
+        try {
+          const wallet = JSON.parse(walletData);
+          if (wallet.address) {
+            startGlobalBotExecutor(wallet.address);
+          }
+        } catch (error) {
+          console.error('Error starting bot executor:', error);
+        }
+      }
+    };
+
+    checkWalletAndStartBots();
+
+    const handleWalletConnected = () => {
+      setTimeout(checkWalletAndStartBots, 1000);
+    };
+
+    const handleWalletDisconnected = () => {
+      stopGlobalBotExecutor();
+    };
+
+    window.addEventListener('walletConnected', handleWalletConnected);
+    window.addEventListener('walletDisconnected', handleWalletDisconnected);
+
     return () => {
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      window.removeEventListener('walletConnected', handleWalletConnected);
+      window.removeEventListener('walletDisconnected', handleWalletDisconnected);
       clearInterval(cleanupInterval);
+      stopGlobalBotExecutor();
     };
   }, []);
 
