@@ -1596,7 +1596,8 @@ export default function Trade({ preselectedToken = null }) {
             issuer: selectedToken.issuer_address,
             value: sanitizeToken(tokenAmountToSell * slippageMultiplier)
           },
-          DeliverMin: xrpl.xrpToDrops(sanitizeXRP(xrpMinReceive).toString())
+          DeliverMin: xrpl.xrpToDrops(sanitizeXRP(xrpMinReceive).toString()),
+          Flags: 131072
         };
 
         try {
@@ -2212,7 +2213,7 @@ export default function Trade({ preselectedToken = null }) {
             ) : (
               <div className="min-h-[200px]">
                 {selectedToken ? (
-                  <TradeHistory tokenId={selectedToken.id} />
+                  <TradeHistory tokenId={selectedToken.id} connectedWallet={connectedWallet} />
                 ) : (
                   <div className="text-center py-8 text-purple-400">
                     <div className="text-4xl mb-2">📊</div>
