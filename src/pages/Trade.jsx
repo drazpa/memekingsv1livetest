@@ -1548,13 +1548,15 @@ export default function Trade({ preselectedToken = null }) {
         }]);
 
         updateTradeStep(2, 'success', { description: 'Trade completed successfully' });
+        setCurrentTradeStep(3);
         await fetchTokenBalance();
 
         setTimeout(() => {
           setShowTradeProgress(false);
           setAmount('');
           setXrpAmount('');
-        }, 3000);
+          setTrading(false);
+        }, 2500);
 
         toast.success((t) => (
           <div className="flex flex-col gap-2">
@@ -2159,10 +2161,17 @@ export default function Trade({ preselectedToken = null }) {
                 />
                 <div className="flex items-center justify-between mt-2">
                   <div className="text-purple-400 text-xs">
-                    {tradeType === 'buy'
-                      ? `Balance: ${xrpBalance.toFixed(4)} XRP`
-                      : `Balance: ${parseFloat(tokenBalance).toFixed(4)} ${selectedToken?.token_name || ''}`
-                    }
+                    {tradeType === 'buy' ? (
+                      <div>
+                        <div>Balance: {xrpBalance.toFixed(4)} XRP</div>
+                        <div className="text-green-400">${(xrpBalance * xrpUsdPrice).toFixed(2)} USD</div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div>Balance: {parseFloat(tokenBalance).toFixed(4)} {selectedToken?.token_name || ''}</div>
+                        <div className="text-green-400">≈ {(parseFloat(tokenBalance) * currentPrice).toFixed(4)} XRP (${(parseFloat(tokenBalance) * currentPrice * xrpUsdPrice).toFixed(2)} USD)</div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-4 gap-2 mt-2">
@@ -2254,19 +2263,46 @@ export default function Trade({ preselectedToken = null }) {
 
                   <div className="flex justify-between">
                     <span className="text-purple-400 text-sm">You {tradeType === 'buy' ? 'Receive' : 'Get'}</span>
-                    <span className="text-purple-200 font-bold">
-                      {tradeType === 'buy'
-                        ? `${estimate.tokenAmount} ${selectedToken?.token_name || ''}`
-                        : `${estimate.xrpAmount} XRP`
-                      }
-                    </span>
+                    <div className="text-right">
+                      <div className="text-purple-200 font-bold">
+                        {tradeType === 'buy'
+                          ? `${estimate.tokenAmount} ${selectedToken?.token_name || ''}`
+                          : `${estimate.xrpAmount} XRP`
+                        }
+                      </div>
+                      {tradeType === 'sell' && (
+                        <div className="text-green-400 text-xs">
+                          ${(parseFloat(estimate.xrpAmount) * xrpUsdPrice).toFixed(2)} USD
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {tradeType === 'buy' && (
+                    <div className="flex justify-between">
+                      <span className="text-purple-400 text-sm">You Spend</span>
+                      <div className="text-right">
+                        <div className="text-purple-200 font-bold">{estimate.xrpAmount} XRP</div>
+                        <div className="text-green-400 text-xs">${(parseFloat(estimate.xrpAmount) * xrpUsdPrice).toFixed(2)} USD</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {tradeType === 'sell' && (
+                    <div className="flex justify-between">
+                      <span className="text-purple-400 text-sm">You Sell</span>
+                      <div className="text-right">
+                        <div className="text-purple-200 font-bold">{estimate.tokenAmount} {selectedToken?.token_name || ''}</div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex justify-between">
                     <span className="text-purple-400 text-sm">Price</span>
-                    <span className="text-purple-200">
-                      {currentPrice.toFixed(8)} XRP
-                    </span>
+                    <div className="text-right">
+                      <div className="text-purple-200">{currentPrice.toFixed(8)} XRP</div>
+                      <div className="text-green-400 text-xs">${(currentPrice * xrpUsdPrice).toFixed(8)} USD</div>
+                    </div>
                   </div>
 
                   <div className="flex justify-between">
@@ -2278,9 +2314,10 @@ export default function Trade({ preselectedToken = null }) {
 
                   <div className="flex justify-between">
                     <span className="text-purple-400 text-sm">Trading Fee</span>
-                    <span className="text-purple-200">
-                      {estimate.fee} XRP
-                    </span>
+                    <div className="text-right">
+                      <div className="text-purple-200">{estimate.fee} XRP</div>
+                      <div className="text-green-400 text-xs">${(parseFloat(estimate.fee) * xrpUsdPrice).toFixed(2)} USD</div>
+                    </div>
                   </div>
 
                   {parseFloat(estimate.priceImpact) > 10 && (
@@ -2524,7 +2561,7 @@ export default function Trade({ preselectedToken = null }) {
       </div>
 
       {selectedToken && (
-        <div className="mt-4">
+        <div className="mt-2">
           <TradeHistory tokenId={selectedToken.id} />
         </div>
       )}
