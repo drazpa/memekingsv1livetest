@@ -18,11 +18,7 @@ export default function ChatInput({ onSend, disabled }) {
   }, [showCommands]);
 
   const quickPrompts = [
-    { label: '💰 Check balance', prompt: 'Check my wallet balance' },
-    { label: '📊 Top tokens', prompt: 'Show me the top performing tokens today' },
-    { label: '🔄 Recent trades', prompt: 'Show my recent trade history' },
-    { label: '📈 Market overview', prompt: 'Give me a market overview' },
-    { label: '🚀 New tokens', prompt: 'Show me recently created tokens' }
+    { label: '💰 Check balance', prompt: 'Check my wallet balance' }
   ];
 
   const handleSubmit = (e) => {

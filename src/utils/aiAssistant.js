@@ -1,6 +1,7 @@
 import { Client } from 'xrpl';
 import { supabase } from './supabase';
 import { getXRPBalance } from './xrplBalance';
+import { commandExecutor } from './commandExecutor';
 
 class AIAssistant {
   constructor() {
@@ -17,11 +18,59 @@ class AIAssistant {
     const stored = localStorage.getItem('connectedWallet');
     if (stored) {
       this.context.connectedWallet = JSON.parse(stored);
+      commandExecutor.setWallet(this.context.connectedWallet);
     }
   }
 
   async processMessage(message) {
     const lowerMessage = message.toLowerCase();
+
+    const parsedCommand = commandExecutor.parseCommand(message);
+    if (parsedCommand.type !== 'UNKNOWN') {
+      const result = await commandExecutor.executeCommand(parsedCommand);
+
+      if (result.success) {
+        return {
+          content: result.message,
+          data: result.data ? {
+            card: {
+              icon: '✅',
+              title: 'Command Executed Successfully',
+              badge: 'Success',
+              items: Object.entries(result.data).map(([key, value]) => ({
+                label: key.charAt(0).toUpperCase() + key.slice(1),
+                value: String(value)
+              }))
+            },
+            txHash: result.txHash,
+            actions: result.txHash ? [{
+              label: 'View on XRPScan',
+              icon: '🔍',
+              style: 'primary',
+              onClick: () => window.open(`https://xrpscan.com/tx/${result.txHash}`, '_blank')
+            }] : []
+          } : null
+        };
+      } else {
+        if (result.requiresWallet) {
+          return {
+            content: result.message,
+            data: {
+              actions: [{
+                label: 'Connect Wallet',
+                icon: '🔗',
+                style: 'primary',
+                onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'setup' }))
+              }]
+            }
+          };
+        }
+        return {
+          content: result.message,
+          data: null
+        };
+      }
+    }
 
     if (this.isAddressBookQuery(lowerMessage)) {
       return await this.handleAddressBook();

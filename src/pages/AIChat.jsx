@@ -77,7 +77,7 @@ export default function AIChat() {
     const welcomeMsg = {
       id: `welcome_${Date.now()}`,
       role: 'assistant',
-      content: 'Hello! I\'m your advanced XRPL AI assistant. I can help you with:\n\n• Check wallet balances and transactions\n• Send and receive tokens\n• Get token information and prices\n• Execute trades and swaps\n• Create and manage tokens\n• Analyze market data\n• Navigate the platform\n• And 100+ more commands!\n\nHow can I assist you today?',
+      content: 'Hello! I\'m your advanced XRPL command-based AI assistant. I can execute commands directly! Try:\n\n**Natural Language Commands:**\n• "SEND rXXX... 15 XRP" - Send XRP instantly\n• "BUY 1000 ORANGE" - Buy tokens\n• "SELL 500 BANANA" - Sell tokens\n• "CHECK BALANCE" - View your balance\n• "PRICE OF BANANA" - Get token price\n• "SETUP TRUSTLINE ORANGE" - Add trustline\n\n**Quick Actions:**\n• "Send 100 APPLE to rXXX..." - Send tokens\n• "What\'s my balance?" - Check wallet\n• "Show top tokens" - Market data\n• "Trade history" - View trades\n\nJust type naturally or use the commands above. What would you like to do?',
       timestamp: new Date(),
       data: null
     };
