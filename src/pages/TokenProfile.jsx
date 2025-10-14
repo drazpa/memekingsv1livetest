@@ -333,14 +333,14 @@ export default function TokenProfile({ tokenSlug }) {
 
   const tweetToken = () => {
     const price = calculatePrice();
-    const tokenUrl = `https://MEMEKINGS.ONLINE/token/${token.token_name}`;
+    const tokenUrl = `https://drazpa-memekingz-a1bo.bolt.host/token/${token.token_name}`;
     const text = `Check out $${token.currency_code} on #XRP Ledger!\n\n💰 Price: ${price} XRP\n📊 Market Cap: ${calculateMarketCap()} XRP\n\n#${token.currency_code} #XRPL #Crypto\n\n${tokenUrl}`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
   const copyProfileLink = () => {
-    const tokenUrl = `https://MEMEKINGS.ONLINE/token/${token.token_name}`;
+    const tokenUrl = `https://drazpa-memekingz-a1bo.bolt.host/token/${token.token_name}`;
     navigator.clipboard.writeText(tokenUrl).then(() => {
       toast.success('Link copied to clipboard!');
     }).catch(() => {
@@ -382,7 +382,7 @@ export default function TokenProfile({ tokenSlug }) {
       <div className="glass rounded-xl p-6 mb-6">
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex items-start gap-4">
-            <TokenIcon token={token} size="4xl" />
+            <TokenIcon token={token} size="4xl" className="!w-48 !h-48 !text-8xl" />
             <div>
               <h1 className="text-4xl font-bold text-purple-200 mb-2">{token.token_name}</h1>
               <div className="flex items-center gap-3 flex-wrap">
@@ -642,8 +642,36 @@ export default function TokenProfile({ tokenSlug }) {
           )}
 
           {activeTab === 'chart' && token.amm_pool_created && (
-            <div className="h-[500px]">
-              <PriceChart data={chartData} />
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="glass rounded-lg p-3 border border-green-500/30">
+                  <div className="text-green-400 text-xs mb-1">Current Price</div>
+                  <div className="text-xl font-bold text-green-200">{calculatePrice()} XRP</div>
+                  <div className="text-green-400 text-xs">${(parseFloat(calculatePrice()) * xrpUsdPrice).toFixed(6)}</div>
+                </div>
+                <div className="glass rounded-lg p-3 border border-blue-500/30">
+                  <div className="text-blue-400 text-xs mb-1">24h Change</div>
+                  <div className={`text-xl font-bold ${
+                    parseFloat(calculate24hChange()) >= 0 ? 'text-green-200' : 'text-red-200'
+                  }`}>
+                    {parseFloat(calculate24hChange()) >= 0 ? '+' : ''}{calculate24hChange()}%
+                  </div>
+                  <div className="text-blue-400 text-xs">Price movement</div>
+                </div>
+                <div className="glass rounded-lg p-3 border border-purple-500/30">
+                  <div className="text-purple-400 text-xs mb-1">XRP Liquidity</div>
+                  <div className="text-xl font-bold text-purple-200">{poolData?.amm_xrp_amount?.toFixed(2) || '0.00'}</div>
+                  <div className="text-purple-400 text-xs">In AMM pool</div>
+                </div>
+                <div className="glass rounded-lg p-3 border border-cyan-500/30">
+                  <div className="text-cyan-400 text-xs mb-1">Token Liquidity</div>
+                  <div className="text-xl font-bold text-cyan-200">{poolData?.amm_asset_amount?.toLocaleString() || '0'}</div>
+                  <div className="text-cyan-400 text-xs">{token.currency_code}</div>
+                </div>
+              </div>
+              <div className="h-[600px] glass rounded-lg p-4">
+                <PriceChart data={chartData} />
+              </div>
             </div>
           )}
 

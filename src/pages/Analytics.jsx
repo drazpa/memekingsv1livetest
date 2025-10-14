@@ -206,7 +206,6 @@ export default function Analytics() {
 
   const loadAnalytics = async () => {
     setLoading(true);
-    const client = new xrpl.Client('wss://xrplcluster.com');
 
     try {
       const { data, error } = await supabase
@@ -218,35 +217,22 @@ export default function Analytics() {
 
       const tokensData = data || [];
 
-      await client.connect();
+      const { data: cachedPools } = await supabase
+        .from('pool_data_cache')
+        .select('*')
+        .gte('last_updated', new Date(Date.now() - 60000).toISOString());
 
-      for (const token of tokensData.filter(t => t.amm_pool_created)) {
-        try {
-          const currencyHex = token.currency_code.length > 3
-            ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
-            : token.currency_code;
-
-          const ammInfoResponse = await client.request({
-            command: 'amm_info',
-            asset: { currency: 'XRP' },
-            asset2: {
-              currency: currencyHex,
-              issuer: token.issuer_address
-            },
-            ledger_index: 'validated'
-          });
-
-          if (ammInfoResponse.result.amm) {
-            const amm = ammInfoResponse.result.amm;
-            token.amm_xrp_amount = parseFloat(amm.amount) / 1000000;
-            token.amm_asset_amount = parseFloat(amm.amount2.value);
+      if (cachedPools) {
+        tokensData.forEach(token => {
+          const cache = cachedPools.find(c => c.token_id === token.id);
+          if (cache) {
+            token.amm_xrp_amount = parseFloat(cache.xrp_amount);
+            token.amm_asset_amount = parseFloat(cache.token_amount);
+            token.current_price = parseFloat(cache.price);
           }
-        } catch (error) {
-          console.error(`Failed to fetch AMM data for ${token.token_name}:`, error.message);
-        }
+        });
       }
 
-      await client.disconnect();
       setTokens(tokensData);
 
       const totalSupply = tokensData.reduce((sum, t) => sum + t.supply, 0);
@@ -288,9 +274,20 @@ export default function Analytics() {
         else priceRanges.high++;
       });
 
+      const { data: tradeData } = await supabase
+        .from('trade_history')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1000);
+
       const now = Date.now();
       const last24h = tokensData.filter(t => now - new Date(t.created_at).getTime() < 86400000);
       const last7d = tokensData.filter(t => now - new Date(t.created_at).getTime() < 604800000);
+      const last1h = tokensData.filter(t => now - new Date(t.created_at).getTime() < 3600000);
+
+      const trades24h = (tradeData || []).filter(t => now - new Date(t.created_at).getTime() < 86400000);
+      const volume24h = trades24h.reduce((sum, t) => sum + parseFloat(t.xrp_amount || 0), 0);
+      const uniqueTraders = new Set((tradeData || []).map(t => t.wallet_address)).size;
 
       const growthRate = tokensData.length > 1
         ? ((last24h.length / tokensData.length) * 100)
@@ -317,6 +314,7 @@ export default function Analytics() {
         : 0;
 
       const tokenVelocity = tokensData.length > 0 ? last24h.length / 24 : 0;
+      const tokenVelocityHourly = last1h.length;
 
       const top10MC = marketCaps.slice(-10).reduce((a, b) => a + b, 0);
       const concentrationIndex = totalMC > 0 ? (top10MC / totalMC) * 100 : 0;
@@ -340,8 +338,12 @@ export default function Analytics() {
         volumeMetrics: {
           last24h: last24h.length,
           last7d: last7d.length,
-          allTime: tokensData.length
+          allTime: tokensData.length,
+          trades24h: trades24h.length,
+          volume24hXRP: volume24h,
+          uniqueTraders
         },
+        tokenVelocityHourly,
         growthRate,
         avgPoolDepth,
         totalLiquidity,
@@ -384,59 +386,71 @@ export default function Analytics() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Total Supply Minted</div>
-          <div className="text-3xl font-bold text-purple-200">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="glass rounded-lg p-4 border border-purple-500/30">
+          <div className="text-purple-400 text-xs mb-1">Total Supply</div>
+          <div className="text-2xl font-bold text-purple-200">
             {(stats.totalSupply / 1000000).toFixed(1)}M
           </div>
-          <div className="text-purple-500 text-xs mt-2">Across all tokens</div>
+          <div className="text-purple-500 text-xs mt-1">Across all tokens</div>
         </div>
 
-        <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Total XRP Locked</div>
-          <div className="text-3xl font-bold text-purple-200">{stats.totalXRPLocked.toFixed(2)}</div>
-          <div className="text-purple-500 text-xs mt-2">In AMM pools (Live)</div>
+        <div className="glass rounded-lg p-4 border border-green-500/30">
+          <div className="text-green-400 text-xs mb-1">XRP Locked</div>
+          <div className="text-2xl font-bold text-green-200">{stats.totalXRPLocked.toFixed(2)}</div>
+          <div className="text-green-500 text-xs mt-1">In AMM pools</div>
         </div>
 
-        <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Total Market Cap</div>
-          <div className="text-3xl font-bold text-purple-200">{stats.totalMarketCap.toFixed(2)}</div>
-          <div className="text-purple-500 text-xs mt-2">XRP value (Live)</div>
+        <div className="glass rounded-lg p-4 border border-blue-500/30">
+          <div className="text-blue-400 text-xs mb-1">Market Cap</div>
+          <div className="text-2xl font-bold text-blue-200">{stats.totalMarketCap.toFixed(2)}</div>
+          <div className="text-blue-500 text-xs mt-1">XRP value</div>
         </div>
 
-        <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Avg Market Cap</div>
-          <div className="text-3xl font-bold text-purple-200">{stats.avgMarketCap.toFixed(4)}</div>
-          <div className="text-purple-500 text-xs mt-2">Per token</div>
+        <div className="glass rounded-lg p-4 border border-cyan-500/30">
+          <div className="text-cyan-400 text-xs mb-1">24h Volume</div>
+          <div className="text-2xl font-bold text-cyan-200">{stats.volumeMetrics.volume24hXRP?.toFixed(2) || 0}</div>
+          <div className="text-cyan-500 text-xs mt-1">{stats.volumeMetrics.trades24h || 0} trades</div>
         </div>
 
-        <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">24h Growth</div>
-          <div className="text-3xl font-bold text-purple-200">{stats.growthRate.toFixed(1)}%</div>
-          <div className="text-purple-500 text-xs mt-2">Token creation rate</div>
+        <div className="glass rounded-lg p-4 border border-yellow-500/30">
+          <div className="text-yellow-400 text-xs mb-1">Active Traders</div>
+          <div className="text-2xl font-bold text-yellow-200">{stats.volumeMetrics.uniqueTraders || 0}</div>
+          <div className="text-yellow-500 text-xs mt-1">Unique wallets</div>
         </div>
 
-        <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Avg Pool Size</div>
-          <div className="text-3xl font-bold text-purple-200">
+        <div className="glass rounded-lg p-4 border border-purple-500/30">
+          <div className="text-purple-400 text-xs mb-1">24h Growth</div>
+          <div className="text-2xl font-bold text-purple-200">{stats.growthRate.toFixed(1)}%</div>
+          <div className="text-purple-500 text-xs mt-1">Token creation</div>
+        </div>
+
+        <div className="glass rounded-lg p-4 border border-green-500/30">
+          <div className="text-green-400 text-xs mb-1">Avg Pool</div>
+          <div className="text-2xl font-bold text-green-200">
             {(stats.avgTokensPerPool / 1000).toFixed(0)}K
           </div>
-          <div className="text-purple-500 text-xs mt-2">Tokens per AMM</div>
+          <div className="text-green-500 text-xs mt-1">Tokens per AMM</div>
         </div>
 
-        <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Success Rate</div>
-          <div className="text-3xl font-bold text-purple-200">{stats.successRate.toFixed(0)}%</div>
-          <div className="text-purple-500 text-xs mt-2">AMM creation</div>
+        <div className="glass rounded-lg p-4 border border-blue-500/30">
+          <div className="text-blue-400 text-xs mb-1">Success Rate</div>
+          <div className="text-2xl font-bold text-blue-200">{stats.successRate.toFixed(0)}%</div>
+          <div className="text-blue-500 text-xs mt-1">AMM creation</div>
         </div>
 
-        <div className="glass rounded-lg p-6">
-          <div className="text-purple-400 text-sm mb-2">Active Pools</div>
-          <div className="text-3xl font-bold text-purple-200">
+        <div className="glass rounded-lg p-4 border border-cyan-500/30">
+          <div className="text-cyan-400 text-xs mb-1">Active Pools</div>
+          <div className="text-2xl font-bold text-cyan-200">
             {tokens.filter(t => t.amm_pool_created).length}
           </div>
-          <div className="text-purple-500 text-xs mt-2">Live trading</div>
+          <div className="text-cyan-500 text-xs mt-1">Live trading</div>
+        </div>
+
+        <div className="glass rounded-lg p-4 border border-yellow-500/30">
+          <div className="text-yellow-400 text-xs mb-1">Velocity</div>
+          <div className="text-2xl font-bold text-yellow-200">{stats.tokenVelocityHourly || 0}</div>
+          <div className="text-yellow-500 text-xs mt-1">Tokens/hour</div>
         </div>
       </div>
 
