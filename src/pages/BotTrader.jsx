@@ -44,6 +44,7 @@ export default function BotTrader() {
   const [botSearchQuery, setBotSearchQuery] = useState('');
   const [favoriteBots, setFavoriteBots] = useState([]);
   const [botSortBy, setBotSortBy] = useState('name');
+  const [xrpUsdPrice, setXrpUsdPrice] = useState(2.50);
   const [newBot, setNewBot] = useState({
     name: '',
     tokenId: '',
@@ -68,7 +69,18 @@ export default function BotTrader() {
     loadTokens();
     loadConnectedWallet();
     loadFavorites();
+    fetchXrpUsdPrice();
   }, []);
+
+  const fetchXrpUsdPrice = async () => {
+    try {
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd');
+      const data = await response.json();
+      setXrpUsdPrice(data.ripple?.usd || 2.50);
+    } catch (error) {
+      console.error('Error fetching XRP/USD price:', error);
+    }
+  };
 
 
   useEffect(() => {
@@ -89,13 +101,49 @@ export default function BotTrader() {
       const interval = setInterval(() => {
         if (isMounted) {
           refreshBotsFromDatabase();
-          fetchTokenBalances();
         }
-      }, 5000);
+      }, 10000);
+
+      const botsSubscription = supabase
+        .channel('bot_updates')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'trading_bots',
+          filter: `wallet_address=eq.${connectedWallet.address}`
+        }, (payload) => {
+          console.log('Bot update received:', payload);
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+            setBots(prev => {
+              const exists = prev.find(b => b.id === payload.new.id);
+              if (exists) {
+                return prev.map(b => b.id === payload.new.id ? payload.new : b);
+              }
+              return [...prev, payload.new];
+            });
+          } else if (payload.eventType === 'DELETE') {
+            setBots(prev => prev.filter(b => b.id !== payload.old.id));
+          }
+        })
+        .subscribe();
+
+      const tradesSubscription = supabase
+        .channel('bot_trades_updates')
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'bot_trades'
+        }, (payload) => {
+          console.log('New bot trade:', payload);
+          refreshBotsFromDatabase();
+        })
+        .subscribe();
 
       return () => {
         isMounted = false;
         clearInterval(interval);
+        botsSubscription.unsubscribe();
+        tradesSubscription.unsubscribe();
       };
     }
   }, [connectedWallet]);
@@ -227,8 +275,6 @@ export default function BotTrader() {
     if (!connectedWallet || tokens.length === 0) return;
 
     try {
-      console.log('🔍 Fetching token balances for wallet:', connectedWallet.address);
-
       const { requestWithRetry } = await import('../utils/xrplClient');
 
       const accountLines = await requestWithRetry({
@@ -237,60 +283,26 @@ export default function BotTrader() {
         ledger_index: 'validated'
       });
 
-      console.log('📊 Account has', accountLines.result.lines.length, 'trustlines');
-      console.log('🎯 Looking up balances for', tokens.length, 'tokens');
-
       const balances = {};
       tokens.forEach(token => {
         const currencyHex = token.currency_code.length > 3
           ? Buffer.from(token.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
           : token.currency_code;
 
-        console.log(`\n🔎 Searching for ${token.token_name}:`);
-        console.log(`   Currency Code: ${token.currency_code}`);
-        console.log(`   Currency Hex: ${currencyHex}`);
-        console.log(`   Issuer: ${token.issuer_address}`);
-
         const tokenLine = accountLines.result.lines.find(line => {
-          console.log(`   Checking line: ${line.currency} from ${line.account}`);
-
-          if (line.account !== token.issuer_address) {
-            console.log(`   ❌ Issuer mismatch`);
-            return false;
-          }
-
+          if (line.account !== token.issuer_address) return false;
           const lineCurrency = line.currency;
-
-          if (token.currency_code.length <= 3) {
-            const match = lineCurrency === token.currency_code;
-            console.log(`   Standard code check: ${match}`);
-            return match;
-          }
-
-          if (lineCurrency.length === 40) {
-            const match = lineCurrency === currencyHex;
-            console.log(`   Hex code check: ${match}`);
-            return match;
-          }
-
-          const match = lineCurrency === token.currency_code;
-          console.log(`   Direct match check: ${match}`);
-          return match;
+          if (token.currency_code.length <= 3) return lineCurrency === token.currency_code;
+          if (lineCurrency.length === 40) return lineCurrency === currencyHex;
+          return lineCurrency === token.currency_code;
         });
 
         balances[token.id] = tokenLine ? parseFloat(tokenLine.balance) : 0;
-
-        if (tokenLine) {
-          console.log(`   ✅ FOUND Balance: ${tokenLine.balance}`);
-        } else {
-          console.log(`   ❌ NO BALANCE FOUND`);
-        }
       });
 
-      console.log('\n💰 Final balances object:', balances);
       setTokenBalances(balances);
     } catch (error) {
-      console.error('❌ Error fetching token balances:', error);
+      console.error('Error fetching token balances:', error);
     }
   };
 
@@ -303,8 +315,6 @@ export default function BotTrader() {
         .gte('last_updated', new Date(Date.now() - cacheAge * 1000).toISOString());
 
       if (!forceRefresh && cachedPools && cachedPools.length > 0 && !cacheError) {
-        console.log(`✅ Using cached pool data (${cachedPools.length} pools)`);
-
         const poolData = {};
         cachedPools.forEach(cache => {
           poolData[cache.token_id] = {
@@ -325,8 +335,6 @@ export default function BotTrader() {
       if (tokensToFetch.length === 0) return;
 
       tokensToFetch.forEach(token => fetchingPools.current.add(token.id));
-
-      console.log('🔄 Fetching fresh pool data from XRPL...');
       const { requestWithRetry } = await import('../utils/xrplClient');
 
       const poolPromises = tokensToFetch.map(async (token) => {
@@ -2088,6 +2096,57 @@ export default function BotTrader() {
     return 0;
   });
 
+  const calculateGlobalStats = useMemo(() => {
+    if (!bots || bots.length === 0) {
+      return {
+        totalBots: 0,
+        activeBots: 0,
+        totalTrades: 0,
+        totalXrpSpent: 0,
+        totalXrpReceived: 0,
+        totalTokensReceived: 0,
+        totalTokensSpent: 0,
+        netProfitXrp: 0,
+        netProfitUsd: 0,
+        winRate: 0
+      };
+    }
+
+    const stats = bots.reduce((acc, bot) => {
+      acc.totalTrades += bot.total_trades || 0;
+      acc.totalXrpSpent += parseFloat(bot.total_xrp_spent || 0);
+      acc.totalXrpReceived += parseFloat(bot.total_xrp_received || 0);
+      acc.totalTokensReceived += parseFloat(bot.total_token_received || 0);
+      acc.totalTokensSpent += parseFloat(bot.total_token_spent || 0);
+      return acc;
+    }, {
+      totalTrades: 0,
+      totalXrpSpent: 0,
+      totalXrpReceived: 0,
+      totalTokensReceived: 0,
+      totalTokensSpent: 0
+    });
+
+    const netProfitXrp = stats.totalXrpReceived - stats.totalXrpSpent;
+    const netProfitUsd = netProfitXrp * xrpUsdPrice;
+    const activeBots = bots.filter(b => b.status === 'running').length;
+    const successfulTrades = bots.reduce((acc, bot) => acc + (bot.successful_trades || 0), 0);
+    const winRate = stats.totalTrades > 0 ? (successfulTrades / stats.totalTrades) * 100 : 0;
+
+    return {
+      totalBots: bots.length,
+      activeBots,
+      totalTrades: stats.totalTrades,
+      totalXrpSpent: stats.totalXrpSpent,
+      totalXrpReceived: stats.totalXrpReceived,
+      totalTokensReceived: stats.totalTokensReceived,
+      totalTokensSpent: stats.totalTokensSpent,
+      netProfitXrp,
+      netProfitUsd,
+      winRate
+    };
+  }, [bots, xrpUsdPrice]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -2102,6 +2161,56 @@ export default function BotTrader() {
           </button>
         )}
       </div>
+
+      {connectedWallet && bots.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="glass rounded-lg p-4 border border-blue-500/30">
+            <div className="text-blue-400 text-sm mb-1">🤖 Total Bots</div>
+            <div className="text-3xl font-bold text-blue-200">{calculateGlobalStats.totalBots}</div>
+            <div className="text-green-400 text-sm mt-1">
+              {calculateGlobalStats.activeBots} Active
+            </div>
+          </div>
+
+          <div className="glass rounded-lg p-4 border border-purple-500/30">
+            <div className="text-purple-400 text-sm mb-1">📊 Total Trades</div>
+            <div className="text-3xl font-bold text-purple-200">{calculateGlobalStats.totalTrades}</div>
+            <div className="text-purple-400 text-sm mt-1">
+              {calculateGlobalStats.winRate.toFixed(1)}% Win Rate
+            </div>
+          </div>
+
+          <div className="glass rounded-lg p-4 border border-cyan-500/30">
+            <div className="text-cyan-400 text-sm mb-1">💰 XRP Spent on Bots</div>
+            <div className="text-3xl font-bold text-cyan-200">{calculateGlobalStats.totalXrpSpent.toFixed(2)}</div>
+            <div className="text-green-400 text-sm mt-1">
+              ${(calculateGlobalStats.totalXrpSpent * xrpUsdPrice).toFixed(2)}
+            </div>
+          </div>
+
+          <div className={`glass rounded-lg p-4 border ${
+            calculateGlobalStats.netProfitXrp >= 0
+              ? 'border-green-500/30'
+              : 'border-red-500/30'
+          }`}>
+            <div className={`text-sm mb-1 ${
+              calculateGlobalStats.netProfitXrp >= 0 ? 'text-green-400' : 'text-red-400'
+            }`}>
+              {calculateGlobalStats.netProfitXrp >= 0 ? '📈' : '📉'} Net P/L
+            </div>
+            <div className={`text-3xl font-bold ${
+              calculateGlobalStats.netProfitXrp >= 0 ? 'text-green-200' : 'text-red-200'
+            }`}>
+              {calculateGlobalStats.netProfitXrp >= 0 ? '+' : ''}{calculateGlobalStats.netProfitXrp.toFixed(2)} XRP
+            </div>
+            <div className={`text-sm mt-1 ${
+              calculateGlobalStats.netProfitUsd >= 0 ? 'text-green-400' : 'text-red-400'
+            }`}>
+              {calculateGlobalStats.netProfitUsd >= 0 ? '+' : ''}${Math.abs(calculateGlobalStats.netProfitUsd).toFixed(2)} USD
+            </div>
+          </div>
+        </div>
+      )}
 
       {!connectedWallet && (
         <div className="glass rounded-lg p-6 bg-yellow-500/10 border border-yellow-500/30">
