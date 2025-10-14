@@ -33,6 +33,20 @@ export default function TokenProfile({ tokenSlug }) {
     try {
       setLoading(true);
 
+      const cachedTokens = localStorage.getItem('cachedTokens');
+      if (cachedTokens) {
+        const tokens = JSON.parse(cachedTokens);
+        const foundToken = tokens.find(t =>
+          t.token_name?.toLowerCase() === tokenSlug?.toLowerCase()
+        );
+
+        if (foundToken) {
+          setToken(foundToken);
+          setLoading(false);
+          return;
+        }
+      }
+
       const { data, error } = await supabase
         .from('meme_tokens')
         .select('*')
@@ -442,6 +456,13 @@ export default function TokenProfile({ tokenSlug }) {
         </div>
 
         <button
+          onClick={() => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'dashboard' }))}
+          className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold px-6 py-3 rounded-lg shadow-lg transition-all duration-300"
+        >
+          ← Back
+        </button>
+
+        <button
           onClick={tweetToken}
           className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold px-6 py-3 rounded-lg shadow-lg transition-all duration-300"
         >
@@ -450,10 +471,10 @@ export default function TokenProfile({ tokenSlug }) {
       </div>
 
       <div className="glass rounded-xl overflow-hidden mb-6">
-        <div className="flex border-b border-purple-500/30">
+        <div className="flex border-b border-purple-500/30 overflow-x-auto">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-6 py-4 font-medium transition-colors ${
+            className={`px-6 py-4 font-medium transition-colors whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'text-purple-200 border-b-2 border-purple-500 bg-purple-500/10'
                 : 'text-purple-400 hover:text-purple-200'
@@ -463,7 +484,7 @@ export default function TokenProfile({ tokenSlug }) {
           </button>
           <button
             onClick={() => setActiveTab('chart')}
-            className={`px-6 py-4 font-medium transition-colors ${
+            className={`px-6 py-4 font-medium transition-colors whitespace-nowrap ${
               activeTab === 'chart'
                 ? 'text-purple-200 border-b-2 border-purple-500 bg-purple-500/10'
                 : 'text-purple-400 hover:text-purple-200'
@@ -472,8 +493,18 @@ export default function TokenProfile({ tokenSlug }) {
             Chart
           </button>
           <button
+            onClick={() => setActiveTab('analytics')}
+            className={`px-6 py-4 font-medium transition-colors whitespace-nowrap ${
+              activeTab === 'analytics'
+                ? 'text-purple-200 border-b-2 border-purple-500 bg-purple-500/10'
+                : 'text-purple-400 hover:text-purple-200'
+            }`}
+          >
+            Analytics
+          </button>
+          <button
             onClick={() => setActiveTab('trades')}
-            className={`px-6 py-4 font-medium transition-colors ${
+            className={`px-6 py-4 font-medium transition-colors whitespace-nowrap ${
               activeTab === 'trades'
                 ? 'text-purple-200 border-b-2 border-purple-500 bg-purple-500/10'
                 : 'text-purple-400 hover:text-purple-200'
@@ -528,8 +559,135 @@ export default function TokenProfile({ tokenSlug }) {
             </div>
           )}
 
+          {activeTab === 'analytics' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/30">
+                  <div className="text-purple-400 text-sm mb-2">💰 Market Cap</div>
+                  <div className="text-2xl font-bold text-purple-200">{calculateMarketCap()} XRP</div>
+                  <div className="text-green-400 text-sm">${(parseFloat(calculateMarketCap()) * xrpUsdPrice).toFixed(2)}</div>
+                </div>
+
+                <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/30">
+                  <div className="text-purple-400 text-sm mb-2">📊 Total Supply</div>
+                  <div className="text-2xl font-bold text-purple-200">{token.supply.toLocaleString()}</div>
+                  <div className="text-purple-400 text-sm">{token.currency_code}</div>
+                </div>
+
+                <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/30">
+                  <div className="text-purple-400 text-sm mb-2">💹 Current Price</div>
+                  <div className="text-2xl font-bold text-purple-200">{calculatePrice()} XRP</div>
+                  <div className="text-green-400 text-sm">${(parseFloat(calculatePrice()) * xrpUsdPrice).toFixed(6)}</div>
+                </div>
+
+                {poolData && (
+                  <>
+                    <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/30">
+                      <div className="text-purple-400 text-sm mb-2">💧 Total Liquidity</div>
+                      <div className="text-2xl font-bold text-purple-200">{poolData.xrpAmount.toFixed(2)} XRP</div>
+                      <div className="text-green-400 text-sm">${(poolData.xrpAmount * xrpUsdPrice).toFixed(2)}</div>
+                    </div>
+
+                    <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/30">
+                      <div className="text-purple-400 text-sm mb-2">📈 24h Volume</div>
+                      <div className="text-2xl font-bold text-purple-200">{poolData.volume24h.toFixed(2)} XRP</div>
+                      <div className="text-green-400 text-sm">${(poolData.volume24h * xrpUsdPrice).toFixed(2)}</div>
+                    </div>
+
+                    <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/30">
+                      <div className="text-purple-400 text-sm mb-2">💎 APR (Annual)</div>
+                      <div className="text-2xl font-bold text-green-400">{poolData.apr.toFixed(2)}%</div>
+                      <div className="text-purple-400 text-sm">Estimated returns</div>
+                    </div>
+
+                    <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/30">
+                      <div className="text-purple-400 text-sm mb-2">🔄 24h Change</div>
+                      <div className={`text-2xl font-bold ${
+                        parseFloat(calculate24hChange()) >= 0 ? 'text-green-400' : 'text-red-400'
+                      }`}>
+                        {parseFloat(calculate24hChange()) >= 0 ? '+' : ''}{calculate24hChange()}%
+                      </div>
+                      <div className="text-purple-400 text-sm">Price movement</div>
+                    </div>
+
+                    <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/30">
+                      <div className="text-purple-400 text-sm mb-2">💵 24h Fees</div>
+                      <div className="text-2xl font-bold text-purple-200">{poolData.fees24h.toFixed(4)} XRP</div>
+                      <div className="text-green-400 text-sm">${(poolData.fees24h * xrpUsdPrice).toFixed(2)}</div>
+                    </div>
+
+                    <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/30">
+                      <div className="text-purple-400 text-sm mb-2">🎯 LP Tokens</div>
+                      <div className="text-2xl font-bold text-purple-200">{(poolData.lpTokens / 1000).toFixed(2)}K</div>
+                      <div className="text-purple-400 text-sm">Outstanding</div>
+                    </div>
+                  </>
+                )}
+
+                <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/30">
+                  <div className="text-purple-400 text-sm mb-2">📅 Token Age</div>
+                  <div className="text-2xl font-bold text-purple-200">
+                    {Math.floor((Date.now() - new Date(token.created_at).getTime()) / (1000 * 60 * 60 * 24))} days
+                  </div>
+                  <div className="text-purple-400 text-sm">Since creation</div>
+                </div>
+
+                <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/30">
+                  <div className="text-purple-400 text-sm mb-2">🏷️ Category</div>
+                  <div className="text-2xl font-bold text-purple-200">{token.category || 'Meme'}</div>
+                  <div className="text-purple-400 text-sm">Token type</div>
+                </div>
+
+                <div className="bg-purple-900/30 rounded-lg p-4 border border-purple-500/30">
+                  <div className="text-purple-400 text-sm mb-2">✅ Pool Status</div>
+                  <div className="text-2xl font-bold text-purple-200">
+                    {token.amm_pool_created ? '🟢 Active' : '🔴 Inactive'}
+                  </div>
+                  <div className="text-purple-400 text-sm">AMM Pool</div>
+                </div>
+              </div>
+
+              {lpBalance && poolData && (
+                <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/30 rounded-lg p-6">
+                  <h3 className="text-xl font-bold text-green-300 mb-4">Your Position Analytics</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                      <div className="text-green-400 text-sm mb-1">LP Tokens Owned</div>
+                      <div className="text-2xl font-bold text-green-200">{lpBalance.balance.toFixed(4)}</div>
+                    </div>
+                    <div>
+                      <div className="text-green-400 text-sm mb-1">Pool Share</div>
+                      <div className="text-2xl font-bold text-green-200">{lpBalance.share.toFixed(4)}%</div>
+                    </div>
+                    <div>
+                      <div className="text-green-400 text-sm mb-1">XRP Value</div>
+                      <div className="text-2xl font-bold text-green-200">{(poolData.xrpAmount * lpBalance.share / 100).toFixed(4)}</div>
+                    </div>
+                    <div>
+                      <div className="text-green-400 text-sm mb-1">USD Value</div>
+                      <div className="text-2xl font-bold text-green-200">${((poolData.xrpAmount * lpBalance.share / 100) * xrpUsdPrice).toFixed(2)}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {activeTab === 'trades' && (
-            <TradeHistory tokenId={token.id} />
+            <div>
+              {!connectedWallet ? (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">🔒</div>
+                  <div className="text-purple-300 mb-2">Connect wallet to view your trades</div>
+                  <div className="text-purple-400 text-sm">Your personal trade history will appear here</div>
+                </div>
+              ) : (
+                <div>
+                  <h3 className="text-xl font-bold text-purple-200 mb-4">My Trades</h3>
+                  <TradeHistory tokenId={token.id} connectedWallet={connectedWallet} />
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
