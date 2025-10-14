@@ -1298,10 +1298,19 @@ export default function Dashboard() {
           )}
         </div>
         <button
-          className="col-span-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold text-xs px-3 py-2 rounded shadow-lg shadow-purple-500/50 hover:shadow-purple-500/70"
+          className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold text-xs px-3 py-2 rounded-lg shadow-lg shadow-purple-500/50 hover:shadow-purple-500/70"
           onClick={(e) => { e.stopPropagation(); tweetToken(token); }}
         >
           𝕏 Post on X
+        </button>
+        <button
+          className="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold text-xs px-3 py-2 rounded-lg shadow-lg shadow-indigo-500/50 hover:shadow-indigo-500/70"
+          onClick={(e) => {
+            e.stopPropagation();
+            window.dispatchEvent(new CustomEvent('navigateToToken', { detail: token.token_name }));
+          }}
+        >
+          👁️ View Profile
         </button>
       </div>
     </div>
@@ -1316,7 +1325,15 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           <TokenIcon token={token} size="3xl" />
           <div>
-            <div className="font-bold text-purple-200">{token.token_name}</div>
+            <div
+              className="font-bold text-purple-200 hover:text-purple-100 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.dispatchEvent(new CustomEvent('navigateToToken', { detail: token.token_name }));
+              }}
+            >
+              {token.token_name}
+            </div>
             <div className="text-purple-400 text-xs">{token.currency_code}</div>
           </div>
         </div>

@@ -16,6 +16,7 @@ import WalletManagement from './components/WalletManagement';
 import Setup from './pages/Setup';
 import AIChat from './pages/AIChat';
 import Social from './pages/Social';
+import TokenProfile from './pages/TokenProfile';
 import { imageCacheManager } from './utils/imageCache';
 
 class ErrorBoundary extends Component {
@@ -61,6 +62,7 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [selectedTradeToken, setSelectedTradeToken] = useState(null);
   const [pageKey, setPageKey] = useState(0);
+  const [tokenSlug, setTokenSlug] = useState(null);
 
   useEffect(() => {
     const handleError = (event) => {
@@ -102,12 +104,19 @@ export default function App() {
       }
     };
 
+    const handleNavigateToToken = (event) => {
+      setTokenSlug(event.detail);
+      handlePageChange('tokenprofile');
+    };
+
     window.addEventListener('navigateToTrade', handleNavigateToTrade);
     window.addEventListener('navigateToPage', handleNavigateToPage);
+    window.addEventListener('navigateToToken', handleNavigateToToken);
 
     return () => {
       window.removeEventListener('navigateToTrade', handleNavigateToTrade);
       window.removeEventListener('navigateToPage', handleNavigateToPage);
+      window.removeEventListener('navigateToToken', handleNavigateToToken);
     };
   }, []);
 
@@ -148,6 +157,8 @@ export default function App() {
         return <AIChat key={pageKey} />;
       case 'social':
         return <Social key={pageKey} />;
+      case 'tokenprofile':
+        return <TokenProfile key={pageKey} tokenSlug={tokenSlug} />;
       default:
         return <Dashboard key={pageKey} />;
     }

@@ -778,6 +778,15 @@ export default function TokenDetailModal({ token, onClose }) {
                 >
                   Trade on DEX
                 </a>
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('navigateToToken', { detail: token.token_name }));
+                    onClose();
+                  }}
+                  className="btn-primary px-4 py-3 rounded-lg font-medium"
+                >
+                  👁️ View Full Profile
+                </button>
                 <a
                   href={`https://testnet.xrpl.org/accounts/${token.issuer_address}`}
                   target="_blank"
