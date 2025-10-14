@@ -1073,27 +1073,52 @@ export default function Dashboard() {
       <div className="space-y-1.5">
         <div className="flex justify-between items-center">
           <span className="text-purple-400 text-xs">Live Price</span>
-          <span className="text-purple-200 text-sm font-bold">{calculatePrice(token)} XRP</span>
+          <div className="text-right">
+            <div className="text-purple-200 text-sm font-bold">{calculatePrice(token)} XRP</div>
+            <div className="text-green-400 text-xs">${(parseFloat(calculatePrice(token)) * xrpUsdPrice).toFixed(6)}</div>
+          </div>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-purple-400 text-xs">Volume 24h</span>
-          <span className="text-purple-200 text-sm font-bold">
-            {token.amm_pool_created ? `${calculateVolume(token)} XRP` : '-'}
-          </span>
+          <div className="text-right">
+            <div className="text-purple-200 text-sm font-bold">
+              {token.amm_pool_created ? `${calculateVolume(token)} XRP` : '-'}
+            </div>
+            {token.amm_pool_created && (
+              <div className="text-green-400 text-xs">
+                ${(parseFloat(calculateVolume(token)) * xrpUsdPrice).toFixed(2)}
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-purple-400 text-xs">Your LP</span>
-          <span className="text-green-400 text-sm font-bold">
-            {lpBalances[token.id] ? parseFloat(lpBalances[token.id]).toFixed(4) : '-'}
-          </span>
+          <div className="text-right">
+            <div className="text-green-400 text-sm font-bold">
+              {lpBalances[token.id] ? parseFloat(lpBalances[token.id]).toFixed(4) : '-'}
+            </div>
+            {lpBalances[token.id] && poolsData[token.id] && (
+              <div className="text-green-400 text-xs">
+                ${(parseFloat(lpBalances[token.id]) * poolsData[token.id].price * 2 * xrpUsdPrice).toFixed(2)}
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-purple-400 text-xs">Market Cap (Live)</span>
-          <span className="text-purple-200 text-sm font-bold font-mono">{calculateMarketCap(token)} XRP</span>
+          <div className="text-right">
+            <div className="text-purple-200 text-sm font-bold font-mono">{calculateMarketCap(token)} XRP</div>
+            <div className="text-green-400 text-xs">${(parseFloat(calculateMarketCap(token)) * xrpUsdPrice).toFixed(2)}</div>
+          </div>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-purple-400 text-xs">XRP Locked (Live)</span>
-          <span className="text-purple-200 text-sm font-bold font-mono">{token.amm_xrp_amount ? token.amm_xrp_amount.toFixed(2) : '0.00'} XRP</span>
+          <div className="text-right">
+            <div className="text-purple-200 text-sm font-bold font-mono">{token.amm_xrp_amount ? token.amm_xrp_amount.toFixed(2) : '0.00'} XRP</div>
+            {token.amm_xrp_amount && (
+              <div className="text-green-400 text-xs">${(token.amm_xrp_amount * xrpUsdPrice).toFixed(2)}</div>
+            )}
+          </div>
         </div>
         <div className="flex justify-between items-center">
           <span className="text-purple-400 text-xs">Total Supply</span>
@@ -1201,27 +1226,62 @@ export default function Dashboard() {
       </td>
       <td className="px-4 py-3 text-purple-300 text-xs">{token.supply.toLocaleString()}</td>
       <td className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="text-purple-200 font-mono text-xs">{calculatePrice(token)}</span>
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-purple-200 font-mono text-xs">{calculatePrice(token)}</span>
+            {token.amm_pool_created && (
+              <span className={`text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
+                parseFloat(calculate24hChange(token)) >= 0
+                  ? 'text-green-300 bg-green-500/10'
+                  : 'text-red-300 bg-red-500/10'
+              }`}>
+                {parseFloat(calculate24hChange(token)) >= 0 ? '+' : ''}{calculate24hChange(token)}%
+              </span>
+            )}
+          </div>
+          <div className="text-green-400 text-xs">
+            ${(parseFloat(calculatePrice(token)) * xrpUsdPrice).toFixed(6)}
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <div>
+          <div className="text-purple-200 text-xs">
+            {token.amm_pool_created ? `${calculateVolume(token)} XRP` : '-'}
+          </div>
           {token.amm_pool_created && (
-            <span className={`text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
-              parseFloat(calculate24hChange(token)) >= 0
-                ? 'text-green-300 bg-green-500/10'
-                : 'text-red-300 bg-red-500/10'
-            }`}>
-              {parseFloat(calculate24hChange(token)) >= 0 ? '+' : ''}{calculate24hChange(token)}%
-            </span>
+            <div className="text-green-400 text-xs">
+              ${(parseFloat(calculateVolume(token)) * xrpUsdPrice).toFixed(2)}
+            </div>
           )}
         </div>
       </td>
-      <td className="px-4 py-3 text-purple-200 text-xs">
-        {token.amm_pool_created ? `${calculateVolume(token)} XRP` : '-'}
+      <td className="px-4 py-3">
+        <div>
+          <div className="text-green-400 text-xs font-bold">
+            {lpBalances[token.id] ? parseFloat(lpBalances[token.id]).toFixed(4) : '-'}
+          </div>
+          {lpBalances[token.id] && poolsData[token.id] && (
+            <div className="text-green-400 text-xs">
+              ${(parseFloat(lpBalances[token.id]) * poolsData[token.id].price * 2 * xrpUsdPrice).toFixed(2)}
+            </div>
+          )}
+        </div>
       </td>
-      <td className="px-4 py-3 text-green-400 text-xs font-bold">
-        {lpBalances[token.id] ? parseFloat(lpBalances[token.id]).toFixed(4) : '-'}
+      <td className="px-4 py-3">
+        <div>
+          <div className="text-purple-200 text-xs font-mono">{calculateMarketCap(token)} XRP</div>
+          <div className="text-green-400 text-xs">${(parseFloat(calculateMarketCap(token)) * xrpUsdPrice).toFixed(2)}</div>
+        </div>
       </td>
-      <td className="px-4 py-3 text-purple-200 text-xs font-mono">{calculateMarketCap(token)} XRP</td>
-      <td className="px-4 py-3 text-purple-300 text-xs font-mono">{token.amm_xrp_amount ? token.amm_xrp_amount.toFixed(2) : '0.00'} XRP</td>
+      <td className="px-4 py-3">
+        <div>
+          <div className="text-purple-300 text-xs font-mono">{token.amm_xrp_amount ? token.amm_xrp_amount.toFixed(2) : '0.00'} XRP</div>
+          {token.amm_xrp_amount && (
+            <div className="text-green-400 text-xs">${(token.amm_xrp_amount * xrpUsdPrice).toFixed(2)}</div>
+          )}
+        </div>
+      </td>
       <td className="px-4 py-3">
         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
           token.amm_pool_created

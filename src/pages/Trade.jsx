@@ -785,12 +785,16 @@ export default function Trade({ preselectedToken = null }) {
   const calculateEstimate = () => {
     if (!selectedToken || !amount || isNaN(amount)) return { tokenAmount: 0, xrpAmount: 0, priceImpact: 0, fee: 0 };
 
-    const price = calculatePrice(selectedToken);
+    const price = livePrice > 0 ? livePrice : calculatePrice(selectedToken);
+
+    if (!price || price === 0) {
+      return { tokenAmount: 0, xrpAmount: 0, priceImpact: 0, fee: 0 };
+    }
 
     if (tradeType === 'buy') {
       const xrp = parseFloat(amount);
       const tokenAmount = xrp / price;
-      const priceImpact = (xrp / selectedToken.amm_xrp_amount) * 100;
+      const priceImpact = selectedToken.amm_xrp_amount > 0 ? (xrp / selectedToken.amm_xrp_amount) * 100 : 0;
 
       return {
         tokenAmount: tokenAmount.toFixed(4),
@@ -801,7 +805,7 @@ export default function Trade({ preselectedToken = null }) {
     } else {
       const tokenAmt = parseFloat(amount);
       const xrp = tokenAmt * price;
-      const priceImpact = (tokenAmt / selectedToken.amm_asset_amount) * 100;
+      const priceImpact = selectedToken.amm_asset_amount > 0 ? (tokenAmt / selectedToken.amm_asset_amount) * 100 : 0;
 
       return {
         tokenAmount: tokenAmt.toFixed(4),
@@ -879,6 +883,9 @@ export default function Trade({ preselectedToken = null }) {
           volume24h: parseFloat(cachedPool.volume_24h || 0)
         });
 
+        setLivePrice(price);
+        setMarketCapUSD(marketCap * xrpUsdPrice);
+
         setRefreshingMarket(false);
         return;
       }
@@ -915,6 +922,9 @@ export default function Trade({ preselectedToken = null }) {
           poolSize: tokenAmount,
           price
         });
+
+        setLivePrice(price);
+        setMarketCapUSD(marketCap * xrpUsdPrice);
 
         await supabase
           .from('pool_data_cache')
@@ -2107,11 +2117,17 @@ export default function Trade({ preselectedToken = null }) {
                     <option value="baseline">📏 Baseline</option>
                   </select>
                   <button
-                    onClick={fetchMarketData}
+                    onClick={async () => {
+                      await fetchMarketData(true);
+                      if (selectedToken) {
+                        await loadChartData();
+                      }
+                    }}
                     disabled={refreshingMarket}
                     className="btn-secondary px-2 py-1 text-xs disabled:opacity-50"
+                    title="Refresh price and chart"
                   >
-                    🔄
+                    {refreshingMarket ? '⏳' : '🔄'}
                   </button>
                 </div>
               </div>
