@@ -2,6 +2,7 @@ import { Client } from 'xrpl';
 import { supabase } from './supabase';
 import { getXRPBalance } from './xrplBalance';
 import { commandExecutor } from './commandExecutor';
+import { AICachedData } from './aiCachedData';
 
 class AIAssistant {
   constructor() {
@@ -346,13 +347,9 @@ class AIAssistant {
 
   async getDetailedTokenInfo(tokenCode) {
     try {
-      const { data: token, error } = await supabase
-        .from('meme_tokens')
-        .select('*')
-        .ilike('currency_code', tokenCode)
-        .single();
+      const tokenData = await AICachedData.getTokenWithCache(tokenCode);
 
-      if (error || !token) {
+      if (!tokenData) {
         return {
           content: `Token "${tokenCode}" not found. Make sure the token code is correct.`,
           data: {
@@ -368,49 +365,42 @@ class AIAssistant {
         };
       }
 
-      const currentPrice = token.amm_xrp_amount && token.amm_asset_amount
-        ? parseFloat(token.amm_xrp_amount) / parseFloat(token.amm_asset_amount)
-        : 0;
-
-      const marketCap = currentPrice * parseFloat(token.supply || 0);
-      const daysOld = Math.floor((Date.now() - new Date(token.created_at).getTime()) / (1000 * 60 * 60 * 24));
-
-      const liquidity = token.amm_xrp_amount
-        ? `${parseFloat(token.amm_xrp_amount).toFixed(4)} XRP`
-        : 'N/A';
+      const formatted = AICachedData.formatTokenData(tokenData);
 
       const details = [
-        { label: 'Token Name', value: token.token_name || 'Unknown' },
-        { label: 'Symbol', value: token.currency_code || 'N/A' },
-        { label: 'Total Supply', value: token.supply ? parseFloat(token.supply).toLocaleString() : 'N/A' },
-        { label: 'Current Price', value: currentPrice > 0 ? `${currentPrice.toFixed(8)} XRP` : 'N/A' },
-        { label: 'Market Cap', value: marketCap > 0 ? `${marketCap.toFixed(4)} XRP` : 'N/A' },
-        { label: 'Liquidity', value: liquidity },
-        { label: 'Days Old', value: `${daysOld} days` },
-        { label: 'Category', value: token.category || 'Other' },
-        { label: 'AMM Pool', value: token.amm_pool_created ? 'Yes ✅' : 'No ❌' },
-        { label: 'Status', value: token.status || 'Unknown' },
-        { label: 'Issuer', value: `${token.issuer_address?.slice(0, 8)}...${token.issuer_address?.slice(-6)}` },
-        { label: 'Created', value: new Date(token.created_at).toLocaleString() }
+        { label: 'Token Name', value: formatted.name },
+        { label: 'Symbol', value: formatted.symbol },
+        { label: 'Total Supply', value: formatted.supply },
+        { label: 'Current Price', value: formatted.price },
+        { label: 'Market Cap', value: formatted.marketCap },
+        { label: 'Liquidity', value: formatted.liquidity },
+        { label: '24h Volume', value: formatted.volume24h },
+        { label: '24h Change', value: formatted.priceChange24h },
+        { label: 'Days Old', value: formatted.daysOld },
+        { label: 'Category', value: formatted.category },
+        { label: 'AMM Pool', value: tokenData.amm_pool_created ? 'Yes ✅' : 'No ❌' },
+        { label: 'Status', value: formatted.status },
+        { label: 'Issuer', value: formatted.issuer },
+        { label: 'Created', value: formatted.created }
       ];
 
-      if (token.description) {
-        details.splice(2, 0, { label: 'Description', value: token.description });
+      if (formatted.description) {
+        details.splice(2, 0, { label: 'Description', value: formatted.description });
       }
-      if (token.twitter_handle) {
-        details.push({ label: 'Twitter', value: `@${token.twitter_handle}` });
+      if (formatted.twitter) {
+        details.push({ label: 'Twitter', value: `@${formatted.twitter}` });
       }
-      if (token.website_url) {
-        details.push({ label: 'Website', value: token.website_url });
+      if (formatted.website) {
+        details.push({ label: 'Website', value: formatted.website });
       }
 
       return {
-        content: `Here are the complete details for ${token.token_name || tokenCode}:`,
+        content: `Here are the complete details for ${tokenData.token_name || tokenCode}:`,
         data: {
           card: {
             icon: '💎',
-            title: `${token.token_name || tokenCode} (${token.currency_code})`,
-            badge: token.category || 'Token',
+            title: `${tokenData.token_name || tokenCode} (${tokenData.currency_code})`,
+            badge: tokenData.category || 'Token',
             items: details
           },
           actions: [
@@ -421,7 +411,7 @@ class AIAssistant {
               onClick: () => {
                 window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'trade' }));
                 setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent('selectToken', { detail: token }));
+                  window.dispatchEvent(new CustomEvent('selectToken', { detail: tokenData }));
                 }, 100);
               }
             },
@@ -429,7 +419,7 @@ class AIAssistant {
               label: 'View on XRPScan',
               icon: '🔍',
               style: 'secondary',
-              onClick: () => window.open(`https://xrpscan.com/account/${token.issuer_address}`, '_blank')
+              onClick: () => window.open(`https://xrpscan.com/account/${tokenData.issuer_address}`, '_blank')
             }
           ]
         }
@@ -1217,25 +1207,19 @@ class AIAssistant {
 
   async handleMarketCapQuery() {
     try {
-      const { data: tokens, error } = await supabase
-        .from('meme_tokens')
-        .select('*')
-        .eq('amm_pool_created', true)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      const tokensWithMC = await AICachedData.getMarketCapRankings(10);
 
-      if (error) throw error;
+      if (!tokensWithMC || tokensWithMC.length === 0) {
+        return {
+          content: 'No market cap data available yet.',
+          data: null
+        };
+      }
 
-      const tokensWithMC = tokens.map(token => {
-        const currentPrice = token.amm_xrp_amount && token.amm_asset_amount
-          ? parseFloat(token.amm_xrp_amount) / parseFloat(token.amm_asset_amount)
-          : 0;
-        const marketCap = currentPrice * parseFloat(token.supply || 0);
-        return { ...token, marketCap, currentPrice };
-      }).filter(t => t.marketCap > 0).sort((a, b) => b.marketCap - a.marketCap);
+      const totalMarketCap = tokensWithMC.reduce((sum, t) => sum + t.marketCap, 0);
 
       return {
-        content: `Here are tokens ranked by market cap:`,
+        content: `Here are tokens ranked by market cap (from cache):`,
         data: {
           card: {
             icon: '💰',
@@ -1243,16 +1227,18 @@ class AIAssistant {
             badge: 'Top Tokens',
             items: [
               { label: 'Total Tokens', value: `${tokensWithMC.length}` },
-              { label: 'Total Market Cap', value: `${tokensWithMC.reduce((sum, t) => sum + t.marketCap, 0).toFixed(2)} XRP` }
+              { label: 'Total Market Cap', value: `${totalMarketCap.toFixed(2)} XRP` },
+              { label: 'Cache Status', value: tokensWithMC[0].cacheStatus === 'valid' ? '✅ Fresh' : '⚠️ Updating' }
             ]
           },
           table: {
-            headers: ['Rank', 'Token', 'Market Cap', 'Price'],
-            rows: tokensWithMC.slice(0, 10).map((token, idx) => [
+            headers: ['Rank', 'Token', 'Market Cap', 'Price', '24h Change'],
+            rows: tokensWithMC.map((token, idx) => [
               `#${idx + 1}`,
               `${token.token_name} (${token.currency_code})`,
               `${token.marketCap.toFixed(2)} XRP`,
-              `${token.currentPrice.toFixed(8)} XRP`
+              `${token.currentPrice.toFixed(8)} XRP`,
+              token.priceChange24h ? `${token.priceChange24h > 0 ? '+' : ''}${token.priceChange24h.toFixed(2)}%` : 'N/A'
             ])
           },
           actions: [
@@ -1275,50 +1261,37 @@ class AIAssistant {
 
   async handleVolumeQuery() {
     try {
-      const { data: trades, error } = await supabase
-        .from('trade_history')
-        .select('*, meme_tokens(*)')
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .order('created_at', { ascending: false });
+      const volumeLeaders = await AICachedData.getVolumeLeaders(10);
 
-      if (error) throw error;
+      if (!volumeLeaders || volumeLeaders.length === 0) {
+        return {
+          content: 'No volume data available yet.',
+          data: null
+        };
+      }
 
-      const volumeByToken = {};
-      trades?.forEach(trade => {
-        const tokenId = trade.token_id;
-        if (!volumeByToken[tokenId]) {
-          volumeByToken[tokenId] = {
-            token: trade.meme_tokens,
-            volume: 0,
-            trades: 0
-          };
-        }
-        volumeByToken[tokenId].volume += parseFloat(trade.xrp_amount || 0);
-        volumeByToken[tokenId].trades += 1;
-      });
-
-      const sortedVolumes = Object.values(volumeByToken)
-        .sort((a, b) => b.volume - a.volume)
-        .slice(0, 10);
+      const totalVolume = volumeLeaders.reduce((sum, t) => sum + t.volume24h, 0);
 
       return {
-        content: `Here are the top tokens by 24h trading volume:`,
+        content: `Here are the top tokens by 24h trading volume (from cache):`,
         data: {
           card: {
             icon: '📊',
             title: '24h Trading Volume',
             badge: 'Last 24 Hours',
             items: [
-              { label: 'Total Volume', value: `${sortedVolumes.reduce((sum, t) => sum + t.volume, 0).toFixed(2)} XRP` },
-              { label: 'Total Trades', value: `${sortedVolumes.reduce((sum, t) => sum + t.trades, 0)}` }
+              { label: 'Total Volume', value: `${totalVolume.toFixed(2)} XRP` },
+              { label: 'Top Tokens', value: `${volumeLeaders.length}` },
+              { label: 'Cache Status', value: volumeLeaders[0].cacheStatus === 'valid' ? '✅ Fresh' : '⚠️ Updating' }
             ]
           },
           table: {
-            headers: ['Token', '24h Volume', 'Trades'],
-            rows: sortedVolumes.map(item => [
-              `${item.token?.token_name || 'Unknown'} (${item.token?.currency_code || 'N/A'})`,
-              `${item.volume.toFixed(2)} XRP`,
-              `${item.trades}`
+            headers: ['Token', '24h Volume', 'Price', '24h Change'],
+            rows: volumeLeaders.map(token => [
+              `${token.token_name} (${token.currency_code})`,
+              `${token.volume24h.toFixed(2)} XRP`,
+              `${token.currentPrice.toFixed(8)} XRP`,
+              token.priceChange24h ? `${token.priceChange24h > 0 ? '+' : ''}${token.priceChange24h.toFixed(2)}%` : 'N/A'
             ])
           },
           actions: [
@@ -1351,66 +1324,53 @@ class AIAssistant {
         };
       }
 
-      const { data: token, error: tokenError } = await supabase
-        .from('meme_tokens')
-        .select('*')
-        .ilike('currency_code', tokenCode)
-        .single();
+      const holdersData = await AICachedData.getTokenHolders(tokenCode, 10);
 
-      if (tokenError || !token) {
+      if (!holdersData) {
         return {
           content: `Token "${tokenCode}" not found.`,
           data: null
         };
       }
 
-      const { data: holders, error } = await supabase
-        .from('token_holdings_cache')
-        .select('*')
-        .eq('token_id', token.id)
-        .order('balance', { ascending: false })
-        .limit(10);
-
-      if (error || !holders || holders.length === 0) {
+      if (!holdersData.holders || holdersData.holders.length === 0) {
         return {
-          content: `No holder data available yet for ${token.token_name} (${tokenCode}). Holder data is updated periodically.`,
+          content: `No holder data available yet for ${holdersData.token.token_name} (${tokenCode}). Holder data is updated periodically.`,
           data: {
             card: {
               icon: '👥',
-              title: `${token.token_name} (${tokenCode})`,
+              title: `${holdersData.token.token_name} (${tokenCode})`,
               badge: 'No Data',
               items: [
                 { label: 'Status', value: 'Holder data not yet available' },
-                { label: 'Total Supply', value: token.supply ? parseFloat(token.supply).toLocaleString() : 'N/A' }
+                { label: 'Total Supply', value: holdersData.token.supply ? parseFloat(holdersData.token.supply).toLocaleString() : 'N/A' }
               ]
             }
           }
         };
       }
 
-      const totalHolders = holders.length;
-      const totalBalance = holders.reduce((sum, h) => sum + parseFloat(h.balance || 0), 0);
-
       return {
-        content: `Here are the top holders of ${token.token_name} (${tokenCode}):`,
+        content: `Here are the top holders of ${holdersData.token.token_name} (${tokenCode}) (from cache):`,
         data: {
           card: {
             icon: '👥',
-            title: `${token.token_name} Holders`,
-            badge: `${totalHolders} Holders`,
+            title: `${holdersData.token.token_name} Holders`,
+            badge: `${holdersData.totalHolders} Holders`,
             items: [
-              { label: 'Total Holders', value: `${totalHolders}` },
-              { label: 'Total Balance', value: totalBalance.toLocaleString() },
-              { label: 'Total Supply', value: token.supply ? parseFloat(token.supply).toLocaleString() : 'N/A' }
+              { label: 'Total Holders', value: `${holdersData.totalHolders}` },
+              { label: 'Total Balance', value: holdersData.totalBalance.toLocaleString() },
+              { label: 'Total Supply', value: holdersData.token.supply ? parseFloat(holdersData.token.supply).toLocaleString() : 'N/A' },
+              { label: 'Cache Status', value: holdersData.cacheStatus === 'valid' ? '✅ Fresh' : '⚠️ Updating' }
             ]
           },
           table: {
             headers: ['Rank', 'Address', 'Balance', '% of Supply'],
-            rows: holders.map((holder, idx) => [
+            rows: holdersData.holders.map((holder, idx) => [
               `#${idx + 1}`,
               `${holder.wallet_address?.slice(0, 8)}...${holder.wallet_address?.slice(-6)}`,
               parseFloat(holder.balance).toLocaleString(),
-              `${((parseFloat(holder.balance) / parseFloat(token.supply)) * 100).toFixed(2)}%`
+              `${((parseFloat(holder.balance) / parseFloat(holdersData.token.supply)) * 100).toFixed(2)}%`
             ])
           },
           actions: [
@@ -1421,7 +1381,7 @@ class AIAssistant {
               onClick: () => {
                 window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'trade' }));
                 setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent('selectToken', { detail: token }));
+                  window.dispatchEvent(new CustomEvent('selectToken', { detail: holdersData.token }));
                 }, 100);
               }
             }
