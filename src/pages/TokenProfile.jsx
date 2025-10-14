@@ -397,14 +397,14 @@ export default function TokenProfile({ tokenSlug }) {
 
   const tweetToken = () => {
     const price = calculatePrice();
-    const tokenUrl = `https://drazpa-memekingz-a1bo.bolt.host/token/${token.token_name}`;
+    const tokenUrl = `${window.location.origin}/token/${token.token_name}`;
     const text = `Check out $${token.currency_code} on #XRP Ledger!\n\n💰 Price: ${price} XRP\n📊 Market Cap: ${calculateMarketCap()} XRP\n\n#${token.currency_code} #XRPL #Crypto\n\n${tokenUrl}`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
   const copyProfileLink = () => {
-    const tokenUrl = `https://drazpa-memekingz-a1bo.bolt.host/token/${token.token_name}`;
+    const tokenUrl = `${window.location.origin}/token/${token.token_name}`;
     navigator.clipboard.writeText(tokenUrl).then(() => {
       toast.success('Link copied to clipboard!');
     }).catch(() => {

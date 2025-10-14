@@ -66,6 +66,33 @@ export default function App() {
   const [tokenSlug, setTokenSlug] = useState(null);
 
   useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith('/token/')) {
+      const slug = path.replace('/token/', '');
+      setTokenSlug(slug);
+      setCurrentPage('tokenprofile');
+    }
+
+    const handlePopState = () => {
+      const path = window.location.pathname;
+      if (path.startsWith('/token/')) {
+        const slug = path.replace('/token/', '');
+        setTokenSlug(slug);
+        setCurrentPage('tokenprofile');
+      } else {
+        setCurrentPage('dashboard');
+        setTokenSlug(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
     const handleError = (event) => {
       console.error('Global error caught:', event.error);
       event.preventDefault();
@@ -138,6 +165,7 @@ export default function App() {
     const handleNavigateToToken = (event) => {
       setTokenSlug(event.detail);
       handlePageChange('tokenprofile');
+      window.history.pushState({}, '', `/token/${event.detail}`);
     };
 
     window.addEventListener('navigateToTrade', handleNavigateToTrade);
@@ -154,6 +182,9 @@ export default function App() {
   const handlePageChange = (page) => {
     setCurrentPage(page);
     setPageKey(prev => prev + 1);
+    if (page !== 'tokenprofile') {
+      window.history.pushState({}, '', '/');
+    }
   };
 
   const renderPage = () => {
