@@ -83,6 +83,15 @@ export default function MyTokens() {
     }
   };
 
+  const handleColumnSort = (column) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('desc');
+    }
+  };
+
   const loadFavorites = async () => {
     if (!connectedWallet) return;
     try {
@@ -541,16 +550,76 @@ export default function MyTokens() {
                 <thead className="bg-purple-900/30 border-b border-purple-500/20">
                   <tr>
                     <th className="text-left p-4 text-purple-300 font-medium">⭐</th>
-                    <th className="text-left p-4 text-purple-300 font-medium">Token</th>
-                    <th className="text-left p-4 text-purple-300 font-medium">Category</th>
-                    <th className="text-left p-4 text-purple-300 font-medium">Days</th>
-                    <th className="text-right p-4 text-purple-300 font-medium">Balance</th>
-                    <th className="text-right p-4 text-purple-300 font-medium">% of Supply</th>
-                    <th className="text-right p-4 text-purple-300 font-medium">Total Supply</th>
-                    <th className="text-right p-4 text-purple-300 font-medium">Price</th>
-                    <th className="text-right p-4 text-purple-300 font-medium">24H Change</th>
-                    <th className="text-right p-4 text-purple-300 font-medium">Value</th>
-                    <th className="text-right p-4 text-purple-300 font-medium">Pool Share</th>
+                    <th
+                      className="text-left p-4 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                      onDoubleClick={() => handleColumnSort('token')}
+                      title="Double-click to sort"
+                    >
+                      Token {sortBy === 'token' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="text-left p-4 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                      onDoubleClick={() => handleColumnSort('category')}
+                      title="Double-click to sort"
+                    >
+                      Category {sortBy === 'category' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="text-left p-4 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                      onDoubleClick={() => handleColumnSort('days')}
+                      title="Double-click to sort"
+                    >
+                      Days {sortBy === 'days' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="text-right p-4 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                      onDoubleClick={() => handleColumnSort('balance')}
+                      title="Double-click to sort"
+                    >
+                      Balance {sortBy === 'balance' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="text-right p-4 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                      onDoubleClick={() => handleColumnSort('supplyPercent')}
+                      title="Double-click to sort"
+                    >
+                      % of Supply {sortBy === 'supplyPercent' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="text-right p-4 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                      onDoubleClick={() => handleColumnSort('supply')}
+                      title="Double-click to sort"
+                    >
+                      Total Supply {sortBy === 'supply' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="text-right p-4 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                      onDoubleClick={() => handleColumnSort('price')}
+                      title="Double-click to sort"
+                    >
+                      Price {sortBy === 'price' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="text-right p-4 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                      onDoubleClick={() => handleColumnSort('24hChange')}
+                      title="Double-click to sort"
+                    >
+                      24H Change {sortBy === '24hChange' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="text-right p-4 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                      onDoubleClick={() => handleColumnSort('value')}
+                      title="Double-click to sort"
+                    >
+                      Value {sortBy === 'value' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th
+                      className="text-right p-4 text-purple-300 font-medium cursor-pointer hover:text-purple-200 select-none"
+                      onDoubleClick={() => handleColumnSort('poolShare')}
+                      title="Double-click to sort"
+                    >
+                      Pool Share {sortBy === 'poolShare' && (sortOrder === 'asc' ? '↑' : '↓')}
+                    </th>
                     <th className="text-right p-4 text-purple-300 font-medium">Issuer</th>
                     <th className="text-center p-4 text-purple-300 font-medium">Actions</th>
                   </tr>
@@ -599,6 +668,21 @@ export default function MyTokens() {
                         const shareB = b.isLPToken ? b.lpShare : 0;
                         compareValue = shareB - shareA;
                       }
+                      else if (sortBy === 'category') {
+                        const catA = a.token.category || '';
+                        const catB = b.token.category || '';
+                        compareValue = catA.localeCompare(catB);
+                      }
+                      else if (sortBy === 'days') {
+                        const daysA = calculateDaysOnMarket(a.token.created_at);
+                        const daysB = calculateDaysOnMarket(b.token.created_at);
+                        compareValue = daysB - daysA;
+                      }
+                      else if (sortBy === 'supply') {
+                        const supplyA = parseFloat(a.token.supply) || 0;
+                        const supplyB = parseFloat(b.token.supply) || 0;
+                        compareValue = supplyB - supplyA;
+                      }
 
                       return sortOrder === 'asc' ? -compareValue : compareValue;
                     })
@@ -631,8 +715,13 @@ export default function MyTokens() {
                         📅 {calculateDaysOnMarket(holding.token.created_at)}d
                       </span>
                     </td>
-                    <td className="text-right p-4 text-purple-200 font-mono">
-                      {holding.balance.toFixed(4)}
+                    <td className="text-right p-4">
+                      <div>
+                        <div className="text-purple-200 font-mono">{holding.balance.toFixed(4)}</div>
+                        <div className="text-green-400 text-xs">
+                          ${(holding.balance * holding.price * xrpPrice).toFixed(2)}
+                        </div>
+                      </div>
                     </td>
                     <td className="text-right p-4 text-purple-200 font-mono">
                       {holding.token.supply && holding.token.supply > 0 ? (
@@ -652,8 +741,17 @@ export default function MyTokens() {
                         <span className="text-purple-500">-</span>
                       )}
                     </td>
-                    <td className="text-right p-4 text-purple-200 font-mono">
-                      {holding.price > 0 ? `${holding.price.toFixed(8)} XRP` : 'N/A'}
+                    <td className="text-right p-4">
+                      {holding.price > 0 ? (
+                        <div>
+                          <div className="text-purple-200 font-mono">{holding.price.toFixed(8)} XRP</div>
+                          <div className="text-green-400 text-xs">
+                            ${(holding.price * xrpPrice).toFixed(6)}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-purple-500">N/A</span>
+                      )}
                     </td>
                     <td className="text-right p-4 font-mono font-bold">
                       {holding.priceChange24h !== undefined ? (
