@@ -37,8 +37,9 @@ export function TokenTrustButton({
       checkTrustlineStatus();
     } else {
       setCheckingTrustline(false);
+      setHasTrustline(false);
     }
-  }, [connectedWallet, token]);
+  }, [token?.id, connectedWallet?.address]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -463,13 +464,26 @@ export function TokenTrustButton({
   }
 
   if (!connectedWallet) {
+    if (!showDropdown) {
+      return (
+        <button
+          disabled
+          className={`bg-gray-700 text-gray-400 rounded-lg disabled:opacity-50 cursor-not-allowed ${getSizeClasses()} ${className}`}
+        >
+          Connect Wallet
+        </button>
+      );
+    }
+
     return (
-      <button
-        disabled
-        className={`bg-gray-700 text-gray-400 rounded-lg disabled:opacity-50 cursor-not-allowed ${getSizeClasses()} ${className}`}
-      >
-        Connect Wallet
-      </button>
+      <div className={`relative trust-dropdown ${className}`}>
+        <button
+          disabled
+          className={`w-full bg-gray-700 text-gray-400 rounded-lg disabled:opacity-50 cursor-not-allowed flex items-center justify-center gap-2 ${getSizeClasses()}`}
+        >
+          <span>Connect Wallet</span>
+        </button>
+      </div>
     );
   }
 
@@ -527,7 +541,10 @@ export function TokenTrustButton({
   return (
     <div className={`relative trust-dropdown ${className}`}>
       <button
-        onClick={() => setDropdownOpen(!dropdownOpen)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setDropdownOpen(!dropdownOpen);
+        }}
         disabled={loading || checkingTrustline}
         className={`w-full bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300 flex items-center justify-center gap-2 ${getSizeClasses()}`}
       >
@@ -547,7 +564,11 @@ export function TokenTrustButton({
       </button>
 
       {dropdownOpen && (
-        <div className="absolute bottom-full left-0 mb-2 w-64 bg-gradient-to-br from-purple-900 to-purple-800 border border-purple-500/30 rounded-lg shadow-xl z-[9999] overflow-hidden backdrop-blur-xl">
+        <div
+          className="absolute bottom-full left-0 mb-2 w-64 bg-gradient-to-br from-purple-900 to-purple-800 border border-purple-500/30 rounded-lg shadow-xl overflow-hidden backdrop-blur-xl"
+          style={{ zIndex: 9999 }}
+          onClick={(e) => e.stopPropagation()}
+        >
           <button
             onClick={() => {
               setDropdownOpen(false);
