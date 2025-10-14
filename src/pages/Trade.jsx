@@ -82,6 +82,7 @@ export default function Trade({ preselectedToken = null }) {
   const [lastTxDetails, setLastTxDetails] = useState(null);
   const [autoRetrying, setAutoRetrying] = useState(false);
   const [retryAttempt, setRetryAttempt] = useState(0);
+  const [tokenSelectionTab, setTokenSelectionTab] = useState('select');
   const [lpPosition, setLpPosition] = useState(null);
   const [loadingLpPosition, setLoadingLpPosition] = useState(false);
   const [showPositionTab, setShowPositionTab] = useState(false);
@@ -1060,7 +1061,9 @@ export default function Trade({ preselectedToken = null }) {
         }
       ) || false;
 
-      setHasTrustline(hasTrust);
+      const hasBalance = parseFloat(tokenBalance) > 0;
+
+      setHasTrustline(hasTrust || hasBalance);
       await client.disconnect();
     } catch (error) {
       console.error('Error checking trustline:', error);
@@ -1864,7 +1867,12 @@ export default function Trade({ preselectedToken = null }) {
                   <div>
                     <h3 className="text-base font-bold text-purple-200">{selectedToken.token_name}/XRP</h3>
                     <div className="flex items-center gap-2">
-                      <div className="text-lg font-bold text-purple-200">{currentPrice.toFixed(8)} XRP</div>
+                      <div className="text-lg font-bold text-purple-200">
+                        {chartDataRef.current.length > 0
+                          ? (chartDataRef.current[chartDataRef.current.length - 1].close || chartDataRef.current[chartDataRef.current.length - 1].value || currentPrice).toFixed(8)
+                          : currentPrice.toFixed(8)
+                        } XRP
+                      </div>
                       <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
                         parseFloat(change24h) >= 0
                           ? 'text-green-300 bg-green-500/10'
@@ -2017,22 +2025,59 @@ export default function Trade({ preselectedToken = null }) {
           )}
 
           <div className="glass rounded-lg p-4">
-            <h3 className="text-lg font-bold text-purple-200 mb-3">Select Token</h3>
-            <select
-              value={selectedToken?.id || ''}
-              onChange={(e) => {
-                const token = tokens.find(t => t.id === e.target.value);
-                setSelectedToken(token);
-              }}
-              className="input w-full mb-3 text-purple-200"
-            >
-              <option value="">Choose a token...</option>
-              {tokens.map((token) => (
-                <option key={token.id} value={token.id}>
-                  {token.token_name} - {calculatePrice(token).toFixed(8)} XRP
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-2 mb-4">
+              <button
+                onClick={() => setTokenSelectionTab('select')}
+                className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all ${
+                  tokenSelectionTab === 'select'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-purple-900/30 text-purple-300 hover:bg-purple-900/50'
+                }`}
+              >
+                Select Token
+              </button>
+              <button
+                onClick={() => setTokenSelectionTab('history')}
+                className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all ${
+                  tokenSelectionTab === 'history'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-purple-900/30 text-purple-300 hover:bg-purple-900/50'
+                }`}
+              >
+                Trade History
+              </button>
+            </div>
+
+            {tokenSelectionTab === 'select' ? (
+              <>
+                <select
+                  value={selectedToken?.id || ''}
+                  onChange={(e) => {
+                    const token = tokens.find(t => t.id === e.target.value);
+                    setSelectedToken(token);
+                  }}
+                  className="input w-full mb-3 text-purple-200"
+                >
+                  <option value="">Choose a token...</option>
+                  {tokens.map((token) => (
+                    <option key={token.id} value={token.id}>
+                      {token.token_name} - {calculatePrice(token).toFixed(8)} XRP
+                    </option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <div className="min-h-[200px]">
+                {selectedToken ? (
+                  <TradeHistory tokenId={selectedToken.id} />
+                ) : (
+                  <div className="text-center py-8 text-purple-400">
+                    <div className="text-4xl mb-2">📊</div>
+                    <div>Select a token to view trade history</div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {selectedToken && (
               <div className="glass rounded-lg p-3 bg-blue-500/10 border border-blue-500/30 mb-4">
@@ -2559,12 +2604,6 @@ export default function Trade({ preselectedToken = null }) {
           </div>
         </div>
       </div>
-
-      {selectedToken && (
-        <div className="mt-2">
-          <TradeHistory tokenId={selectedToken.id} />
-        </div>
-      )}
 
       <TokenCreationProgressModal
         isOpen={showTradeProgress}
