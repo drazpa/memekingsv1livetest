@@ -95,6 +95,7 @@ export default function Dashboard() {
   const [tokenFilterTab, setTokenFilterTab] = useState('all');
   const [mainTokenTab, setMainTokenTab] = useState('all');
   const [swapDropdownOpen, setSwapDropdownOpen] = useState(null);
+  const [trustDropdownOpen, setTrustDropdownOpen] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [volumeHistory, setVolumeHistory] = useState({});
   const TOKENS_PER_PAGE = 100;
@@ -126,11 +127,14 @@ export default function Dashboard() {
       if (swapDropdownOpen && !event.target.closest('.swap-dropdown')) {
         setSwapDropdownOpen(null);
       }
+      if (trustDropdownOpen && !event.target.closest('.trust-dropdown')) {
+        setTrustDropdownOpen(null);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [swapDropdownOpen]);
+  }, [swapDropdownOpen, trustDropdownOpen]);
 
   useEffect(() => {
     if (tokens.length > 0 && Object.keys(poolsData).length === 0) {
@@ -1253,6 +1257,8 @@ export default function Dashboard() {
             size="sm"
             className="w-full"
             showDropdown={true}
+            isDropdownOpen={trustDropdownOpen === token.id}
+            onDropdownToggle={(tokenId) => setTrustDropdownOpen(trustDropdownOpen === tokenId ? null : tokenId)}
           />
         </div>
         <div className="relative swap-dropdown" onClick={(e) => { e.stopPropagation(); }}>
@@ -1446,6 +1452,8 @@ export default function Dashboard() {
               }}
               size="sm"
               showDropdown={true}
+              isDropdownOpen={trustDropdownOpen === token.id}
+              onDropdownToggle={(tokenId) => setTrustDropdownOpen(trustDropdownOpen === tokenId ? null : tokenId)}
             />
           </div>
           <div className="relative swap-dropdown" onClick={(e) => { e.stopPropagation(); }}>

@@ -11,12 +11,17 @@ export function TokenTrustButton({
   onTrustlineUpdate,
   className = '',
   size = 'md',
-  showDropdown = false
+  showDropdown = false,
+  isDropdownOpen = false,
+  onDropdownToggle = null
 }) {
   const [loading, setLoading] = useState(false);
   const [hasTrustline, setHasTrustline] = useState(false);
   const [checkingTrustline, setCheckingTrustline] = useState(true);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [internalDropdownOpen, setInternalDropdownOpen] = useState(false);
+
+  const dropdownOpen = onDropdownToggle ? isDropdownOpen : internalDropdownOpen;
+  const setDropdownOpen = onDropdownToggle || setInternalDropdownOpen;
 
   const getCurrencyHex = (token) => {
     if (token.currency_hex) return token.currency_hex;
@@ -41,16 +46,6 @@ export function TokenTrustButton({
     }
   }, [token?.id, connectedWallet?.address]);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownOpen && !event.target.closest('.trust-dropdown')) {
-        setDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [dropdownOpen]);
 
   const checkTrustlineStatus = async () => {
     if (!connectedWallet || !token) {
@@ -543,7 +538,11 @@ export function TokenTrustButton({
       <button
         onClick={(e) => {
           e.stopPropagation();
-          setDropdownOpen(!dropdownOpen);
+          if (onDropdownToggle) {
+            onDropdownToggle(token.id);
+          } else {
+            setDropdownOpen(!dropdownOpen);
+          }
         }}
         disabled={loading || checkingTrustline}
         className={`w-full bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300 flex items-center justify-center gap-2 ${getSizeClasses()}`}
@@ -571,7 +570,11 @@ export function TokenTrustButton({
         >
           <button
             onClick={() => {
-              setDropdownOpen(false);
+              if (onDropdownToggle) {
+                onDropdownToggle(null);
+              } else {
+                setDropdownOpen(false);
+              }
               handleSetupTrustline();
             }}
             disabled={loading || hasTrustline}
@@ -590,7 +593,11 @@ export function TokenTrustButton({
 
           <button
             onClick={() => {
-              setDropdownOpen(false);
+              if (onDropdownToggle) {
+                onDropdownToggle(null);
+              } else {
+                setDropdownOpen(false);
+              }
               handleRemoveTrustline();
             }}
             disabled={loading || !hasTrustline || tokenBalance > 0}
@@ -614,7 +621,13 @@ export function TokenTrustButton({
             target="_blank"
             rel="noopener noreferrer"
             className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3"
-            onClick={() => setDropdownOpen(false)}
+            onClick={() => {
+              if (onDropdownToggle) {
+                onDropdownToggle(null);
+              } else {
+                setDropdownOpen(false);
+              }
+            }}
           >
             <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
