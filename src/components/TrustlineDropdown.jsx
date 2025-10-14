@@ -204,11 +204,11 @@ export function TrustlineDropdown({
   };
 
   return (
-    <div className="relative inline-block" ref={dropdownRef}>
+    <div className="relative inline-block z-50" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={loading}
-        className="bg-gradient-to-r from-green-600 to-green-500 text-white py-2 px-4 rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300 flex items-center gap-2"
+        className="bg-gradient-to-r from-purple-600 to-purple-500 text-white py-2 px-4 rounded-lg hover:from-purple-500 hover:to-purple-400 disabled:opacity-50 shadow-lg shadow-purple-500/20 transition-all duration-300 flex items-center gap-2"
       >
         {loading ? (
           <>
@@ -229,44 +229,50 @@ export function TrustlineDropdown({
       </button>
 
       {isOpen && !loading && (
-        <div className="absolute right-0 mt-2 w-56 bg-gray-800 rounded-lg shadow-xl border border-gray-700 z-50">
+        <div className="absolute right-0 mt-2 w-64 bg-gray-900 rounded-lg shadow-2xl border border-purple-500/30 z-[100]">
           <div className="py-1">
             <button
               onClick={handleMemeKingsSetup}
-              className="w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-gray-700/50 transition-colors flex items-center gap-3"
+              className="w-full text-left px-4 py-3 text-sm text-purple-200 hover:bg-purple-900/50 transition-colors flex items-center gap-3"
             >
-              <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-              </svg>
+              <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
               <div>
-                <div className="font-medium">Setup MEMEKINGS</div>
-                <div className="text-xs text-gray-400">Add all token trustlines</div>
+                <div className="font-medium">Setup</div>
+                <div className="text-xs text-purple-400">Add this token trustline</div>
               </div>
             </button>
 
             <button
               onClick={handleMemeKingsRemove}
-              className="w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-gray-700/50 transition-colors flex items-center gap-3 border-t border-gray-700"
+              className="w-full text-left px-4 py-3 text-sm text-purple-200 hover:bg-purple-900/50 transition-colors flex items-center gap-3 border-t border-purple-500/20"
             >
-              <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
               <div>
-                <div className="font-medium">Remove MEMEKINGS</div>
-                <div className="text-xs text-gray-400">Remove empty trustlines</div>
+                <div className="font-medium">Remove</div>
+                <div className="text-xs text-purple-400">Remove empty trustline</div>
               </div>
             </button>
 
             <button
               onClick={handleXamanLink}
-              className="w-full text-left px-4 py-3 text-sm text-gray-200 hover:bg-gray-700/50 transition-colors flex items-center gap-3 border-t border-gray-700"
+              className="w-full text-left px-4 py-3 text-sm text-purple-200 hover:bg-purple-900/50 transition-colors flex items-center gap-3 border-t border-purple-500/20"
             >
-              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
+              <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </div>
               <div>
-                <div className="font-medium">XAMAN Link</div>
-                <div className="text-xs text-gray-400">Open XAMAN app</div>
+                <div className="font-medium">XRPScan Link</div>
+                <div className="text-xs text-purple-400">View issuer details</div>
               </div>
             </button>
           </div>
