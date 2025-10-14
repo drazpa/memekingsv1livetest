@@ -3,6 +3,8 @@ import { createChart } from 'lightweight-charts';
 import * as xrpl from 'xrpl';
 import TokenIcon from './TokenIcon';
 import { supabase } from '../utils/supabase';
+import SendTokenModal from './SendTokenModal';
+import ReceiveTokenModal from './ReceiveTokenModal';
 
 export default function TokenDetailModal({ token, onClose }) {
   const priceChartContainerRef = useRef(null);
@@ -20,14 +22,69 @@ export default function TokenDetailModal({ token, onClose }) {
   const [timeframe, setTimeframe] = useState('1h');
   const [livePrice, setLivePrice] = useState(0);
   const [priceChange24h, setPriceChange24h] = useState(0);
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [connectedWallet, setConnectedWallet] = useState(null);
+  const [userBalance, setUserBalance] = useState(0);
 
   useEffect(() => {
     fetchLivePoolData();
+    loadConnectedWallet();
 
     return () => {
       stopRealTimeUpdates();
     };
   }, [token]);
+
+  useEffect(() => {
+    if (connectedWallet && token) {
+      fetchUserBalance();
+    }
+  }, [connectedWallet, token]);
+
+  const loadConnectedWallet = () => {
+    const wallet = localStorage.getItem('connectedWallet');
+    if (wallet) {
+      setConnectedWallet(JSON.parse(wallet));
+    }
+  };
+
+  const fetchUserBalance = async () => {
+    if (!connectedWallet || !token) return;
+
+    try {
+      const client = new xrpl.Client(
+        connectedWallet.network === 'mainnet'
+          ? 'wss://xrplcluster.com'
+          : 'wss://s.altnet.rippletest.net:51233'
+      );
+
+      await client.connect();
+
+      const response = await client.request({
+        command: 'account_lines',
+        account: connectedWallet.address,
+        ledger_index: 'validated'
+      });
+
+      const lines = response.result.lines || [];
+      const tokenLine = lines.find(line =>
+        line.account === token.issuer_address &&
+        (line.currency === token.currency_hex || line.currency === token.currency_code)
+      );
+
+      if (tokenLine) {
+        setUserBalance(parseFloat(tokenLine.balance));
+      } else {
+        setUserBalance(0);
+      }
+
+      await client.disconnect();
+    } catch (error) {
+      console.error('Error fetching user balance:', error);
+      setUserBalance(0);
+    }
+  };
 
   useEffect(() => {
     if (livePoolData && priceChartContainerRef.current && volumeChartContainerRef.current) {
@@ -762,6 +819,22 @@ export default function TokenDetailModal({ token, onClose }) {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+                {connectedWallet && (
+                  <>
+                    <button
+                      onClick={() => setShowSendModal(true)}
+                      className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold px-4 py-3 rounded-lg shadow-lg"
+                    >
+                      📤 Send
+                    </button>
+                    <button
+                      onClick={() => setShowReceiveModal(true)}
+                      className="bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-4 py-3 rounded-lg shadow-lg"
+                    >
+                      📥 Receive
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => {
                     localStorage.setItem('selectedTradeToken', JSON.stringify(token));
@@ -818,6 +891,27 @@ export default function TokenDetailModal({ token, onClose }) {
           )}
         </div>
       </div>
+
+      {showSendModal && connectedWallet && (
+        <SendTokenModal
+          token={token}
+          balance={userBalance}
+          wallet={connectedWallet}
+          onClose={() => setShowSendModal(false)}
+          onSuccess={() => {
+            setShowSendModal(false);
+            fetchUserBalance();
+          }}
+        />
+      )}
+
+      {showReceiveModal && connectedWallet && (
+        <ReceiveTokenModal
+          token={token}
+          wallet={connectedWallet}
+          onClose={() => setShowReceiveModal(false)}
+        />
+      )}
     </div>
   );
 }
