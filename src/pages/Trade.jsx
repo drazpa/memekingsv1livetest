@@ -1640,9 +1640,16 @@ export default function Trade({ preselectedToken = null }) {
       const result = await client.submitAndWait(signed.tx_blob, { timeout: 45000 });
 
       if (result.result.meta.TransactionResult === 'tesSUCCESS') {
-        const actualAmount = tradeType === 'buy'
-          ? parseFloat(result.result.meta.delivered_amount?.value || estimate.tokenAmount)
-          : estimate.tokenAmount;
+        let actualAmount;
+        if (tradeType === 'buy') {
+          if (result.result.meta.delivered_amount && typeof result.result.meta.delivered_amount === 'object' && result.result.meta.delivered_amount.value) {
+            actualAmount = parseFloat(result.result.meta.delivered_amount.value);
+          } else {
+            actualAmount = parseFloat(estimate.tokenAmount);
+          }
+        } else {
+          actualAmount = parseFloat(estimate.tokenAmount);
+        }
 
         const txHash = result.result.hash;
         setLastTxHash(txHash);
