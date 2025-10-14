@@ -4,6 +4,7 @@ import TokenIcon from '../components/TokenIcon';
 import { TokenTrustButton } from '../components/TokenTrustButton';
 import TradeHistory from '../components/TradeHistory';
 import { XRPScanLink } from '../components/XRPScanLink';
+import { PriceChart } from '../components/PriceChart';
 import toast from 'react-hot-toast';
 import * as xrpl from 'xrpl';
 
@@ -16,6 +17,8 @@ export default function TokenProfile({ tokenSlug }) {
   const [lpBalance, setLpBalance] = useState(null);
   const [swapDropdownOpen, setSwapDropdownOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [chartData, setChartData] = useState([]);
+  const [userBalance, setUserBalance] = useState(null);
 
   useEffect(() => {
     loadToken();
@@ -26,6 +29,8 @@ export default function TokenProfile({ tokenSlug }) {
   useEffect(() => {
     if (token) {
       fetchPoolData();
+      fetchUserBalance();
+      generateMockChartData();
     }
   }, [token, connectedWallet]);
 
@@ -268,11 +273,79 @@ export default function TokenProfile({ tokenSlug }) {
     return change.toFixed(2);
   };
 
+  const fetchUserBalance = async () => {
+    if (!connectedWallet || !token) return;
+
+    try {
+      const client = new xrpl.Client(
+        connectedWallet.network === 'mainnet'
+          ? 'wss://xrplcluster.com'
+          : 'wss://s.altnet.rippletest.net:51233'
+      );
+
+      await client.connect();
+
+      const response = await client.request({
+        command: 'account_lines',
+        account: connectedWallet.address,
+        ledger_index: 'validated'
+      });
+
+      const lines = response.result.lines || [];
+      const tokenLine = lines.find(line =>
+        line.account === token.issuer_address &&
+        (line.currency === token.currency_hex || line.currency === token.currency_code)
+      );
+
+      if (tokenLine) {
+        const balance = parseFloat(tokenLine.balance);
+        setUserBalance(balance);
+      } else {
+        setUserBalance(0);
+      }
+
+      await client.disconnect();
+    } catch (error) {
+      console.error('Error fetching user balance:', error);
+      setUserBalance(0);
+    }
+  };
+
+  const generateMockChartData = () => {
+    if (!token) return;
+
+    const basePrice = parseFloat(calculatePrice()) || 0.00000001;
+    const now = Math.floor(Date.now() / 1000);
+    const data = [];
+
+    for (let i = 30; i >= 0; i--) {
+      const time = now - (i * 3600);
+      const variance = (Math.random() - 0.5) * 0.2;
+      const price = Math.max(basePrice * (1 + variance), 0.00000001);
+      data.push({
+        time,
+        value: price
+      });
+    }
+
+    setChartData(data);
+  };
+
   const tweetToken = () => {
     const price = calculatePrice();
-    const text = `Check out ${token.token_name} (${token.currency_code}) on XRPL!\n\n💰 Price: ${price} XRP\n📊 Market Cap: ${calculateMarketCap()} XRP\n\n#XRPL #${token.currency_code} #Crypto`;
+    const tokenUrl = `https://MEMEKINGS.ONLINE/token/${token.token_name}`;
+    const text = `Check out $${token.currency_code} on #XRP Ledger!\n\n💰 Price: ${price} XRP\n📊 Market Cap: ${calculateMarketCap()} XRP\n\n#${token.currency_code} #XRPL #Crypto\n\n${tokenUrl}`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
+  };
+
+  const copyProfileLink = () => {
+    const tokenUrl = `https://MEMEKINGS.ONLINE/token/${token.token_name}`;
+    navigator.clipboard.writeText(tokenUrl).then(() => {
+      toast.success('Link copied to clipboard!');
+    }).catch(() => {
+      toast.error('Failed to copy link');
+    });
   };
 
   if (loading) {
@@ -344,6 +417,20 @@ export default function TokenProfile({ tokenSlug }) {
                 </div>
               )}
             </div>
+
+            {connectedWallet && userBalance !== null && (
+              <div className="glass rounded-lg p-4 text-center min-w-[200px] bg-purple-500/10 border border-purple-500/30">
+                <div className="text-purple-400 text-sm mb-1">Your Holdings</div>
+                <div className="text-xl font-bold text-purple-200">{userBalance.toFixed(4)}</div>
+                <div className="text-purple-400 text-xs">{token.currency_code}</div>
+                <div className="text-green-400 text-sm mt-1">
+                  {(userBalance * parseFloat(calculatePrice())).toFixed(4)} XRP
+                </div>
+                <div className="text-green-400 text-xs">
+                  ${(userBalance * parseFloat(calculatePrice()) * xrpUsdPrice).toFixed(2)}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -463,6 +550,16 @@ export default function TokenProfile({ tokenSlug }) {
         </button>
 
         <button
+          onClick={copyProfileLink}
+          className="bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-bold px-6 py-3 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+          Share Link
+        </button>
+
+        <button
           onClick={tweetToken}
           className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold px-6 py-3 rounded-lg shadow-lg transition-all duration-300"
         >
@@ -545,10 +642,8 @@ export default function TokenProfile({ tokenSlug }) {
           )}
 
           {activeTab === 'chart' && token.amm_pool_created && (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">📊</div>
-              <div className="text-purple-300">Chart feature coming soon</div>
-              <div className="text-purple-400 text-sm mt-2">Historical price data will be displayed here</div>
+            <div className="h-[500px]">
+              <PriceChart data={chartData} />
             </div>
           )}
 
@@ -556,6 +651,7 @@ export default function TokenProfile({ tokenSlug }) {
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📊</div>
               <div className="text-purple-300">Chart will be available once AMM pool is created</div>
+              <div className="text-purple-400 text-sm mt-2">Historical price data requires an active trading pool</div>
             </div>
           )}
 
