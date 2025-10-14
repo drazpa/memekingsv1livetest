@@ -23,7 +23,8 @@ function TokenIcon({ token, size = 'md', className = '' }) {
     md: 'w-12 h-12 min-w-[3rem] min-h-[3rem] text-xl',
     lg: 'w-16 h-16 min-w-[4rem] min-h-[4rem] text-2xl',
     xl: 'w-20 h-20 min-w-[5rem] min-h-[5rem] text-3xl',
-    '3xl': 'w-24 h-24 min-w-[6rem] min-h-[6rem] text-4xl'
+    '2xl': 'w-24 h-24 min-w-[6rem] min-h-[6rem] text-4xl',
+    '3xl': 'w-32 h-32 min-w-[8rem] min-h-[8rem] text-6xl'
   };
 
   const sizeClass = sizeClasses[size] || sizeClasses.md;
@@ -93,26 +94,28 @@ function TokenIcon({ token, size = 'md', className = '' }) {
 
   if (currentUrl && !imageError) {
     return (
-      <div className={`relative inline-block ${sizeClass} flex-shrink-0 rounded-full overflow-hidden aspect-square`}>
-        {!imageLoaded && (
-          <div className={`absolute inset-0 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white font-bold ${className}`}>
-            {token.token_name[0]}
-          </div>
-        )}
-        <img
-          key={`${token.id}-${currentGatewayIndex}-${retryCount}`}
-          src={currentUrl}
-          alt={token.token_name}
-          className={`w-full h-full rounded-full object-cover border-2 border-purple-500 ${className} transition-opacity duration-200 ${!imageLoaded ? 'opacity-0' : 'opacity-100'} aspect-square`}
-          onLoad={async () => {
-            await imageCacheManager.set(cacheKey, currentUrl);
-            setImageLoaded(true);
-          }}
-          onError={handleImageError}
-          loading="lazy"
-          decoding="async"
-          crossOrigin="anonymous"
-        />
+      <div className={`relative inline-block ${sizeClass} flex-shrink-0`}>
+        <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-purple-500 bg-gradient-to-br from-purple-500 to-purple-700">
+          {!imageLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center text-white font-bold">
+              {token.token_name[0]}
+            </div>
+          )}
+          <img
+            key={`${token.id}-${currentGatewayIndex}-${retryCount}`}
+            src={currentUrl}
+            alt={token.token_name}
+            className={`w-full h-full object-cover transition-opacity duration-200 ${!imageLoaded ? 'opacity-0' : 'opacity-100'}`}
+            onLoad={async () => {
+              await imageCacheManager.set(cacheKey, currentUrl);
+              setImageLoaded(true);
+            }}
+            onError={handleImageError}
+            loading="lazy"
+            decoding="async"
+            crossOrigin="anonymous"
+          />
+        </div>
       </div>
     );
   }
