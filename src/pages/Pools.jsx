@@ -393,13 +393,13 @@ export default function Pools() {
     const marketCap = calculateMarketCap(token);
 
     return (
-      <div className="glass rounded-lg p-6 space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="glass rounded-lg p-4 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <TokenIcon token={token} size="3xl" />
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xl font-bold text-purple-200">{token.token_name}/XRP</h3>
+                <h3 className="text-lg sm:text-xl font-bold text-purple-200">{token.token_name}/XRP</h3>
                 <button
                   onClick={(e) => toggleFavorite(token.id, e)}
                   className="text-lg hover:scale-110 transition-transform"
@@ -410,14 +410,14 @@ export default function Pools() {
               <p className="text-purple-400 text-sm">AMM Pool</p>
             </div>
           </div>
-          <div className="text-right">
-            <div className="flex items-center justify-end gap-2">
+          <div className="text-left sm:text-right w-full sm:w-auto">
+            <div className="flex items-center gap-2">
               <div>
-                <div className="text-2xl font-bold text-purple-200">{livePrice.toFixed(8)}</div>
+                <div className="text-xl sm:text-2xl font-bold text-purple-200 font-mono break-all">{livePrice.toFixed(8)}</div>
                 <div className="text-green-400 text-xs">${(livePrice * xrpUsdPrice).toFixed(6)}</div>
               </div>
               {token.amm_pool_created && (
-                <span className={`text-xs font-medium px-2 py-1 rounded ${
+                <span className={`text-xs font-medium px-2 py-1 rounded whitespace-nowrap ${
                   parseFloat(calculate24hChange(token)) >= 0
                     ? 'text-green-300 bg-green-500/10'
                     : 'text-red-300 bg-red-500/10'
@@ -457,14 +457,14 @@ export default function Pools() {
 
             {lpBalance && (
               <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div>
                     <div className="text-green-300 text-sm font-medium mb-1">Your LP Position</div>
                     <div className="text-green-200 text-xs">
                       {lpBalance.balance.toFixed(4)} LP Tokens ({lpBalance.share.toFixed(4)}% of pool)
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right">
                     <div className="text-green-200 font-bold">
                       ~{(poolData.xrpAmount * lpBalance.share / 100).toFixed(4)} XRP
                     </div>

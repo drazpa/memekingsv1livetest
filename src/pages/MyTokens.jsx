@@ -30,8 +30,11 @@ export default function MyTokens() {
   const [sortOrder, setSortOrder] = useState('desc');
   const [favorites, setFavorites] = useState([]);
   const [showLPTokens, setShowLPTokens] = useState(true);
+  const [showRegularTokens, setShowRegularTokens] = useState(true);
+  const [showUserTokens, setShowUserTokens] = useState(true);
   const [xrpPrice, setXrpPrice] = useState(2.50);
   const [tokenFilterTab, setTokenFilterTab] = useState('all');
+  const [userCreatedTokens, setUserCreatedTokens] = useState([]);
 
   useEffect(() => {
     loadConnectedWallet();
@@ -65,6 +68,7 @@ export default function MyTokens() {
     if (connectedWallet) {
       fetchHoldings();
       loadFavorites();
+      loadUserCreatedTokens();
     }
   }, [connectedWallet]);
 
@@ -143,12 +147,28 @@ export default function MyTokens() {
     }
   };
 
+  const loadUserCreatedTokens = async () => {
+    if (!connectedWallet) return;
+    try {
+      const { data, error } = await supabase
+        .from('meme_tokens')
+        .select('*')
+        .eq('issuer_address', connectedWallet.address)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUserCreatedTokens(data || []);
+    } catch (error) {
+      console.error('Error loading user created tokens:', error);
+    }
+  };
+
   const calculateAnalytics = (tokenHoldings) => {
     let totalValue = 0;
     let lpCount = 0;
     let totalTokenValue = 0;
     let totalLPValue = 0;
-    let userTokensCreated = 0;
+    let userTokensCreated = userCreatedTokens.length;
     let userTokensChange = 0;
 
     tokenHoldings.forEach(holding => {
@@ -159,17 +179,11 @@ export default function MyTokens() {
       } else {
         totalTokenValue += holding.value;
       }
-      if (connectedWallet && holding.token.issuer_address === connectedWallet.address) {
-        userTokensCreated++;
-        if (holding.priceChange24h) {
-          userTokensChange += holding.priceChange24h;
-        }
-      }
     });
 
     const totalValueChange24h = ((Math.random() - 0.3) * 20).toFixed(2);
     const lpValueChange24h = ((Math.random() - 0.3) * 15).toFixed(2);
-    const userTokensChange24h = userTokensCreated > 0 ? (userTokensChange / userTokensCreated) : 0;
+    const userTokensChange24h = 0;
 
     setAnalytics({
       totalValue: totalValue.toFixed(4),
@@ -562,10 +576,22 @@ export default function MyTokens() {
                 className="flex-1 min-w-[200px] bg-purple-900/30 border border-purple-500/30 rounded-lg px-4 py-2 text-purple-200 placeholder-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             <button
+              onClick={() => setShowRegularTokens(!showRegularTokens)}
+              className="bg-purple-900/30 border border-purple-500/30 rounded-lg px-3 py-2 text-purple-200 hover:bg-purple-900/50 transition-colors whitespace-nowrap text-sm"
+            >
+              {showRegularTokens ? '👁️ Hide Tokens' : '👁️ Show Tokens'}
+            </button>
+            <button
               onClick={() => setShowLPTokens(!showLPTokens)}
-              className="bg-purple-900/30 border border-purple-500/30 rounded-lg px-4 py-2 text-purple-200 hover:bg-purple-900/50 transition-colors whitespace-nowrap"
+              className="bg-purple-900/30 border border-purple-500/30 rounded-lg px-3 py-2 text-purple-200 hover:bg-purple-900/50 transition-colors whitespace-nowrap text-sm"
             >
               {showLPTokens ? '👁️ Hide LP' : '👁️ Show LP'}
+            </button>
+            <button
+              onClick={() => setShowUserTokens(!showUserTokens)}
+              className="bg-purple-900/30 border border-purple-500/30 rounded-lg px-3 py-2 text-purple-200 hover:bg-purple-900/50 transition-colors whitespace-nowrap text-sm"
+            >
+              {showUserTokens ? '👁️ Hide My Tokens' : '👁️ Show My Tokens'}
             </button>
             <select
               value={sortBy}
@@ -676,6 +702,7 @@ export default function MyTokens() {
                   {holdings
                     .filter(holding => {
                       if (!showLPTokens && holding.isLPToken) return false;
+                      if (!showRegularTokens && !holding.isLPToken) return false;
                       if (tokenFilterTab === 'user' && connectedWallet && holding.token.issuer_address !== connectedWallet.address) return false;
                       if (!searchQuery) return true;
                       const search = searchQuery.toLowerCase();
@@ -895,6 +922,46 @@ export default function MyTokens() {
           <div className="text-6xl mb-4">📭</div>
           <h3 className="text-2xl font-bold text-purple-200 mb-2">No Tokens Found</h3>
           <p className="text-purple-400">You don't have any platform tokens in your wallet yet</p>
+        </div>
+      )}
+
+      {showUserTokens && userCreatedTokens.length > 0 && (
+        <div className="glass rounded-lg p-6 mt-6">
+          <h2 className="text-2xl font-bold text-purple-200 mb-4">
+            🎨 Tokens You Created ({userCreatedTokens.length})
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {userCreatedTokens.map(token => (
+              <div key={token.id} className="glass rounded-lg p-4 hover:bg-purple-900/30 transition-colors cursor-pointer"
+                onClick={() => window.dispatchEvent(new CustomEvent('navigateToToken', { detail: token.token_name }))}>
+                <div className="flex items-start gap-3">
+                  <TokenIcon token={token} size="3xl" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold text-purple-200 truncate">{token.token_name}</div>
+                    <div className="text-purple-400 text-sm">{token.currency_code}</div>
+                    {token.category && <CategoryBadge category={token.category} size="xs" />}
+                    <div className="mt-2">
+                      <div className="text-purple-300 text-xs">Supply</div>
+                      <div className="text-purple-200 font-mono text-sm">{token.supply.toLocaleString()}</div>
+                    </div>
+                    {token.amm_pool_created ? (
+                      <div className="mt-2">
+                        <span className="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs font-medium">
+                          AMM Pool Active
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-2">
+                        <span className="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded text-xs font-medium">
+                          No AMM Pool
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

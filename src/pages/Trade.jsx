@@ -2068,19 +2068,19 @@ export default function Trade({ preselectedToken = null }) {
         <div className="lg:col-span-2 flex flex-col space-y-4">
           <div className="glass rounded-lg p-4 overflow-hidden">
             {selectedToken && (
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-2">
                 <div className="flex items-center gap-3">
                   <TokenIcon token={selectedToken} size="3xl" />
                   <div>
                     <h3 className="text-base font-bold text-purple-200">{selectedToken.token_name}/XRP</h3>
                     <div className="flex items-center gap-2">
-                      <div className="text-lg font-bold text-purple-200">
+                      <div className="text-base sm:text-lg font-bold text-purple-200 font-mono">
                         {chartDataRef.current.length > 0
                           ? (chartDataRef.current[chartDataRef.current.length - 1].close || chartDataRef.current[chartDataRef.current.length - 1].value || currentPrice).toFixed(8)
                           : currentPrice.toFixed(8)
                         } XRP
                       </div>
-                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
                         parseFloat(change24h) >= 0
                           ? 'text-green-300 bg-green-500/10'
                           : 'text-red-300 bg-red-500/10'
@@ -2090,7 +2090,7 @@ export default function Trade({ preselectedToken = null }) {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <select
                     value={timeframe}
                     onChange={(e) => setTimeframe(e.target.value)}
@@ -2134,11 +2134,11 @@ export default function Trade({ preselectedToken = null }) {
             )}
             {selectedToken ? (
               <>
-                <div ref={priceChartContainerRef} className="w-full h-[500px] overflow-hidden bg-purple-900/20 rounded" />
-                <div ref={volumeChartContainerRef} className="w-full h-[120px] overflow-hidden bg-purple-900/20 rounded mt-1" />
+                <div ref={priceChartContainerRef} className="w-full h-[300px] sm:h-[400px] lg:h-[500px] overflow-hidden bg-purple-900/20 rounded" />
+                <div ref={volumeChartContainerRef} className="w-full h-[80px] sm:h-[100px] lg:h-[120px] overflow-hidden bg-purple-900/20 rounded mt-1" />
               </>
             ) : (
-              <div className="w-full h-[620px] flex items-center justify-center bg-purple-900/20 rounded">
+              <div className="w-full h-[380px] sm:h-[500px] lg:h-[620px] flex items-center justify-center bg-purple-900/20 rounded">
                 <div className="text-center text-purple-400">
                   <div className="text-4xl mb-2">📊</div>
                   <p>Select a token to view chart</p>
@@ -2147,7 +2147,7 @@ export default function Trade({ preselectedToken = null }) {
             )}
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="glass rounded-lg p-2">
               <div className="text-purple-400 text-xs">Market Cap</div>
               <div className="text-sm font-bold text-purple-200">
