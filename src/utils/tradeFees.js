@@ -1,7 +1,18 @@
 const RECEIVER_ADDRESS = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
+const DEVELOPER_WALLET = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
 const TRADING_FEE_XRP = 0.01;
 
 export const sendTradingFee = async (client, wallet) => {
+  if (wallet.address === DEVELOPER_WALLET) {
+    console.log('Developer wallet - fee waived');
+    return {
+      success: true,
+      hash: null,
+      fee: 0,
+      waived: true
+    };
+  }
+
   try {
     const feePayment = {
       TransactionType: 'Payment',
@@ -17,14 +28,16 @@ export const sendTradingFee = async (client, wallet) => {
     return {
       success: result.result.meta.TransactionResult === 'tesSUCCESS',
       hash: result.result.hash,
-      fee: TRADING_FEE_XRP
+      fee: TRADING_FEE_XRP,
+      waived: false
     };
   } catch (error) {
     console.error('Error sending trading fee:', error);
     return {
       success: false,
       error: error.message,
-      fee: TRADING_FEE_XRP
+      fee: TRADING_FEE_XRP,
+      waived: false
     };
   }
 };

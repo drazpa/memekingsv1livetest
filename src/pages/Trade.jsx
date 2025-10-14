@@ -9,6 +9,7 @@ import { logActivity, ACTION_TYPES } from '../utils/activityLogger';
 import TokenCreationProgressModal from '../components/TokenCreationProgressModal';
 import SlippageRetryModal from '../components/SlippageRetryModal';
 import PoolHistoryModal from '../components/PoolHistoryModal';
+import TradeHistory from '../components/TradeHistory';
 import { onTokenUpdate } from '../utils/tokenEvents';
 import { XRPScanLink } from '../components/XRPScanLink';
 import { getXRPBalance } from '../utils/xrplBalance';
@@ -1534,6 +1535,18 @@ export default function Trade({ preselectedToken = null }) {
           tokenId: selectedToken.id
         });
 
+        await supabase.from('trade_history').insert([{
+          token_id: selectedToken.id,
+          trader_address: connectedWallet.address,
+          trade_type: tradeType,
+          token_amount: actualAmount,
+          xrp_amount: parseFloat(estimate.xrpAmount),
+          price: livePrice,
+          tx_hash: txHash,
+          slippage: parseFloat(slippage),
+          platform_fee: feeResult.waived ? 0 : feeResult.fee
+        }]);
+
         updateTradeStep(2, 'success', { description: 'Trade completed successfully' });
         await fetchTokenBalance();
 
@@ -1943,43 +1956,45 @@ export default function Trade({ preselectedToken = null }) {
             </div>
           </div>
 
-          <div className="glass rounded-lg p-3 flex-1">
-            <h3 className="text-base font-bold text-purple-200 mb-2">Token Info</h3>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
-              <div className="flex flex-col py-1">
+          <div className="glass rounded-lg p-2">
+            <h3 className="text-sm font-bold text-purple-200 mb-2">Token Info</h3>
+            <div className="grid grid-cols-4 gap-2 text-xs">
+              <div className="flex flex-col">
                 <span className="text-purple-400 text-[10px]">Supply</span>
-                <span className="text-purple-200 font-bold text-xs">
-                  {selectedToken ? selectedToken.supply.toLocaleString() : 0}
+                <span className="text-purple-200 font-bold text-[11px]">
+                  {selectedToken ? (selectedToken.supply / 1e9).toFixed(1) : 0}B
                 </span>
               </div>
-              <div className="flex flex-col py-1">
+              <div className="flex flex-col">
                 <span className="text-purple-400 text-[10px]">Circulating</span>
-                <span className="text-purple-200 font-bold text-xs">
-                  {selectedToken ? (selectedToken.supply * 0.9).toLocaleString() : 0}
+                <span className="text-purple-200 font-bold text-[11px]">
+                  {selectedToken ? ((selectedToken.supply * 0.9) / 1e9).toFixed(1) : 0}B
                 </span>
               </div>
-              <div className="flex flex-col py-1">
+              <div className="flex flex-col">
                 <span className="text-purple-400 text-[10px]">Price</span>
-                <span className="text-purple-200 font-bold text-xs">
-                  {selectedToken ? currentPrice.toFixed(8) : 0} XRP
+                <span className="text-purple-200 font-bold text-[11px]">
+                  {selectedToken ? currentPrice.toFixed(8) : 0}
                 </span>
               </div>
-              <div className="flex flex-col py-1">
+              <div className="flex flex-col">
                 <span className="text-purple-400 text-[10px]">Liquidity</span>
-                <span className="text-purple-200 font-bold text-xs">
-                  {marketData ? marketData.liquidity.toFixed(2) : (selectedToken ? selectedToken.amm_xrp_amount.toFixed(2) : 0)} XRP
+                <span className="text-purple-200 font-bold text-[11px]">
+                  {marketData ? marketData.liquidity.toFixed(0) : (selectedToken ? selectedToken.amm_xrp_amount.toFixed(0) : 0)}
                 </span>
               </div>
-              <div className="col-span-2 pt-2 border-t border-purple-500/20">
-                <div className="text-purple-400 text-[10px] mb-1">Currency Code</div>
-                <div className="text-purple-300 text-[11px] font-mono bg-black/30 px-2 py-1 rounded">
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-purple-500/20">
+              <div>
+                <div className="text-purple-400 text-[10px]">Currency Code</div>
+                <div className="text-purple-300 text-[10px] font-mono bg-black/30 px-1 py-0.5 rounded">
                   {selectedToken ? selectedToken.currency_code : ''}
                 </div>
               </div>
-              <div className="col-span-2 pt-2 border-t border-purple-500/20">
-                <div className="text-purple-400 text-[10px] mb-1">Issuer Address</div>
-                <div className="text-purple-300 text-[10px] font-mono bg-black/30 px-2 py-1 rounded break-all">
-                  {selectedToken ? selectedToken.issuer_address : ''}
+              <div>
+                <div className="text-purple-400 text-[10px]">Issuer</div>
+                <div className="text-purple-300 text-[10px] font-mono bg-black/30 px-1 py-0.5 rounded truncate">
+                  {selectedToken ? `${selectedToken.issuer_address.slice(0, 8)}...` : ''}
                 </div>
               </div>
             </div>
@@ -2507,6 +2522,12 @@ export default function Trade({ preselectedToken = null }) {
           </div>
         </div>
       </div>
+
+      {selectedToken && (
+        <div className="mt-4">
+          <TradeHistory tokenId={selectedToken.id} />
+        </div>
+      )}
 
       <TokenCreationProgressModal
         isOpen={showTradeProgress}

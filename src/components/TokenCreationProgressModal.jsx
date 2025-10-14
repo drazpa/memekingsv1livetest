@@ -139,9 +139,9 @@ export default function TokenCreationProgressModal({ isOpen, steps, currentStep,
             </div>
           )}
 
-          {!canClose && (
-            <div className="text-center text-purple-400 text-sm">
-              Please wait while we create your token...
+          {!canClose && currentStep < steps.length && !steps.some(s => s.error) && (
+            <div className="text-center text-purple-400 text-sm animate-pulse">
+              Processing transaction...
             </div>
           )}
         </div>
