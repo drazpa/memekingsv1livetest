@@ -10,6 +10,7 @@ import TokenCreationProgressModal from '../components/TokenCreationProgressModal
 import SlippageRetryModal from '../components/SlippageRetryModal';
 import PoolHistoryModal from '../components/PoolHistoryModal';
 import TradeHistory from '../components/TradeHistory';
+import MiniAIChat from '../components/MiniAIChat';
 import { onTokenUpdate } from '../utils/tokenEvents';
 import { XRPScanLink } from '../components/XRPScanLink';
 import { getXRPBalance } from '../utils/xrplBalance';
@@ -96,6 +97,7 @@ export default function Trade({ preselectedToken = null }) {
   const [depositing, setDepositing] = useState(false);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [depositMode, setDepositMode] = useState('both');
+  const [showMiniAIChat, setShowMiniAIChat] = useState(false);
   const priceChartContainerRef = useRef(null);
   const volumeChartContainerRef = useRef(null);
   const priceChartInstanceRef = useRef(null);
@@ -2028,24 +2030,32 @@ export default function Trade({ preselectedToken = null }) {
           <h2 className="text-2xl font-bold text-purple-200">Trade</h2>
           <p className="text-purple-400 text-sm">Buy and sell meme tokens</p>
         </div>
-        {selectedToken && (
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowPoolHistory(true)}
-              className="btn-primary text-white px-4 py-2 rounded-lg font-medium text-sm"
-            >
-              📊 History
-            </button>
-            <a
-              href={`https://xmagnetic.org/dex/${selectedToken.currency_code}+${selectedToken.issuer_address}_XRP+XRP?network=mainnet`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary text-white px-4 py-2 rounded-lg font-medium text-sm"
-            >
-              Magnetic DEX →
-            </a>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowMiniAIChat(true)}
+            className="btn-primary text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 hover:scale-105 transition-transform"
+          >
+            🤖 AI Chat
+          </button>
+          {selectedToken && (
+            <>
+              <button
+                onClick={() => setShowPoolHistory(true)}
+                className="btn-primary text-white px-4 py-2 rounded-lg font-medium text-sm"
+              >
+                📊 History
+              </button>
+              <a
+                href={`https://xmagnetic.org/dex/${selectedToken.currency_code}+${selectedToken.issuer_address}_XRP+XRP?network=mainnet`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary text-white px-4 py-2 rounded-lg font-medium text-sm"
+              >
+                Magnetic DEX →
+              </a>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:h-[calc(100vh-12rem)]">
@@ -2932,6 +2942,11 @@ export default function Trade({ preselectedToken = null }) {
         token={selectedToken}
         transactions={poolHistory}
         loading={loadingHistory}
+      />
+
+      <MiniAIChat
+        isOpen={showMiniAIChat}
+        onClose={() => setShowMiniAIChat(false)}
       />
     </div>
   );
