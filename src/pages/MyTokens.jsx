@@ -71,13 +71,31 @@ export default function MyTokens() {
 
   useEffect(() => {
     if (connectedWallet && !hasLoadedInitialData) {
-      loadCachedDataInstantly();
-      fetchHoldings();
-      loadFavorites();
-      loadUserCreatedTokens();
-      setHasLoadedInitialData(true);
+      console.log('🚀 Initializing MyTokens page...');
+      const initialize = async () => {
+        try {
+          console.log('1️⃣ Loading cached data...');
+          await loadCachedDataInstantly();
+
+          console.log('2️⃣ Fetching fresh holdings...');
+          await fetchHoldings();
+
+          console.log('3️⃣ Loading favorites...');
+          await loadFavorites();
+
+          console.log('4️⃣ Loading user created tokens...');
+          await loadUserCreatedTokens();
+
+          console.log('✅ Initialization complete');
+          setHasLoadedInitialData(true);
+        } catch (error) {
+          console.error('❌ Initialization error:', error);
+          setLoading(false);
+        }
+      };
+      initialize();
     }
-  }, [connectedWallet]);
+  }, [connectedWallet, hasLoadedInitialData]);
 
   useEffect(() => {
     if (connectedWallet && hasLoadedInitialData) {
@@ -184,16 +202,25 @@ export default function MyTokens() {
   };
 
   const loadCachedDataInstantly = async () => {
-    if (!connectedWallet) return;
+    if (!connectedWallet) {
+      console.log('⚠️ loadCachedDataInstantly: No connected wallet');
+      return;
+    }
 
     try {
+      console.log('📦 Loading cached data for:', connectedWallet.address);
       const { data: cachedData, error } = await supabase
         .from('token_holdings_cache')
         .select('*, token:meme_tokens(*)')
         .eq('wallet_address', connectedWallet.address)
         .order('last_updated', { ascending: false });
 
-      if (!error && cachedData && cachedData.length > 0) {
+      if (error) {
+        console.error('❌ Cache load error:', error);
+        return;
+      }
+
+      if (cachedData && cachedData.length > 0) {
         console.log(`⚡ MyTokens: Loaded ${cachedData.length} holdings from cache instantly`);
 
         const tokenHoldings = cachedData.map(cache => {
@@ -216,6 +243,8 @@ export default function MyTokens() {
 
         setHoldings(tokenHoldings);
         calculateAnalytics(tokenHoldings);
+      } else {
+        console.log('📭 No cached data found');
       }
     } catch (error) {
       console.error('Error loading cached holdings:', error);
@@ -256,15 +285,24 @@ export default function MyTokens() {
   };
 
   const fetchHoldings = async (forceRefresh = false) => {
-    if (!connectedWallet) return;
+    if (!connectedWallet) {
+      console.log('⚠️ fetchHoldings: No connected wallet');
+      setLoading(false);
+      return;
+    }
 
     const timeSinceLastFetch = Date.now() - lastFetchTime;
     if (!forceRefresh && timeSinceLastFetch < 300000 && holdings.length > 0) {
       console.log('⏭️ Skipping fetch - data is fresh (less than 5 minutes old)');
+      setLoading(false);
       return;
     }
 
-    console.log('\n💼 Fetching token holdings...');
+    console.log('\n💼 Fetching token holdings...', {
+      forceRefresh,
+      timeSinceLastFetch,
+      holdingsLength: holdings.length
+    });
     setLoading(true);
 
     try {
@@ -525,14 +563,20 @@ export default function MyTokens() {
         console.log(`💾 Cached ${cacheRecords.length} holdings`);
       }
 
+      console.log('✅ Successfully fetched holdings:', {
+        tokenHoldings: tokenHoldings.length,
+        ammPools: Object.keys(ammPools).length
+      });
+
       setHoldings(tokenHoldings);
       setPoolsData(ammPools);
       calculateAnalytics(tokenHoldings);
       setLastFetchTime(Date.now());
     } catch (error) {
-      console.error('Error fetching holdings:', error);
-      toast.error('Failed to fetch token holdings');
+      console.error('❌ Error fetching holdings:', error);
+      toast.error('Failed to fetch token holdings: ' + error.message);
     } finally {
+      console.log('🏁 fetchHoldings complete, setting loading=false');
       setLoading(false);
     }
   };
