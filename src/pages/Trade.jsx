@@ -145,7 +145,6 @@ export default function Trade({ preselectedToken = null }) {
       renderChart();
     }
     if (selectedToken && connectedWallet) {
-      checkTrustline();
       fetchTokenBalance();
       fetchLpPosition();
     }
@@ -971,6 +970,7 @@ export default function Trade({ preselectedToken = null }) {
         if (cached.data) {
           console.log('Using cached token balance:', cached.data.balance);
           setTokenBalance(cached.data.balance.toString());
+          setHasTrustline(true);
           setLoadingBalance(false);
           return;
         }
@@ -1013,6 +1013,10 @@ export default function Trade({ preselectedToken = null }) {
         console.log('Token balance:', balance);
         setTokenBalance(balance);
 
+        const hasTrustlineActive = tokenLine !== undefined;
+        setHasTrustline(hasTrustlineActive);
+        console.log('Trustline active:', hasTrustlineActive);
+
         await supabase
           .from('token_holdings_cache')
           .upsert({
@@ -1029,10 +1033,12 @@ export default function Trade({ preselectedToken = null }) {
           });
       } else {
         setTokenBalance('0');
+        setHasTrustline(false);
       }
     } catch (error) {
       console.error('Error fetching balances:', error);
       setTokenBalance('0');
+      setHasTrustline(false);
     } finally {
       setLoadingBalance(false);
     }
@@ -1046,42 +1052,9 @@ export default function Trade({ preselectedToken = null }) {
       return;
     }
 
-    try {
-      setCheckingTrustline(true);
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
-
-      const response = await client.request({
-        command: 'account_lines',
-        account: connectedWallet.address,
-        ledger_index: 'validated'
-      });
-
-      const currencyHex = selectedToken.currency_code.length > 3
-        ? Buffer.from(selectedToken.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
-        : selectedToken.currency_code;
-
-      const hasTrust = response.result.lines?.some(
-        line => {
-          const matchesIssuer = line.account === selectedToken.issuer_address;
-          const matchesCurrency =
-            line.currency === selectedToken.currency_code ||
-            line.currency === currencyHex ||
-            line.currency.toUpperCase() === currencyHex.toUpperCase();
-          return matchesIssuer && matchesCurrency;
-        }
-      ) || false;
-
-      const hasBalance = parseFloat(tokenBalance) > 0;
-
-      setHasTrustline(hasTrust || hasBalance);
-      await client.disconnect();
-    } catch (error) {
-      console.error('Error checking trustline:', error);
-      setHasTrustline(false);
-    } finally {
-      setCheckingTrustline(false);
-    }
+    setCheckingTrustline(true);
+    await fetchBalances();
+    setCheckingTrustline(false);
   };
 
   const setupTrustline = async () => {
