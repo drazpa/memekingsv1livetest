@@ -12,9 +12,10 @@ import PoolHistoryModal from '../components/PoolHistoryModal';
 import { onTokenUpdate } from '../utils/tokenEvents';
 import { XRPScanLink } from '../components/XRPScanLink';
 import { getXRPBalance } from '../utils/xrplBalance';
+import { sendTradingFee, TRADING_FEE_XRP } from '../utils/tradeFees';
 
 const RECEIVER_ADDRESS = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
-const TRADING_FEE = 0.01;
+const TRADING_FEE = TRADING_FEE_XRP;
 
 const sanitizeXRP = (amount) => {
   const num = parseFloat(amount);
@@ -86,6 +87,10 @@ export default function Trade({ preselectedToken = null }) {
   const [withdrawMode, setWithdrawMode] = useState('both');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositTokenAmount, setDepositTokenAmount] = useState('');
+  const [depositing, setDepositing] = useState(false);
+  const [showDepositModal, setShowDepositModal] = useState(false);
   const priceChartContainerRef = useRef(null);
   const volumeChartContainerRef = useRef(null);
   const priceChartInstanceRef = useRef(null);
@@ -1043,12 +1048,16 @@ export default function Trade({ preselectedToken = null }) {
         ? Buffer.from(selectedToken.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
         : selectedToken.currency_code;
 
-      const hasTrust = response.result.lines.some(
-        line => line.account === selectedToken.issuer_address &&
-                (line.currency === selectedToken.currency_code ||
-                 line.currency === currencyHex ||
-                 line.currency === selectedToken.currency_code.substring(0, 3))
-      );
+      const hasTrust = response.result.lines?.some(
+        line => {
+          const matchesIssuer = line.account === selectedToken.issuer_address;
+          const matchesCurrency =
+            line.currency === selectedToken.currency_code ||
+            line.currency === currencyHex ||
+            line.currency.toUpperCase() === currencyHex.toUpperCase();
+          return matchesIssuer && matchesCurrency;
+        }
+      ) || false;
 
       setHasTrustline(hasTrust);
       await client.disconnect();
@@ -1258,12 +1267,20 @@ export default function Trade({ preselectedToken = null }) {
 
     const xrpToReceive = parseFloat(lpPosition.xrp) * withdrawPercentage;
     const tokensToReceive = parseFloat(lpPosition.tokens) * withdrawPercentage;
+    const tokenValueInXrp = tokensToReceive * currentPrice;
+    const totalValueInXrp = xrpToReceive + tokenValueInXrp;
+    const totalValueInUsd = totalValueInXrp * xrpUsdPrice;
 
     return {
       xrpToReceive: xrpToReceive.toFixed(6),
       tokensToReceive: tokensToReceive.toFixed(6),
+      tokenValueInXrp: tokenValueInXrp.toFixed(6),
+      totalValueInXrp: totalValueInXrp.toFixed(6),
+      totalValueInUsd: totalValueInUsd.toFixed(2),
       networkFee: '0.00001',
-      estimatedTotal: (xrpToReceive * 2).toFixed(6)
+      platformFee: TRADING_FEE.toFixed(2),
+      netXrp: (xrpToReceive - TRADING_FEE).toFixed(6),
+      estimatedTotal: totalValueInXrp.toFixed(6)
     };
   };
 
@@ -1318,11 +1335,16 @@ export default function Trade({ preselectedToken = null }) {
       const result = await client.submitAndWait(signed.tx_blob, { timeout: 45000 });
 
       if (result.result.meta.TransactionResult === 'tesSUCCESS') {
+        const feeResult = await sendTradingFee(client, wallet);
+
         toast.success((t) => (
           <div className="flex flex-col gap-2">
             <div className="font-semibold">Withdrawal Successful!</div>
             <div className="text-sm">
               Received {estimate.xrpToReceive} XRP and {estimate.tokensToReceive} {selectedToken.token_name}
+            </div>
+            <div className="text-xs opacity-75">
+              Platform fee: {TRADING_FEE} XRP
             </div>
             <div className="text-xs">
               <XRPScanLink type="tx" value={result.result.hash} network="mainnet" />
@@ -1397,8 +1419,8 @@ export default function Trade({ preselectedToken = null }) {
 
     const steps = [
       { title: 'Connecting to XRPL', description: 'Establishing connection to the XRP Ledger network' },
-      { title: `${tradeAction} ${selectedToken.token_name}`, description: `Swapping ${tradeType === 'buy' ? estimate.xrpAmount + ' XRP for ' + estimate.tokenAmount : estimate.tokenAmount + ' for ' + estimate.xrpAmount + ' XRP'} ${selectedToken.token_name}` },
-      { title: 'Transaction Complete', description: 'Trade executed successfully' }
+      { title: `${tradeAction} ${selectedToken.token_name}`, description: `${tradeType === 'buy' ? 'Buying' : 'Selling'} ${estimate.tokenAmount} ${selectedToken.token_name} ${tradeType === 'buy' ? 'with' : 'for'} ${estimate.xrpAmount} XRP` },
+      { title: 'Trade Complete', description: `${tradeType === 'buy' ? 'Bought' : 'Sold'} ${selectedToken.token_name} successfully` }
     ];
 
     setTradeSteps(steps);
@@ -1478,6 +1500,8 @@ export default function Trade({ preselectedToken = null }) {
         setLastTxHash(txHash);
         setRetryAttempt(0);
 
+        const feeResult = await sendTradingFee(client, wallet);
+
         const txDetails = {
           hash: txHash,
           type: tradeType,
@@ -1485,7 +1509,9 @@ export default function Trade({ preselectedToken = null }) {
           xrpAmount: estimate.xrpAmount,
           tokenName: selectedToken.token_name,
           timestamp: new Date().toISOString(),
-          fee: (parseFloat(result.result.Fee) / 1000000).toFixed(6)
+          fee: (parseFloat(result.result.Fee) / 1000000).toFixed(6),
+          platformFee: feeResult.fee,
+          platformFeeTx: feeResult.hash
         };
         setLastTxDetails(txDetails);
 
@@ -1819,7 +1845,7 @@ export default function Trade({ preselectedToken = null }) {
             {selectedToken && (
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
-                  <TokenIcon token={selectedToken} size="lg" />
+                  <TokenIcon token={selectedToken} size="3xl" />
                   <div>
                     <h3 className="text-base font-bold text-purple-200">{selectedToken.token_name}/XRP</h3>
                     <div className="flex items-center gap-2">
@@ -2362,14 +2388,27 @@ export default function Trade({ preselectedToken = null }) {
                         </div>
                       </div>
 
-                      <div className="glass rounded-lg p-4 space-y-2">
+                      <div className="glass rounded-lg p-4 space-y-3">
                         <div className="flex justify-between text-sm">
-                          <span className="text-purple-400">Share</span>
+                          <span className="text-purple-400">Pool Share</span>
                           <span className="text-purple-200 font-bold">{lpPosition.sharePercentage}%</span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span className="text-purple-400">Estimated value</span>
-                          <span className="text-purple-200 font-bold">{lpPosition.estimatedValue} XRP</span>
+                          <span className="text-purple-400">Position Value</span>
+                          <div className="text-right">
+                            <div className="text-purple-200 font-bold">{lpPosition.estimatedValue} XRP</div>
+                            <div className="text-xs text-green-400">${(parseFloat(lpPosition.estimatedValue) * xrpUsdPrice).toFixed(2)}</div>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t border-purple-500/20">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-purple-400">XRP Value</span>
+                            <span className="text-purple-300">${(parseFloat(lpPosition.xrp) * xrpUsdPrice).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs mt-1">
+                            <span className="text-purple-400">{selectedToken.token_name} Value</span>
+                            <span className="text-purple-300">${(parseFloat(lpPosition.tokens) * currentPrice * xrpUsdPrice).toFixed(2)}</span>
+                          </div>
                         </div>
                       </div>
 
@@ -2399,20 +2438,36 @@ export default function Trade({ preselectedToken = null }) {
                         </div>
 
                         {withdrawAmount && parseFloat(withdrawAmount) > 0 && calculateWithdrawEstimate() && (
-                          <div className="glass rounded-lg p-4 space-y-2">
+                          <div className="glass rounded-lg p-4 space-y-3">
                             <h5 className="font-medium text-purple-200 mb-2">Withdraw Estimate</h5>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-purple-400">You will receive</span>
+                            <div className="space-y-2">
+                              <div className="flex justify-between">
+                                <span className="text-purple-400">XRP</span>
+                                <div className="text-right">
+                                  <div className="text-purple-200 font-bold">{calculateWithdrawEstimate().xrpToReceive}</div>
+                                  <div className="text-xs text-purple-400">${(parseFloat(calculateWithdrawEstimate().xrpToReceive) * xrpUsdPrice).toFixed(2)}</div>
+                                </div>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-purple-400">{selectedToken.token_name}</span>
+                                <div className="text-right">
+                                  <div className="text-purple-200 font-bold">{calculateWithdrawEstimate().tokensToReceive}</div>
+                                  <div className="text-xs text-purple-400">{calculateWithdrawEstimate().tokenValueInXrp} XRP</div>
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex justify-between">
-                              <span className="text-purple-400">XRP</span>
-                              <span className="text-purple-200 font-bold">{calculateWithdrawEstimate().xrpToReceive}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-purple-400">{selectedToken.token_name}</span>
-                              <span className="text-purple-200 font-bold">{calculateWithdrawEstimate().tokensToReceive}</span>
-                            </div>
-                            <div className="pt-2 border-t border-purple-500/20">
+                            <div className="pt-2 border-t border-purple-500/20 space-y-1">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-purple-400">Total Value</span>
+                                <div className="text-right">
+                                  <div className="text-purple-200 font-bold">{calculateWithdrawEstimate().totalValueInXrp} XRP</div>
+                                  <div className="text-xs text-green-400">${calculateWithdrawEstimate().totalValueInUsd}</div>
+                                </div>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-purple-400">Platform Fee</span>
+                                <span className="text-red-300">{calculateWithdrawEstimate().platformFee} XRP</span>
+                              </div>
                               <div className="flex justify-between text-xs">
                                 <span className="text-purple-400">Network Fee</span>
                                 <span className="text-purple-300">{calculateWithdrawEstimate().networkFee} XRP</span>
