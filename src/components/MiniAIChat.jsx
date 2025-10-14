@@ -22,10 +22,12 @@ export default function MiniAIChat({ isOpen, onClose }) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isTyping]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 100);
   };
 
   const initializeSession = () => {
@@ -111,7 +113,14 @@ export default function MiniAIChat({ isOpen, onClose }) {
     }
 
     try {
-      const response = await aiAssistant.current.processMessage(content);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Request timed out after 30 seconds')), 30000)
+      );
+
+      const response = await Promise.race([
+        aiAssistant.current.processMessage(content),
+        timeoutPromise
+      ]);
 
       const assistantMessage = {
         id: `assistant_${Date.now()}`,
@@ -128,11 +137,12 @@ export default function MiniAIChat({ isOpen, onClose }) {
       const errorMessage = {
         id: `error_${Date.now()}`,
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
+        content: `Error: ${error.message || 'Something went wrong'}. Please try again or check your wallet connection.`,
         timestamp: new Date(),
         data: null
       };
       setMessages(prev => [...prev, errorMessage]);
+      await saveMessage(errorMessage);
     } finally {
       setIsTyping(false);
     }

@@ -310,7 +310,13 @@ export class CommandExecutor {
       const prepared = await this.client.autofill(payment);
       const wallet = xrpl.Wallet.fromSeed(this.wallet.seed);
       const signed = wallet.sign(prepared);
-      const result = await this.client.submitAndWait(signed.tx_blob, { timeout: 45000 });
+
+      const result = await Promise.race([
+        this.client.submitAndWait(signed.tx_blob),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Transaction timed out after 20 seconds')), 20000)
+        )
+      ]);
 
       if (result.result.meta.TransactionResult === 'tesSUCCESS') {
         const actualAmount = result.result.meta.delivered_amount?.value
@@ -360,9 +366,10 @@ export class CommandExecutor {
         };
       }
     } catch (error) {
+      console.error('Buy token error:', error);
       return {
         success: false,
-        message: `Failed to buy token: ${error.message}`
+        message: `Failed to buy token: ${error.message}. ${error.message.includes('timeout') ? 'The network may be slow, try again with fewer tokens.' : 'Check your balance and try again.'}`
       };
     }
   }
@@ -410,7 +417,13 @@ export class CommandExecutor {
       const prepared = await this.client.autofill(payment);
       const wallet = xrpl.Wallet.fromSeed(this.wallet.seed);
       const signed = wallet.sign(prepared);
-      const result = await this.client.submitAndWait(signed.tx_blob, { timeout: 45000 });
+
+      const result = await Promise.race([
+        this.client.submitAndWait(signed.tx_blob),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Transaction timed out after 20 seconds')), 20000)
+        )
+      ]);
 
       if (result.result.meta.TransactionResult === 'tesSUCCESS') {
         await sendTradingFee(this.client, wallet);
@@ -454,9 +467,10 @@ export class CommandExecutor {
         };
       }
     } catch (error) {
+      console.error('Sell token error:', error);
       return {
         success: false,
-        message: `Failed to sell token: ${error.message}`
+        message: `Failed to sell token: ${error.message}. ${error.message.includes('timeout') ? 'The network may be slow, try again with fewer tokens.' : 'Check your token balance and try again.'}`
       };
     }
   }
