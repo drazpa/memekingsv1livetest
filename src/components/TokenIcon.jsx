@@ -93,7 +93,7 @@ function TokenIcon({ token, size = 'md', className = '' }) {
 
   if (currentUrl && !imageError) {
     return (
-      <div className={`relative inline-block ${sizeClass} flex-shrink-0`}>
+      <div className={`relative inline-block ${sizeClass} flex-shrink-0 rounded-full overflow-hidden aspect-square`}>
         {!imageLoaded && (
           <div className={`absolute inset-0 rounded-full bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center text-white font-bold ${className}`}>
             {token.token_name[0]}
@@ -103,7 +103,7 @@ function TokenIcon({ token, size = 'md', className = '' }) {
           key={`${token.id}-${currentGatewayIndex}-${retryCount}`}
           src={currentUrl}
           alt={token.token_name}
-          className={`${sizeClass} rounded-full object-cover border-2 border-purple-500 ${className} transition-opacity duration-200 ${!imageLoaded ? 'opacity-0' : 'opacity-100'} aspect-square`}
+          className={`w-full h-full rounded-full object-cover border-2 border-purple-500 ${className} transition-opacity duration-200 ${!imageLoaded ? 'opacity-0' : 'opacity-100'} aspect-square`}
           onLoad={async () => {
             await imageCacheManager.set(cacheKey, currentUrl);
             setImageLoaded(true);

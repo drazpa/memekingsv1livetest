@@ -91,10 +91,14 @@ export default function TokenProfile({ tokenSlug }) {
   };
 
   const fetchPoolData = async () => {
-    if (!token || !token.amm_pool_created) return;
+    if (!token || !token.amm_pool_created) {
+      console.log('TokenProfile: No AMM pool created for token', token?.token_name);
+      return;
+    }
 
     try {
-      const { data: cache } = await supabase
+      console.log('TokenProfile: Fetching pool data for token', token.id);
+      const { data: cache, error: cacheError } = await supabase
         .from('pool_data_cache')
         .select('*')
         .eq('token_id', token.id)
@@ -102,7 +106,15 @@ export default function TokenProfile({ tokenSlug }) {
         .limit(1)
         .maybeSingle();
 
-      if (cache && (Date.now() - new Date(cache.last_updated).getTime() < 120000)) {
+      if (cacheError) {
+        console.error('TokenProfile: Cache fetch error:', cacheError);
+      }
+
+      if (cache) {
+        console.log('TokenProfile: Found cached pool data:', cache);
+        const cacheAge = Date.now() - new Date(cache.last_updated).getTime();
+        console.log('TokenProfile: Cache age (ms):', cacheAge);
+
         setPoolData({
           xrpAmount: parseFloat(cache.xrp_amount),
           tokenAmount: parseFloat(cache.token_amount),
@@ -117,7 +129,14 @@ export default function TokenProfile({ tokenSlug }) {
         if (connectedWallet) {
           fetchLPBalance(cache.lp_tokens);
         }
-        return;
+
+        if (cacheAge < 120000) {
+          console.log('TokenProfile: Using fresh cache data');
+          return;
+        }
+        console.log('TokenProfile: Cache is stale, fetching fresh data...');
+      } else {
+        console.log('TokenProfile: No cache found, fetching fresh data');
       }
 
       const client = new xrpl.Client('wss://xrplcluster.com');
@@ -382,7 +401,9 @@ export default function TokenProfile({ tokenSlug }) {
       <div className="glass rounded-xl p-6 mb-6">
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex items-start gap-4">
-            <TokenIcon token={token} size="4xl" className="!w-48 !h-48 !text-8xl" />
+            <div className="w-32 h-32 flex-shrink-0">
+              <TokenIcon token={token} size="xl" className="!w-32 !h-32 !min-w-[8rem] !min-h-[8rem] !text-6xl" />
+            </div>
             <div>
               <h1 className="text-4xl font-bold text-purple-200 mb-2">{token.token_name}</h1>
               <div className="flex items-center gap-3 flex-wrap">
@@ -660,12 +681,12 @@ export default function TokenProfile({ tokenSlug }) {
                 </div>
                 <div className="glass rounded-lg p-3 border border-purple-500/30">
                   <div className="text-purple-400 text-xs mb-1">XRP Liquidity</div>
-                  <div className="text-xl font-bold text-purple-200">{poolData?.amm_xrp_amount?.toFixed(2) || '0.00'}</div>
+                  <div className="text-xl font-bold text-purple-200">{poolData?.xrpAmount?.toFixed(2) || '0.00'}</div>
                   <div className="text-purple-400 text-xs">In AMM pool</div>
                 </div>
                 <div className="glass rounded-lg p-3 border border-cyan-500/30">
                   <div className="text-cyan-400 text-xs mb-1">Token Liquidity</div>
-                  <div className="text-xl font-bold text-cyan-200">{poolData?.amm_asset_amount?.toLocaleString() || '0'}</div>
+                  <div className="text-xl font-bold text-cyan-200">{poolData?.tokenAmount?.toLocaleString() || '0'}</div>
                   <div className="text-cyan-400 text-xs">{token.currency_code}</div>
                 </div>
               </div>
