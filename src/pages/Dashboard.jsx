@@ -130,7 +130,7 @@ export default function Dashboard() {
   }, [swapDropdownOpen]);
 
   useEffect(() => {
-    if (tokens.length > 0) {
+    if (tokens.length > 0 && Object.keys(poolsData).length === 0) {
       fetchAllPoolsData();
     }
   }, [tokens]);
@@ -139,17 +139,17 @@ export default function Dashboard() {
     if (Object.keys(poolsData).length > 0) {
       calculateLivePoolStats();
     }
-  }, [poolsData]);
+  }, [poolsData, tokens]);
 
   useEffect(() => {
-    if (tokens.length > 0) {
+    if (tokens.length > 0 && trustlineStats.totalTrustlines === 0) {
       fetchTrustlineStats();
       calculate24hTokens();
     }
   }, [tokens]);
 
   useEffect(() => {
-    if (connectedWallet && Object.keys(poolsData).length > 0) {
+    if (connectedWallet && Object.keys(poolsData).length > 0 && Object.keys(lpBalances).length === 0) {
       fetchLPBalances();
     }
   }, [connectedWallet, poolsData]);
@@ -1127,41 +1127,41 @@ export default function Dashboard() {
           </button>
 
           {swapDropdownOpen === token.id && (
-            <div className="absolute top-full left-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-[9999] overflow-hidden">
+            <div className="absolute top-full left-0 mt-2 w-64 glass bg-gradient-to-br from-purple-900/95 to-purple-800/95 border border-purple-500/30 rounded-lg shadow-xl z-[9999] overflow-hidden">
               <button
                 onClick={() => {
                   setSwapDropdownOpen(null);
                   localStorage.setItem('selectedTradeToken', JSON.stringify(token));
                   window.dispatchEvent(new CustomEvent('navigateToTrade', { detail: token }));
                 }}
-                className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-3 border-b border-slate-700"
+                className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3 border-b border-purple-500/30"
               >
-                <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-300">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <div className="text-white font-medium">Trade Page</div>
-                  <div className="text-gray-400 text-xs">Swap on MEMEKINGS</div>
+                  <div className="text-purple-100 font-medium">Trade Page</div>
+                  <div className="text-purple-300 text-xs">Swap on MEMEKINGS</div>
                 </div>
               </button>
 
               <a
-                href={`https://magnetic.exchange/?issue=${encodeURIComponent(token.currency_code || token.currency_hex)}&issuer=${encodeURIComponent(token.issuer_address)}`}
+                href={`https://xmagnetic.org/dex/${encodeURIComponent(token.currency_code)}+${encodeURIComponent(token.issuer_address)}_XRP+XRP?network=mainnet`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-3"
+                className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3"
                 onClick={() => setSwapDropdownOpen(null)}
               >
-                <div className="w-8 h-8 rounded-lg bg-cyan-600/20 flex items-center justify-center text-cyan-400">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-300">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <div className="text-white font-medium">Magnetic Link</div>
-                  <div className="text-gray-400 text-xs">Different wallet required</div>
+                  <div className="text-purple-100 font-medium">Magnetic Link</div>
+                  <div className="text-purple-300 text-xs">Trade on xMagnetic</div>
                 </div>
               </a>
             </div>
@@ -1258,41 +1258,41 @@ export default function Dashboard() {
             </button>
 
             {swapDropdownOpen === token.id && (
-              <div className="absolute top-full left-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-[9999] overflow-hidden">
+              <div className="absolute top-full left-0 mt-2 w-64 glass bg-gradient-to-br from-purple-900/95 to-purple-800/95 border border-purple-500/30 rounded-lg shadow-xl z-[9999] overflow-hidden">
                 <button
                   onClick={() => {
                     setSwapDropdownOpen(null);
                     localStorage.setItem('selectedTradeToken', JSON.stringify(token));
                     window.dispatchEvent(new CustomEvent('navigateToTrade', { detail: token }));
                   }}
-                  className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-3 border-b border-slate-700"
+                  className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3 border-b border-purple-500/30"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-300">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <div className="text-white font-medium">Trade Page</div>
-                    <div className="text-gray-400 text-xs">Swap on MEMEKINGS</div>
+                    <div className="text-purple-100 font-medium">Trade Page</div>
+                    <div className="text-purple-300 text-xs">Swap on MEMEKINGS</div>
                   </div>
                 </button>
 
                 <a
-                  href={`https://magnetic.exchange/?issue=${encodeURIComponent(token.currency_code || token.currency_hex)}&issuer=${encodeURIComponent(token.issuer_address)}`}
+                  href={`https://xmagnetic.org/dex/${encodeURIComponent(token.currency_code)}+${encodeURIComponent(token.issuer_address)}_XRP+XRP?network=mainnet`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-3"
+                  className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3"
                   onClick={() => setSwapDropdownOpen(null)}
                 >
-                  <div className="w-8 h-8 rounded-lg bg-cyan-600/20 flex items-center justify-center text-cyan-400">
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-300">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <div className="text-white font-medium">Magnetic Link</div>
-                    <div className="text-gray-400 text-xs">Different wallet required</div>
+                    <div className="text-purple-100 font-medium">Magnetic Link</div>
+                    <div className="text-purple-300 text-xs">Trade on xMagnetic</div>
                   </div>
                 </a>
               </div>
