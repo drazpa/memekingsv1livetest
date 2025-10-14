@@ -103,7 +103,8 @@ function TokenIcon({ token, size = 'md', className = '' }) {
           key={`${token.id}-${currentGatewayIndex}-${retryCount}`}
           src={currentUrl}
           alt={token.token_name}
-          className={`w-full h-full rounded-full object-cover border-2 border-purple-500 ${className} transition-opacity duration-200 ${!imageLoaded ? 'opacity-0' : 'opacity-100'} aspect-square`}
+          className={`w-full h-full rounded-full object-contain border-2 border-purple-500 ${className} transition-opacity duration-200 ${!imageLoaded ? 'opacity-0' : 'opacity-100'} aspect-square`}
+          style={{ objectPosition: 'center' }}
           onLoad={async () => {
             await imageCacheManager.set(cacheKey, currentUrl);
             setImageLoaded(true);

@@ -439,16 +439,16 @@ export default function TokenProfile({ tokenSlug }) {
               )}
             </div>
 
-            {connectedWallet && userBalance !== null && (
+            {connectedWallet && (
               <div className="glass rounded-lg p-4 text-center min-w-[200px] bg-purple-500/10 border border-purple-500/30">
                 <div className="text-purple-400 text-sm mb-1">Your Holdings</div>
-                <div className="text-xl font-bold text-purple-200">{userBalance.toFixed(4)}</div>
+                <div className="text-xl font-bold text-purple-200">{(userBalance || 0).toFixed(4)}</div>
                 <div className="text-purple-400 text-xs">{token.currency_code}</div>
                 <div className="text-green-400 text-sm mt-1">
-                  {(userBalance * parseFloat(calculatePrice())).toFixed(4)} XRP
+                  {((userBalance || 0) * parseFloat(calculatePrice())).toFixed(4)} XRP
                 </div>
                 <div className="text-green-400 text-xs">
-                  ${(userBalance * parseFloat(calculatePrice()) * xrpUsdPrice).toFixed(2)}
+                  ${((userBalance || 0) * parseFloat(calculatePrice()) * xrpUsdPrice).toFixed(2)}
                 </div>
               </div>
             )}
@@ -527,7 +527,7 @@ export default function TokenProfile({ tokenSlug }) {
         </div>
       )}
 
-      <div className="flex gap-3 mb-6 flex-wrap">
+      <div className="flex gap-3 mb-6 flex-wrap justify-center items-center">
         <TokenTrustButton
           token={token}
           connectedWallet={connectedWallet}
@@ -582,10 +582,61 @@ export default function TokenProfile({ tokenSlug }) {
 
         <button
           onClick={tweetToken}
-          className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold px-6 py-3 rounded-lg shadow-lg transition-all duration-300"
+          className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold px-6 py-3 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2"
         >
-          𝕏 Share on X
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+          </svg>
+          Share on X
         </button>
+
+        {token.twitter_handle ? (
+          <a
+            href={`https://twitter.com/${token.twitter_handle.replace('@', '')}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold px-6 py-3 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+            </svg>
+            Twitter
+          </a>
+        ) : (
+          <button
+            disabled
+            className="bg-gray-600 text-gray-400 font-bold px-6 py-3 rounded-lg shadow-lg cursor-not-allowed opacity-50 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+            </svg>
+            Twitter
+          </button>
+        )}
+
+        {token.website_url ? (
+          <a
+            href={token.website_url.startsWith('http') ? token.website_url : `https://${token.website_url}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold px-6 py-3 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+            </svg>
+            Website
+          </a>
+        ) : (
+          <button
+            disabled
+            className="bg-gray-600 text-gray-400 font-bold px-6 py-3 rounded-lg shadow-lg cursor-not-allowed opacity-50 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+            </svg>
+            Website
+          </button>
+        )}
       </div>
 
       <div className="glass rounded-xl overflow-hidden mb-6">
