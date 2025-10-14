@@ -1554,6 +1554,34 @@ export default function Trade({ preselectedToken = null }) {
           SendMax: xrpl.xrpToDrops(sanitizeXRP(xrpMaxSpend).toString()),
           Flags: 131072
         };
+
+        try {
+          const pathfindRequest = {
+            command: 'ripple_path_find',
+            source_account: connectedWallet.address,
+            destination_account: connectedWallet.address,
+            destination_amount: {
+              currency: currencyHex,
+              issuer: selectedToken.issuer_address,
+              value: sanitizeToken(tokenAmountTarget)
+            },
+            source_currencies: [
+              { currency: 'XRP' }
+            ]
+          };
+
+          const pathfindResult = await client.request(pathfindRequest);
+
+          if (pathfindResult.result.alternatives && pathfindResult.result.alternatives.length > 0) {
+            const bestPath = pathfindResult.result.alternatives[0];
+            if (bestPath.paths_computed && bestPath.paths_computed.length > 0) {
+              payment.Paths = bestPath.paths_computed;
+              console.log('✓ Using AMM path for swap');
+            }
+          }
+        } catch (pathError) {
+          console.warn('Path finding warning (will use auto-path):', pathError.message);
+        }
       } else {
         const tokenAmountToSell = parseFloat(estimate.tokenAmount);
         const xrpMinReceive = parseFloat(estimate.xrpAmount) * (1 - (parseFloat(slippage) / 100));
@@ -1570,12 +1598,40 @@ export default function Trade({ preselectedToken = null }) {
           },
           DeliverMin: xrpl.xrpToDrops(sanitizeXRP(xrpMinReceive).toString())
         };
+
+        try {
+          const pathfindRequest = {
+            command: 'ripple_path_find',
+            source_account: connectedWallet.address,
+            destination_account: connectedWallet.address,
+            destination_amount: xrpl.xrpToDrops(sanitizeXRP(parseFloat(estimate.xrpAmount)).toString()),
+            source_currencies: [
+              {
+                currency: currencyHex,
+                issuer: selectedToken.issuer_address
+              }
+            ]
+          };
+
+          const pathfindResult = await client.request(pathfindRequest);
+
+          if (pathfindResult.result.alternatives && pathfindResult.result.alternatives.length > 0) {
+            const bestPath = pathfindResult.result.alternatives[0];
+            if (bestPath.paths_computed && bestPath.paths_computed.length > 0) {
+              payment.Paths = bestPath.paths_computed;
+              console.log('✓ Using AMM path for swap');
+            }
+          }
+        } catch (pathError) {
+          console.warn('Path finding warning (will use auto-path):', pathError.message);
+        }
       }
 
       console.log(`\n💱 ${tradeType.toUpperCase()} Swap:`);
       console.log(`   ${tradeType === 'buy' ? 'Spending' : 'Receiving'}: ${estimate.xrpAmount} XRP`);
       console.log(`   ${tradeType === 'buy' ? 'Receiving' : 'Spending'}: ${estimate.tokenAmount} ${selectedToken.token_name}`);
       console.log(`   Slippage: ${slippage}%`);
+      console.log(`   Payment:`, JSON.stringify(payment, null, 2));
 
       const prepared = await client.autofill(payment);
       const signed = wallet.sign(prepared);
