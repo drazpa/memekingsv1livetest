@@ -12,11 +12,22 @@ export default function AdvancedChart({ token, chartData, timeframe, onTimeframe
   const [logScale, setLogScale] = useState(false);
 
   useEffect(() => {
-    if (!chartContainerRef.current || !chartData || chartData.length === 0) return;
+    if (!chartContainerRef.current) return;
 
-    if (chartRef.current) {
-      chartRef.current.remove();
+    if (!chartData || !Array.isArray(chartData) || chartData.length === 0) {
+      console.log('No chart data available yet');
+      return;
     }
+
+    try {
+      if (chartRef.current) {
+        try {
+          chartRef.current.remove();
+        } catch (e) {
+          console.error('Error removing old chart:', e);
+        }
+        chartRef.current = null;
+      }
 
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
@@ -87,21 +98,28 @@ export default function AdvancedChart({ token, chartData, timeframe, onTimeframe
       });
     }
 
-    const formattedData = chartData.map(d => {
-      if (chartStyle === 'line' || chartStyle === 'area') {
+    const formattedData = chartData
+      .filter(d => d && d.time && (d.close !== undefined || d.value !== undefined))
+      .map(d => {
+        if (chartStyle === 'line' || chartStyle === 'area') {
+          return {
+            time: d.time,
+            value: d.close || d.value || 0
+          };
+        }
         return {
           time: d.time,
-          value: d.close
+          open: d.open || d.close || d.value || 0,
+          high: d.high || d.close || d.value || 0,
+          low: d.low || d.close || d.value || 0,
+          close: d.close || d.value || 0
         };
-      }
-      return {
-        time: d.time,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close
-      };
-    });
+      });
+
+    if (formattedData.length === 0) {
+      console.warn('No valid chart data after formatting');
+      return;
+    }
 
     priceSeries.setData(formattedData);
 
@@ -118,14 +136,18 @@ export default function AdvancedChart({ token, chartData, timeframe, onTimeframe
         },
       });
 
-      const volumeData = chartData.map(d => ({
-        time: d.time,
-        value: d.volume || 0,
-        color: d.close >= d.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
-      }));
+      const volumeData = chartData
+        .filter(d => d && d.time)
+        .map(d => ({
+          time: d.time,
+          value: d.volume || 0,
+          color: (d.close || 0) >= (d.open || 0) ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
+        }));
 
-      volumeSeries.setData(volumeData);
-      volumeSeriesRef.current = volumeSeries;
+      if (volumeData.length > 0) {
+        volumeSeries.setData(volumeData);
+        volumeSeriesRef.current = volumeSeries;
+      }
     }
 
     chart.timeScale().fitContent();
@@ -146,9 +168,24 @@ export default function AdvancedChart({ token, chartData, timeframe, onTimeframe
     return () => {
       window.removeEventListener('resize', handleResize);
       if (chartRef.current) {
-        chartRef.current.remove();
+        try {
+          chartRef.current.remove();
+        } catch (e) {
+          console.error('Error cleaning up chart:', e);
+        }
       }
     };
+    } catch (error) {
+      console.error('Error creating advanced chart:', error);
+      if (chartRef.current) {
+        try {
+          chartRef.current.remove();
+        } catch (e) {
+          console.error('Error removing chart after error:', e);
+        }
+        chartRef.current = null;
+      }
+    }
   }, [chartData, chartStyle, showVolume, showGrid, logScale]);
 
   const timeframes = [
@@ -244,6 +281,14 @@ export default function AdvancedChart({ token, chartData, timeframe, onTimeframe
       </div>
 
       <div className="flex-1 relative bg-gray-900">
+        {(!chartData || chartData.length === 0) && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center text-gray-400">
+              <div className="text-4xl mb-2">📊</div>
+              <p>Loading chart data...</p>
+            </div>
+          </div>
+        )}
         <div ref={chartContainerRef} className="w-full h-full" />
       </div>
 
