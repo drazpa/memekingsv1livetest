@@ -5,6 +5,8 @@ import { TokenTrustButton } from '../components/TokenTrustButton';
 import TradeHistory from '../components/TradeHistory';
 import { XRPScanLink } from '../components/XRPScanLink';
 import { PriceChart } from '../components/PriceChart';
+import SendTokenModal from '../components/SendTokenModal';
+import ReceiveTokenModal from '../components/ReceiveTokenModal';
 import toast from 'react-hot-toast';
 import * as xrpl from 'xrpl';
 
@@ -19,12 +21,20 @@ export default function TokenProfile({ tokenSlug }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [chartData, setChartData] = useState([]);
   const [userBalance, setUserBalance] = useState(null);
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
 
   useEffect(() => {
     loadToken();
     loadConnectedWallet();
     fetchXrpUsdPrice();
   }, [tokenSlug]);
+
+  useEffect(() => {
+    if (token && connectedWallet) {
+      fetchCachedBalance();
+    }
+  }, [token, connectedWallet]);
 
   useEffect(() => {
     if (token) {
@@ -292,6 +302,32 @@ export default function TokenProfile({ tokenSlug }) {
     return change.toFixed(2);
   };
 
+  const fetchCachedBalance = async () => {
+    if (!connectedWallet || !token) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('token_holdings_cache')
+        .select('balance')
+        .eq('wallet_address', connectedWallet.address)
+        .eq('token_id', token.id)
+        .order('last_updated', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setUserBalance(parseFloat(data.balance));
+      } else {
+        fetchUserBalance();
+      }
+    } catch (error) {
+      console.error('Error fetching cached balance:', error);
+      fetchUserBalance();
+    }
+  };
+
   const fetchUserBalance = async () => {
     if (!connectedWallet || !token) return;
 
@@ -316,12 +352,21 @@ export default function TokenProfile({ tokenSlug }) {
         (line.currency === token.currency_hex || line.currency === token.currency_code)
       );
 
-      if (tokenLine) {
-        const balance = parseFloat(tokenLine.balance);
-        setUserBalance(balance);
-      } else {
-        setUserBalance(0);
-      }
+      const balance = tokenLine ? parseFloat(tokenLine.balance) : 0;
+      setUserBalance(balance);
+
+      await supabase
+        .from('token_holdings_cache')
+        .upsert({
+          wallet_address: connectedWallet.address,
+          token_id: token.id,
+          balance: balance,
+          price: parseFloat(calculatePrice()),
+          value: balance * parseFloat(calculatePrice()),
+          last_updated: new Date().toISOString()
+        }, {
+          onConflict: 'wallet_address,token_id'
+        });
 
       await client.disconnect();
     } catch (error) {
@@ -422,6 +467,36 @@ export default function TokenProfile({ tokenSlug }) {
               {token.description && (
                 <p className="text-purple-300 mt-3 max-w-2xl">{token.description}</p>
               )}
+              {(token.twitter_handle || token.website_url) && (
+                <div className="flex items-center gap-3 mt-3 flex-wrap">
+                  {token.website_url && (
+                    <a
+                      href={token.website_url.startsWith('http') ? token.website_url : `https://${token.website_url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-purple-300 hover:text-purple-100 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      </svg>
+                      <span className="text-sm">Website</span>
+                    </a>
+                  )}
+                  {token.twitter_handle && (
+                    <a
+                      href={`https://twitter.com/${token.twitter_handle.replace('@', '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-purple-300 hover:text-purple-100 transition-colors"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                      </svg>
+                      <span className="text-sm">@{token.twitter_handle.replace('@', '')}</span>
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -442,13 +517,27 @@ export default function TokenProfile({ tokenSlug }) {
             {connectedWallet && (
               <div className="glass rounded-lg p-4 text-center min-w-[200px] bg-purple-500/10 border border-purple-500/30">
                 <div className="text-purple-400 text-sm mb-1">Your Holdings</div>
-                <div className="text-xl font-bold text-purple-200">{(userBalance || 0).toFixed(4)}</div>
+                <div className="text-xl font-bold text-purple-200">{userBalance !== null ? userBalance.toFixed(4) : '0.0000'}</div>
                 <div className="text-purple-400 text-xs">{token.currency_code}</div>
                 <div className="text-green-400 text-sm mt-1">
                   {((userBalance || 0) * parseFloat(calculatePrice())).toFixed(4)} XRP
                 </div>
                 <div className="text-green-400 text-xs">
                   ${((userBalance || 0) * parseFloat(calculatePrice()) * xrpUsdPrice).toFixed(2)}
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => setShowSendModal(true)}
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all"
+                  >
+                    Send
+                  </button>
+                  <button
+                    onClick={() => setShowReceiveModal(true)}
+                    className="flex-1 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-all"
+                  >
+                    Receive
+                  </button>
                 </div>
               </div>
             )}
@@ -887,6 +976,27 @@ export default function TokenProfile({ tokenSlug }) {
           )}
         </div>
       </div>
+
+      {showSendModal && connectedWallet && (
+        <SendTokenModal
+          token={token}
+          balance={userBalance || 0}
+          wallet={connectedWallet}
+          onClose={() => setShowSendModal(false)}
+          onSuccess={() => {
+            setShowSendModal(false);
+            fetchUserBalance();
+          }}
+        />
+      )}
+
+      {showReceiveModal && connectedWallet && (
+        <ReceiveTokenModal
+          token={token}
+          wallet={connectedWallet}
+          onClose={() => setShowReceiveModal(false)}
+        />
+      )}
     </div>
   );
 }
