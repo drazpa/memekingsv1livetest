@@ -4,6 +4,7 @@ import * as xrpl from 'xrpl';
 import { Buffer } from 'buffer';
 import TokenIcon from '../components/TokenIcon';
 import TokenDetailModal from '../components/TokenDetailModal';
+import DailyMarketInsights from '../components/DailyMarketInsights';
 
 export default function Top10() {
   const [tokens, setTokens] = useState([]);
@@ -14,6 +15,50 @@ export default function Top10() {
   useEffect(() => {
     loadTokensData();
   }, []);
+
+  const getTradeCount = async (tokenId) => {
+    try {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { count, error } = await supabase
+        .from('trade_history')
+        .select('*', { count: 'exact', head: true })
+        .eq('token_id', tokenId)
+        .gte('created_at', oneDayAgo);
+
+      if (error) {
+        console.error('Error fetching trade count:', error);
+        return 0;
+      }
+      return count || 0;
+    } catch (error) {
+      console.error('Error in getTradeCount:', error);
+      return 0;
+    }
+  };
+
+  const getTradeVolume = async (tokenId) => {
+    try {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from('trade_history')
+        .select('token_amount, xrp_amount')
+        .eq('token_id', tokenId)
+        .gte('created_at', oneDayAgo);
+
+      if (error || !data) {
+        console.error('Error fetching trade volume:', error);
+        return { volume: 0, value: 0 };
+      }
+
+      const volume = data.reduce((sum, trade) => sum + parseFloat(trade.token_amount || 0), 0);
+      const value = data.reduce((sum, trade) => sum + parseFloat(trade.xrp_amount || 0), 0);
+
+      return { volume, value };
+    } catch (error) {
+      console.error('Error in getTradeVolume:', error);
+      return { volume: 0, value: 0 };
+    }
+  };
 
   const calculatePrice = (token) => {
     if (token.live_price) return token.live_price;
@@ -64,7 +109,7 @@ export default function Top10() {
     setLoading(true);
 
     try {
-      const cacheAge = 30;
+      const cacheAge = 300;
       const { data: cachedPools, error: cacheError } = await supabase
         .from('pool_data_cache')
         .select('*')
@@ -88,16 +133,17 @@ export default function Top10() {
           poolMap[cache.token_id] = cache;
         });
 
-        tokensData.forEach(token => {
+        for (const token of tokensData) {
           const cached = poolMap[token.id];
           if (cached) {
             token.amm_xrp_amount = parseFloat(cached.xrp_amount);
             token.amm_asset_amount = parseFloat(cached.token_amount);
             token.live_price = parseFloat(cached.price);
             token.volume_24h = parseFloat(cached.volume_24h || 0);
-            token.value_24h = token.amm_xrp_amount * (Math.random() * 2);
+            token.value_24h = parseFloat(cached.volume_24h || 0) * parseFloat(cached.price || 0);
+            token.trade_count_24h = await getTradeCount(token.id);
           }
-        });
+        }
 
         setTokens(tokensData);
         setLoading(false);
@@ -140,8 +186,12 @@ export default function Top10() {
             token.amm_asset_amount = currentAsset;
             token.live_price = currentPrice;
 
-            token.volume_24h = token.volume_24h || Math.random() * 10000;
-            token.value_24h = token.value_24h || currentXRP * (Math.random() * 2);
+            const tradeCount = await getTradeCount(token.id);
+            const tradeStats = await getTradeVolume(token.id);
+
+            token.volume_24h = tradeStats.volume || 0;
+            token.value_24h = tradeStats.value || 0;
+            token.trade_count_24h = tradeCount;
 
             await supabase
               .from('pool_data_cache')
@@ -153,7 +203,7 @@ export default function Top10() {
                 price: currentPrice,
                 account_id: amm.account,
                 volume_24h: token.volume_24h || 0,
-                price_change_24h: 0,
+                price_change_24h: calculate24hChange(token),
                 last_updated: new Date().toISOString()
               }, { onConflict: 'token_id' });
           } else {
@@ -328,7 +378,7 @@ export default function Top10() {
 
           <div className="p-4 bg-gradient-to-br from-orange-500/10 to-red-500/10 rounded-lg border border-orange-500/20">
             <div className="text-orange-400 text-xs mb-1">24h Trade Count</div>
-            <div className="text-2xl font-bold text-orange-200">{totalVolume24h.toFixed(0)}</div>
+            <div className="text-2xl font-bold text-orange-200">{tokens.reduce((sum, t) => sum + (t.trade_count_24h || 0), 0)}</div>
             <div className="text-orange-500 text-xs mt-1">transactions</div>
           </div>
 
@@ -361,6 +411,8 @@ export default function Top10() {
           </div>
         </div>
       </div>
+
+      <DailyMarketInsights tokens={tokens} topTokens={topTokens} category={selectedCategory} />
 
       <div className="glass rounded-lg p-6">
         <h3 className="text-xl font-bold text-blue-200 mb-4">Select Category</h3>
@@ -590,8 +642,8 @@ export default function Top10() {
                       </div>
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <div className="text-blue-200 font-semibold">{(token.volume_24h || 0).toFixed(0)}</div>
-                      <div className="text-xs text-blue-400">txs</div>
+                      <div className="text-blue-200 font-semibold">{token.trade_count_24h || 0}</div>
+                      <div className="text-xs text-blue-400">trades</div>
                     </td>
                     <td className="px-4 py-4 text-right">
                       <div className="text-purple-200 font-bold">{(token.value_24h || 0).toFixed(4)}</div>
@@ -708,7 +760,7 @@ export default function Top10() {
                       </div>
                       <div>
                         <div className="text-blue-400 mb-1">24h Trades</div>
-                        <div className="text-blue-200 font-semibold">{(token.volume_24h || 0).toFixed(0)}</div>
+                        <div className="text-blue-200 font-semibold">{token.trade_count_24h || 0}</div>
                       </div>
                     </div>
                   </div>
@@ -891,7 +943,7 @@ export default function Top10() {
                       {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)}%
                     </td>
                     <td className="px-3 py-2 text-right text-blue-200 font-semibold">
-                      {(token.volume_24h || 0).toFixed(0)}
+                      {token.trade_count_24h || 0}
                     </td>
                     <td className="px-3 py-2 text-right text-purple-200 font-bold">
                       {(token.value_24h || 0).toFixed(4)}
