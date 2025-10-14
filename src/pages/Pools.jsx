@@ -23,9 +23,14 @@ export default function Pools() {
   const [swapDropdownOpen, setSwapDropdownOpen] = useState(null);
 
   useEffect(() => {
-    loadTokens();
-    loadConnectedWallet();
-    fetchXrpUsdPrice();
+    const initialize = async () => {
+      await loadTokens();
+      await loadCachedPoolData();
+      loadConnectedWallet();
+      fetchXrpUsdPrice();
+    };
+
+    initialize();
 
     const unsubscribe = onTokenUpdate(() => {
       loadTokens();
@@ -48,6 +53,16 @@ export default function Pools() {
     if (tokens.length > 0 && Object.keys(poolsData).length === 0) {
       fetchAllPoolsData();
     }
+  }, [tokens]);
+
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      if (tokens.length > 0) {
+        fetchAllPoolsData(false);
+      }
+    }, 300000);
+
+    return () => clearInterval(refreshInterval);
   }, [tokens]);
 
   useEffect(() => {
@@ -161,11 +176,68 @@ export default function Pools() {
     }
   };
 
+  const loadCachedPoolData = async () => {
+    try {
+      const { data: cachedPools, error } = await supabase
+        .from('pool_data_cache')
+        .select('*');
+
+      if (!error && cachedPools && cachedPools.length > 0) {
+        const poolData = {};
+        cachedPools.forEach(cache => {
+          poolData[cache.token_id] = {
+            xrpAmount: parseFloat(cache.xrp_amount),
+            tokenAmount: parseFloat(cache.token_amount),
+            lpTokens: parseFloat(cache.lp_tokens),
+            price: parseFloat(cache.price),
+            accountId: cache.account_id,
+            volume24h: parseFloat(cache.volume_24h || 0),
+            priceChange24h: parseFloat(cache.price_change_24h || 0)
+          };
+        });
+        setPoolsData(poolData);
+        console.log(`⚡ Loaded ${cachedPools.length} pools from cache instantly`);
+      }
+    } catch (error) {
+      console.error('Error loading cached pool data:', error);
+    }
+  };
+
+  const fetch24hVolumes = async (tokenIds) => {
+    try {
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+      const { data, error } = await supabase
+        .from('trade_history')
+        .select('token_id, xrp_amount')
+        .in('token_id', tokenIds)
+        .gte('created_at', twentyFourHoursAgo);
+
+      if (error) throw error;
+
+      const volumeByToken = {};
+      tokenIds.forEach(id => volumeByToken[id] = 0);
+
+      if (data && data.length > 0) {
+        data.forEach(trade => {
+          const volume = parseFloat(trade.xrp_amount || 0);
+          volumeByToken[trade.token_id] = (volumeByToken[trade.token_id] || 0) + volume;
+        });
+      }
+
+      console.log('📊 24h volumes calculated:', volumeByToken);
+      return volumeByToken;
+    } catch (error) {
+      console.error('Error fetching 24h volumes:', error);
+      return {};
+    }
+  };
+
   const fetchAllPoolsData = async (forceRefresh = false) => {
     setRefreshing(true);
 
     try {
-      const cacheAge = 30;
+      const cacheAge = 300;
       const { data: cachedPools, error: cacheError } = await supabase
         .from('pool_data_cache')
         .select('*')
@@ -195,6 +267,8 @@ export default function Pools() {
       console.log('🔄 Fetching fresh pool data from XRPL...');
       const { requestWithRetry } = await import('../utils/xrplClient');
       const poolData = {};
+
+      const volumeData = await fetch24hVolumes(tokens.map(t => t.id));
 
       for (const token of tokens) {
         try {
@@ -226,7 +300,7 @@ export default function Pools() {
             const tradingFee = parseFloat(amm.trading_fee || 0) / 1000;
             const auctionSlot = amm.auction_slot || null;
 
-            const volume24h = token.volume_24h ? parseFloat(token.volume_24h) : 0;
+            const volume24h = volumeData[token.id] || 0;
             const fees24h = volume24h * (tradingFee / 100);
             const apr = xrpAmount > 0 ? ((fees24h * 365) / xrpAmount) * 100 : 0;
 
