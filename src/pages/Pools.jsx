@@ -295,7 +295,7 @@ export default function Pools() {
         .from('lp_balance_cache')
         .select('*')
         .eq('wallet_address', connectedWallet.address)
-        .gte('last_updated', new Date(Date.now() - 30000).toISOString());
+        .gte('last_updated', new Date(Date.now() - (5 * 60 * 1000)).toISOString());
 
       if (cachedBalances && cachedBalances.length > 0) {
         console.log('✅ Using cached LP balances:', cachedBalances.length);

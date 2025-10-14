@@ -14,6 +14,7 @@ import { onTokenUpdate } from '../utils/tokenEvents';
 import { XRPScanLink } from '../components/XRPScanLink';
 import { getXRPBalance } from '../utils/xrplBalance';
 import { sendTradingFee, TRADING_FEE_XRP } from '../utils/tradeFees';
+import { CACHE_DURATIONS } from '../utils/cacheConfig';
 
 const RECEIVER_ADDRESS = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
 const TRADING_FEE = TRADING_FEE_XRP;
@@ -86,6 +87,7 @@ export default function Trade({ preselectedToken = null }) {
   const [lpPosition, setLpPosition] = useState(null);
   const [loadingLpPosition, setLoadingLpPosition] = useState(false);
   const [showPositionTab, setShowPositionTab] = useState(false);
+  const fetchMarketDataTimeoutRef = useRef(null);
   const [withdrawMode, setWithdrawMode] = useState('both');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
@@ -149,11 +151,19 @@ export default function Trade({ preselectedToken = null }) {
       fetchLpPosition();
     }
     if (selectedToken) {
-      fetchMarketData();
+      if (fetchMarketDataTimeoutRef.current) {
+        clearTimeout(fetchMarketDataTimeoutRef.current);
+      }
+      fetchMarketDataTimeoutRef.current = setTimeout(() => {
+        fetchMarketData();
+      }, 300);
     }
 
     return () => {
       stopRealTimeUpdates();
+      if (fetchMarketDataTimeoutRef.current) {
+        clearTimeout(fetchMarketDataTimeoutRef.current);
+      }
     };
   }, [selectedToken, connectedWallet]);
 
@@ -237,7 +247,7 @@ export default function Trade({ preselectedToken = null }) {
       if (isMounted) {
         fetchLivePrice();
       }
-    }, 5000);
+    }, 15000);
 
     return () => {
       isMounted = false;
@@ -399,7 +409,7 @@ export default function Trade({ preselectedToken = null }) {
 
     priceUpdateIntervalRef.current = setInterval(() => {
       updateRealTimePrice();
-    }, 5000);
+    }, 20000);
   };
 
   const stopRealTimeUpdates = () => {
@@ -859,12 +869,11 @@ export default function Trade({ preselectedToken = null }) {
     try {
       setRefreshingMarket(true);
 
-      const cacheAge = 30;
       const { data: cachedPool } = await supabase
         .from('pool_data_cache')
         .select('*')
         .eq('token_id', selectedToken.id)
-        .gte('last_updated', new Date(Date.now() - cacheAge * 1000).toISOString())
+        .gte('last_updated', new Date(Date.now() - CACHE_DURATIONS.POOL_DATA).toISOString())
         .maybeSingle();
 
       if (!forceRefresh && cachedPool) {
@@ -964,7 +973,7 @@ export default function Trade({ preselectedToken = null }) {
           .select('*')
           .eq('wallet_address', connectedWallet.address)
           .eq('token_id', selectedToken.id)
-          .gte('last_updated', new Date(Date.now() - 30000).toISOString())
+          .gte('last_updated', new Date(Date.now() - CACHE_DURATIONS.BALANCE).toISOString())
           .maybeSingle();
 
         if (cached.data) {
@@ -1115,7 +1124,7 @@ export default function Trade({ preselectedToken = null }) {
         .select('*')
         .eq('wallet_address', connectedWallet.address)
         .eq('token_id', selectedToken.id)
-        .gte('last_updated', new Date(Date.now() - 30000).toISOString())
+        .gte('last_updated', new Date(Date.now() - CACHE_DURATIONS.LP_POSITION).toISOString())
         .maybeSingle();
 
       if (cached.data && cached.data.lp_balance > 0) {

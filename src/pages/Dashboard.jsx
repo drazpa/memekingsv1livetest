@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
+import { CACHE_DURATIONS, getCachedData, setCachedData } from '../utils/cacheConfig';
 import toast from 'react-hot-toast';
 import * as xrpl from 'xrpl';
 import { Buffer } from 'buffer';
@@ -321,6 +322,14 @@ export default function Dashboard() {
 
   const loadTokens = async () => {
     try {
+      const cachedTokens = getCachedData('dashboard_tokens', CACHE_DURATIONS.TOKEN_LIST);
+      if (cachedTokens) {
+        console.log('✅ Using cached token list');
+        setTokens(cachedTokens);
+        setFilteredTokens(cachedTokens);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('meme_tokens')
         .select('*')
@@ -333,7 +342,7 @@ export default function Dashboard() {
       const { data: cachedPools } = await supabase
         .from('pool_data_cache')
         .select('*')
-        .gte('last_updated', new Date(Date.now() - 30000).toISOString());
+        .gte('last_updated', new Date(Date.now() - CACHE_DURATIONS.POOL_DATA).toISOString());
 
       if (cachedPools && cachedPools.length > 0) {
         const poolMap = {};
@@ -353,6 +362,7 @@ export default function Dashboard() {
       }
 
       setTokens(tokensData);
+      setCachedData('dashboard_tokens', tokensData);
 
       const stats = {
         totalTokens: tokensData.length,

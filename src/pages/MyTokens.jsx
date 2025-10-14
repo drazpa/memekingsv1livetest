@@ -266,7 +266,7 @@ export default function MyTokens() {
       const { data: cachedPools } = await supabase
         .from('pool_data_cache')
         .select('*')
-        .gte('last_updated', new Date(Date.now() - 30000).toISOString());
+        .gte('last_updated', new Date(Date.now() - (5 * 60 * 1000)).toISOString());
 
       const poolCacheMap = {};
       if (cachedPools) {

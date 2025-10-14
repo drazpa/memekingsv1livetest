@@ -162,7 +162,7 @@ export default function Vault() {
         .from('token_holdings_cache')
         .select('*')
         .eq('wallet_address', connectedWallet.address)
-        .gte('last_updated', new Date(Date.now() - 30000).toISOString());
+        .gte('last_updated', new Date(Date.now() - (5 * 60 * 1000)).toISOString());
 
       if (cachedHoldings && cachedHoldings.length > 0) {
         console.log('✅ Using cached token holdings');

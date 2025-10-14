@@ -105,7 +105,7 @@ export default function TokenDetailModal({ token, onClose }) {
           .from('pool_data_cache')
           .select('*')
           .eq('token_id', token.id)
-          .gte('last_updated', new Date(Date.now() - 30000).toISOString())
+          .gte('last_updated', new Date(Date.now() - (5 * 60 * 1000)).toISOString())
           .maybeSingle();
 
         if (cachedPool) {
@@ -156,7 +156,7 @@ export default function TokenDetailModal({ token, onClose }) {
         .from('pool_data_cache')
         .select('*')
         .eq('token_id', token.id)
-        .gte('last_updated', new Date(Date.now() - 30000).toISOString())
+        .gte('last_updated', new Date(Date.now() - (5 * 60 * 1000)).toISOString())
         .maybeSingle();
 
       if (cachedPool) {
