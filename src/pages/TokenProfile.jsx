@@ -34,7 +34,7 @@ export default function TokenProfile({ tokenSlug }) {
       setLoading(true);
 
       const { data, error } = await supabase
-        .from('tokens')
+        .from('meme_tokens')
         .select('*')
         .ilike('token_name', tokenSlug)
         .single();

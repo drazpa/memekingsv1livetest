@@ -761,45 +761,57 @@ export default function TokenDetailModal({ token, onClose }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <a
-                  href={`https://xmagnetic.org/amm/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn text-purple-300 px-4 py-3 rounded-lg text-center font-medium"
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => {
+                    localStorage.setItem('selectedTradeToken', JSON.stringify(token));
+                    window.dispatchEvent(new CustomEvent('navigateToTrade', { detail: token }));
+                    onClose();
+                  }}
+                  className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold px-4 py-3 rounded-lg shadow-lg"
                 >
-                  AMM Pool
-                </a>
-                <a
-                  href={`https://xmagnetic.org/dex/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-primary text-white px-4 py-3 rounded-lg text-center font-medium"
+                  💱 Trade on MEMEKINGS
+                </button>
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'bottrader' }));
+                    onClose();
+                  }}
+                  className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-bold px-4 py-3 rounded-lg shadow-lg"
                 >
-                  Trade on DEX
-                </a>
+                  🤖 Bot Trader
+                </button>
+                <button
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'pools' }));
+                    onClose();
+                  }}
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold px-4 py-3 rounded-lg shadow-lg"
+                >
+                  💧 LP Pools
+                </button>
                 <button
                   onClick={() => {
                     window.dispatchEvent(new CustomEvent('navigateToToken', { detail: token.token_name }));
                     onClose();
                   }}
-                  className="btn-primary px-4 py-3 rounded-lg font-medium"
+                  className="bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white font-bold px-4 py-3 rounded-lg shadow-lg"
                 >
                   👁️ View Full Profile
                 </button>
                 <a
-                  href={`https://testnet.xrpl.org/accounts/${token.issuer_address}`}
+                  href={`https://xrpscan.com/account/${token.issuer_address}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn text-purple-300 px-4 py-3 rounded-lg text-center font-medium"
+                  className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold px-4 py-3 rounded-lg shadow-lg text-center"
                 >
-                  Explorer
+                  🔍 Explorer
                 </a>
                 <button
                   onClick={onClose}
-                  className="btn text-purple-300 px-4 py-3 rounded-lg font-medium"
+                  className="bg-purple-900/30 border border-purple-500/30 hover:bg-purple-900/50 text-purple-200 font-medium px-4 py-3 rounded-lg"
                 >
-                  Back
+                  ← Back
                 </button>
               </div>
             </>
