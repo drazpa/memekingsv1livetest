@@ -440,7 +440,7 @@ export function TokenTrustButton({
   const getSizeClasses = () => {
     switch (size) {
       case 'sm':
-        return 'px-3 py-1.5 text-xs';
+        return 'px-3 py-2 text-xs';
       case 'lg':
         return 'px-6 py-3 text-base';
       default:

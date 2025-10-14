@@ -1045,7 +1045,7 @@ export default function Dashboard() {
       const matchesCategory = filterCategory === 'all' || t.category === filterCategory;
       const matchesTab = tokenFilterTab === 'all' ||
                         (tokenFilterTab === 'memeking' && t.issuer_address === ISSUER_ADDRESS) ||
-                        (tokenFilterTab === 'user' && t.issuer_address !== ISSUER_ADDRESS);
+                        (tokenFilterTab === 'user' && connectedWallet && t.issuer_address === connectedWallet.address);
       return matchesSearch && matchesFilter && matchesCategory && matchesTab;
     })
     .sort((a, b) => {
