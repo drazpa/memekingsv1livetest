@@ -547,7 +547,7 @@ export function TokenTrustButton({
       </button>
 
       {dropdownOpen && (
-        <div className="absolute bottom-full left-0 mb-2 w-64 glass bg-gradient-to-br from-purple-900/95 to-purple-800/95 border border-purple-500/30 rounded-lg shadow-xl z-[9999] overflow-hidden">
+        <div className="absolute bottom-full left-0 mb-2 w-64 bg-gradient-to-br from-purple-900 to-purple-800 border border-purple-500/30 rounded-lg shadow-xl z-[9999] overflow-hidden backdrop-blur-xl">
           <button
             onClick={() => {
               setDropdownOpen(false);

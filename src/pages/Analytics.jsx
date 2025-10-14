@@ -37,11 +37,24 @@ export default function Analytics() {
     concentrationIndex: 0,
     avgAge: 0
   });
+  const [xrpUsdPrice, setXrpUsdPrice] = useState(2.50);
 
   useEffect(() => {
     loadAnalytics();
     loadConnectedWallet();
+    fetchXrpUsdPrice();
   }, []);
+
+  const fetchXrpUsdPrice = async () => {
+    try {
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd');
+      const data = await response.json();
+      setXrpUsdPrice(data.ripple?.usd || 2.50);
+    } catch (error) {
+      console.error('Error fetching XRP/USD price:', error);
+      setXrpUsdPrice(2.50);
+    }
+  };
 
   useEffect(() => {
     if (connectedWallet) {
@@ -736,10 +749,21 @@ export default function Analytics() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-purple-300">{token.supply.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-purple-200 font-mono text-sm">{price.toFixed(8)}</td>
-                    <td className="px-4 py-3 text-purple-200 font-bold">{marketCap.toFixed(4)}</td>
-                    <td className="px-4 py-3 text-purple-300">
-                      {token.amm_pool_created ? `${token.amm_xrp_amount?.toFixed(2) || '0.00'} XRP` : '-'}
+                    <td className="px-4 py-3">
+                      <div className="text-purple-200 font-mono text-sm">{price.toFixed(8)} XRP</div>
+                      <div className="text-green-400 text-xs">${(price * xrpUsdPrice).toFixed(6)}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-purple-200 font-bold">{marketCap.toFixed(4)} XRP</div>
+                      <div className="text-green-400 text-xs">${(marketCap * xrpUsdPrice).toFixed(2)}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {token.amm_pool_created ? (
+                        <div>
+                          <div className="text-purple-300">{token.amm_xrp_amount?.toFixed(2) || '0.00'} XRP</div>
+                          <div className="text-green-400 text-xs">${((token.amm_xrp_amount || 0) * xrpUsdPrice).toFixed(2)}</div>
+                        </div>
+                      ) : '-'}
                     </td>
                     <td className="px-4 py-3 text-purple-400">{ratio}</td>
                     <td className="px-4 py-3 text-purple-400 text-sm">{age}h ago</td>
@@ -765,12 +789,14 @@ export default function Analytics() {
             <div className="text-2xl font-bold text-purple-200">
               {stats.totalLiquidity.toFixed(2)} XRP
             </div>
+            <div className="text-green-400 text-sm">${(stats.totalLiquidity * xrpUsdPrice).toFixed(2)}</div>
           </div>
           <div className="glass rounded-lg p-4">
             <div className="text-purple-400 text-sm mb-1">Avg Pool Depth</div>
             <div className="text-2xl font-bold text-purple-200">
               {stats.avgPoolDepth.toFixed(2)} XRP
             </div>
+            <div className="text-green-400 text-sm">${(stats.avgPoolDepth * xrpUsdPrice).toFixed(2)}</div>
           </div>
         </div>
 
@@ -793,7 +819,10 @@ export default function Analytics() {
                 return (
                   <tr key={token.id} className="border-t border-purple-500/20 hover:bg-purple-900/20">
                     <td className="px-4 py-3 text-purple-200 font-bold">{token.token_name}</td>
-                    <td className="px-4 py-3 text-right text-purple-200">{token.amm_xrp_amount?.toFixed(2) || '0.00'} XRP</td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="text-purple-200">{token.amm_xrp_amount?.toFixed(2) || '0.00'} XRP</div>
+                      <div className="text-green-400 text-xs">${((token.amm_xrp_amount || 0) * xrpUsdPrice).toFixed(2)}</div>
+                    </td>
                     <td className="px-4 py-3 text-right text-purple-300">{token.amm_asset_amount?.toLocaleString() || '0'}</td>
                     <td className="px-4 py-3 text-right text-purple-400">{priceImpact}% per XRP</td>
                     <td className="px-4 py-3 text-right text-purple-200 font-bold">{poolShare}%</td>
