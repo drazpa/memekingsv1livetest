@@ -106,6 +106,12 @@ class AIAssistant {
       return this.handleNavigation(lowerMessage);
     } else if (this.isTokenStatsQuery(lowerMessage)) {
       return await this.handleTokenStats();
+    } else if (this.isMarketCapQuery(lowerMessage)) {
+      return await this.handleMarketCapQuery();
+    } else if (this.isVolumeQuery(lowerMessage)) {
+      return await this.handleVolumeQuery();
+    } else if (this.isHoldersQuery(lowerMessage)) {
+      return await this.handleHoldersQuery(message);
     } else if (this.isBotQuery(lowerMessage)) {
       return await this.handleBotQuery();
     } else if (this.isHelpQuery(lowerMessage)) {
@@ -120,7 +126,12 @@ class AIAssistant {
   }
 
   isTokenQuery(msg) {
-    return msg.includes('token') && (msg.includes('info') || msg.includes('about') || msg.includes('details'));
+    return (msg.includes('token') || msg.includes('coin')) &&
+           (msg.includes('info') || msg.includes('about') || msg.includes('details') ||
+            msg.includes('show') || msg.includes('tell me') || msg.includes('what is') ||
+            msg.includes('stats') || msg.includes('statistics') || msg.includes('market cap') ||
+            msg.includes('supply') || msg.includes('price') || msg.includes('liquidity') ||
+            msg.includes('days') || /\b[A-Z]{3,10}\b/.test(msg));
   }
 
   isTradeQuery(msg) {
@@ -173,6 +184,18 @@ class AIAssistant {
 
   isBotQuery(msg) {
     return msg.includes('bot') && (msg.includes('status') || msg.includes('trading') || msg.includes('performance'));
+  }
+
+  isMarketCapQuery(msg) {
+    return msg.includes('market cap') || msg.includes('marketcap') || msg.includes('mcap');
+  }
+
+  isVolumeQuery(msg) {
+    return msg.includes('volume') || msg.includes('trading volume');
+  }
+
+  isHoldersQuery(msg) {
+    return msg.includes('holder') || msg.includes('who holds') || msg.includes('ownership');
   }
 
   isBuyTokenQuery(msg) {
@@ -242,9 +265,17 @@ class AIAssistant {
 
   async handleTokenQuery(message) {
     try {
+      const tokenMatch = message.match(/(?:about|info|details|for|show)\s+([A-Z]{3,10})/i);
+
+      if (tokenMatch) {
+        const tokenCode = tokenMatch[1].toUpperCase();
+        return await this.getDetailedTokenInfo(tokenCode);
+      }
+
       const { data: tokens, error } = await supabase
-        .from('tokens')
+        .from('meme_tokens')
         .select('*')
+        .eq('amm_pool_created', true)
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -266,11 +297,10 @@ class AIAssistant {
         };
       }
 
-      const totalSupply = tokens.reduce((sum, t) => sum + (parseFloat(t.total_supply) || 0), 0);
-      const avgVolume = tokens.reduce((sum, t) => sum + (t.volume_24h || 0), 0) / tokens.length;
+      const totalSupply = tokens.reduce((sum, t) => sum + (parseFloat(t.supply) || 0), 0);
 
       return {
-        content: `I found ${tokens.length} recent tokens from the platform database:`,
+        content: `I found ${tokens.length} active tokens:`,
         data: {
           card: {
             icon: '💎',
@@ -278,16 +308,15 @@ class AIAssistant {
             badge: `${tokens.length} Tokens`,
             items: [
               { label: 'Total Tokens', value: `${tokens.length}` },
-              { label: 'Avg 24h Volume', value: avgVolume.toFixed(2) },
-              { label: 'Total Supply', value: totalSupply.toFixed(0) }
+              { label: 'Total Supply', value: totalSupply.toLocaleString() }
             ]
           },
           table: {
-            headers: ['Token', 'Symbol', 'Volume', 'Created'],
+            headers: ['Token', 'Symbol', 'Supply', 'Created'],
             rows: tokens.slice(0, 5).map(token => [
-              token.name || 'Unknown',
+              token.token_name || 'Unknown',
               token.currency_code || 'N/A',
-              token.volume_24h ? token.volume_24h.toFixed(2) : 'N/A',
+              token.supply ? parseFloat(token.supply).toLocaleString() : 'N/A',
               new Date(token.created_at).toLocaleDateString()
             ])
           },
@@ -310,6 +339,105 @@ class AIAssistant {
     } catch (error) {
       return {
         content: 'I had trouble fetching token information. Please try again.',
+        data: null
+      };
+    }
+  }
+
+  async getDetailedTokenInfo(tokenCode) {
+    try {
+      const { data: token, error } = await supabase
+        .from('meme_tokens')
+        .select('*')
+        .ilike('currency_code', tokenCode)
+        .single();
+
+      if (error || !token) {
+        return {
+          content: `Token "${tokenCode}" not found. Make sure the token code is correct.`,
+          data: {
+            actions: [
+              {
+                label: 'View All Tokens',
+                icon: '📋',
+                style: 'primary',
+                onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'mytokens' }))
+              }
+            ]
+          }
+        };
+      }
+
+      const currentPrice = token.amm_xrp_amount && token.amm_asset_amount
+        ? parseFloat(token.amm_xrp_amount) / parseFloat(token.amm_asset_amount)
+        : 0;
+
+      const marketCap = currentPrice * parseFloat(token.supply || 0);
+      const daysOld = Math.floor((Date.now() - new Date(token.created_at).getTime()) / (1000 * 60 * 60 * 24));
+
+      const liquidity = token.amm_xrp_amount
+        ? `${parseFloat(token.amm_xrp_amount).toFixed(4)} XRP`
+        : 'N/A';
+
+      const details = [
+        { label: 'Token Name', value: token.token_name || 'Unknown' },
+        { label: 'Symbol', value: token.currency_code || 'N/A' },
+        { label: 'Total Supply', value: token.supply ? parseFloat(token.supply).toLocaleString() : 'N/A' },
+        { label: 'Current Price', value: currentPrice > 0 ? `${currentPrice.toFixed(8)} XRP` : 'N/A' },
+        { label: 'Market Cap', value: marketCap > 0 ? `${marketCap.toFixed(4)} XRP` : 'N/A' },
+        { label: 'Liquidity', value: liquidity },
+        { label: 'Days Old', value: `${daysOld} days` },
+        { label: 'Category', value: token.category || 'Other' },
+        { label: 'AMM Pool', value: token.amm_pool_created ? 'Yes ✅' : 'No ❌' },
+        { label: 'Status', value: token.status || 'Unknown' },
+        { label: 'Issuer', value: `${token.issuer_address?.slice(0, 8)}...${token.issuer_address?.slice(-6)}` },
+        { label: 'Created', value: new Date(token.created_at).toLocaleString() }
+      ];
+
+      if (token.description) {
+        details.splice(2, 0, { label: 'Description', value: token.description });
+      }
+      if (token.twitter_handle) {
+        details.push({ label: 'Twitter', value: `@${token.twitter_handle}` });
+      }
+      if (token.website_url) {
+        details.push({ label: 'Website', value: token.website_url });
+      }
+
+      return {
+        content: `Here are the complete details for ${token.token_name || tokenCode}:`,
+        data: {
+          card: {
+            icon: '💎',
+            title: `${token.token_name || tokenCode} (${token.currency_code})`,
+            badge: token.category || 'Token',
+            items: details
+          },
+          actions: [
+            {
+              label: 'Trade This Token',
+              icon: '💱',
+              style: 'primary',
+              onClick: () => {
+                window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'trade' }));
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('selectToken', { detail: token }));
+                }, 100);
+              }
+            },
+            {
+              label: 'View on XRPScan',
+              icon: '🔍',
+              style: 'secondary',
+              onClick: () => window.open(`https://xrpscan.com/account/${token.issuer_address}`, '_blank')
+            }
+          ]
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching token details:', error);
+      return {
+        content: `I had trouble fetching details for "${tokenCode}". Please try again.`,
         data: null
       };
     }
@@ -1082,6 +1210,228 @@ class AIAssistant {
     } catch (error) {
       return {
         content: 'I had trouble fetching token statistics. Please try again.',
+        data: null
+      };
+    }
+  }
+
+  async handleMarketCapQuery() {
+    try {
+      const { data: tokens, error } = await supabase
+        .from('meme_tokens')
+        .select('*')
+        .eq('amm_pool_created', true)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      const tokensWithMC = tokens.map(token => {
+        const currentPrice = token.amm_xrp_amount && token.amm_asset_amount
+          ? parseFloat(token.amm_xrp_amount) / parseFloat(token.amm_asset_amount)
+          : 0;
+        const marketCap = currentPrice * parseFloat(token.supply || 0);
+        return { ...token, marketCap, currentPrice };
+      }).filter(t => t.marketCap > 0).sort((a, b) => b.marketCap - a.marketCap);
+
+      return {
+        content: `Here are tokens ranked by market cap:`,
+        data: {
+          card: {
+            icon: '💰',
+            title: 'Market Cap Rankings',
+            badge: 'Top Tokens',
+            items: [
+              { label: 'Total Tokens', value: `${tokensWithMC.length}` },
+              { label: 'Total Market Cap', value: `${tokensWithMC.reduce((sum, t) => sum + t.marketCap, 0).toFixed(2)} XRP` }
+            ]
+          },
+          table: {
+            headers: ['Rank', 'Token', 'Market Cap', 'Price'],
+            rows: tokensWithMC.slice(0, 10).map((token, idx) => [
+              `#${idx + 1}`,
+              `${token.token_name} (${token.currency_code})`,
+              `${token.marketCap.toFixed(2)} XRP`,
+              `${token.currentPrice.toFixed(8)} XRP`
+            ])
+          },
+          actions: [
+            {
+              label: 'View Top 10',
+              icon: '👑',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'top10' }))
+            }
+          ]
+        }
+      };
+    } catch (error) {
+      return {
+        content: 'I had trouble fetching market cap data. Please try again.',
+        data: null
+      };
+    }
+  }
+
+  async handleVolumeQuery() {
+    try {
+      const { data: trades, error } = await supabase
+        .from('trade_history')
+        .select('*, meme_tokens(*)')
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const volumeByToken = {};
+      trades?.forEach(trade => {
+        const tokenId = trade.token_id;
+        if (!volumeByToken[tokenId]) {
+          volumeByToken[tokenId] = {
+            token: trade.meme_tokens,
+            volume: 0,
+            trades: 0
+          };
+        }
+        volumeByToken[tokenId].volume += parseFloat(trade.xrp_amount || 0);
+        volumeByToken[tokenId].trades += 1;
+      });
+
+      const sortedVolumes = Object.values(volumeByToken)
+        .sort((a, b) => b.volume - a.volume)
+        .slice(0, 10);
+
+      return {
+        content: `Here are the top tokens by 24h trading volume:`,
+        data: {
+          card: {
+            icon: '📊',
+            title: '24h Trading Volume',
+            badge: 'Last 24 Hours',
+            items: [
+              { label: 'Total Volume', value: `${sortedVolumes.reduce((sum, t) => sum + t.volume, 0).toFixed(2)} XRP` },
+              { label: 'Total Trades', value: `${sortedVolumes.reduce((sum, t) => sum + t.trades, 0)}` }
+            ]
+          },
+          table: {
+            headers: ['Token', '24h Volume', 'Trades'],
+            rows: sortedVolumes.map(item => [
+              `${item.token?.token_name || 'Unknown'} (${item.token?.currency_code || 'N/A'})`,
+              `${item.volume.toFixed(2)} XRP`,
+              `${item.trades}`
+            ])
+          },
+          actions: [
+            {
+              label: 'View Trade History',
+              icon: '📈',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'activity' }))
+            }
+          ]
+        }
+      };
+    } catch (error) {
+      return {
+        content: 'I had trouble fetching volume data. Please try again.',
+        data: null
+      };
+    }
+  }
+
+  async handleHoldersQuery(message) {
+    try {
+      const tokenMatch = message.match(/(?:holder|holds|ownership).*?([A-Z]{3,10})/i);
+      const tokenCode = tokenMatch ? tokenMatch[1].toUpperCase() : null;
+
+      if (!tokenCode) {
+        return {
+          content: 'Please specify which token you want to check holders for. Example: "Who holds ORANGE?" or "Show holders for KOOL"',
+          data: null
+        };
+      }
+
+      const { data: token, error: tokenError } = await supabase
+        .from('meme_tokens')
+        .select('*')
+        .ilike('currency_code', tokenCode)
+        .single();
+
+      if (tokenError || !token) {
+        return {
+          content: `Token "${tokenCode}" not found.`,
+          data: null
+        };
+      }
+
+      const { data: holders, error } = await supabase
+        .from('token_holdings_cache')
+        .select('*')
+        .eq('token_id', token.id)
+        .order('balance', { ascending: false })
+        .limit(10);
+
+      if (error || !holders || holders.length === 0) {
+        return {
+          content: `No holder data available yet for ${token.token_name} (${tokenCode}). Holder data is updated periodically.`,
+          data: {
+            card: {
+              icon: '👥',
+              title: `${token.token_name} (${tokenCode})`,
+              badge: 'No Data',
+              items: [
+                { label: 'Status', value: 'Holder data not yet available' },
+                { label: 'Total Supply', value: token.supply ? parseFloat(token.supply).toLocaleString() : 'N/A' }
+              ]
+            }
+          }
+        };
+      }
+
+      const totalHolders = holders.length;
+      const totalBalance = holders.reduce((sum, h) => sum + parseFloat(h.balance || 0), 0);
+
+      return {
+        content: `Here are the top holders of ${token.token_name} (${tokenCode}):`,
+        data: {
+          card: {
+            icon: '👥',
+            title: `${token.token_name} Holders`,
+            badge: `${totalHolders} Holders`,
+            items: [
+              { label: 'Total Holders', value: `${totalHolders}` },
+              { label: 'Total Balance', value: totalBalance.toLocaleString() },
+              { label: 'Total Supply', value: token.supply ? parseFloat(token.supply).toLocaleString() : 'N/A' }
+            ]
+          },
+          table: {
+            headers: ['Rank', 'Address', 'Balance', '% of Supply'],
+            rows: holders.map((holder, idx) => [
+              `#${idx + 1}`,
+              `${holder.wallet_address?.slice(0, 8)}...${holder.wallet_address?.slice(-6)}`,
+              parseFloat(holder.balance).toLocaleString(),
+              `${((parseFloat(holder.balance) / parseFloat(token.supply)) * 100).toFixed(2)}%`
+            ])
+          },
+          actions: [
+            {
+              label: 'Trade This Token',
+              icon: '💱',
+              style: 'primary',
+              onClick: () => {
+                window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'trade' }));
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent('selectToken', { detail: token }));
+                }, 100);
+              }
+            }
+          ]
+        }
+      };
+    } catch (error) {
+      console.error('Error fetching holder data:', error);
+      return {
+        content: 'I had trouble fetching holder data. Please try again.',
         data: null
       };
     }
