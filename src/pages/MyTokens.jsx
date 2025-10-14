@@ -932,10 +932,10 @@ export default function MyTokens() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {userCreatedTokens.map(token => (
-              <div key={token.id} className="glass rounded-lg p-4 hover:bg-purple-900/30 transition-colors cursor-pointer"
-                onClick={() => window.dispatchEvent(new CustomEvent('navigateToToken', { detail: token.token_name }))}>
-                <div className="flex items-start gap-3">
-                  <TokenIcon token={token} size="3xl" />
+              <div key={token.id} className="glass rounded-lg p-4 hover:bg-purple-900/30 transition-colors">
+                <div className="flex items-start gap-3 mb-3 cursor-pointer"
+                  onClick={() => window.dispatchEvent(new CustomEvent('navigateToToken', { detail: token.token_name }))}>
+                  <TokenIcon token={token} size="lg" />
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-purple-200 truncate">{token.token_name}</div>
                     <div className="text-purple-400 text-sm">{token.currency_code}</div>
@@ -958,6 +958,35 @@ export default function MyTokens() {
                       </div>
                     )}
                   </div>
+                </div>
+                <div className="flex gap-2 flex-wrap pt-3 border-t border-purple-500/20">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const holding = holdings.find(h => h.token.id === token.id);
+                      if (holding) {
+                        setSelectedHolding(holding);
+                        setShowSendModal(true);
+                      } else {
+                        toast.error('You need to hold this token to send it');
+                      }
+                    }}
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold px-3 py-2 text-xs rounded-lg shadow-lg transition-all"
+                    title="Send tokens"
+                  >
+                    📤 Send
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedHolding({ token, balance: 0 });
+                      setShowReceiveModal(true);
+                    }}
+                    className="flex-1 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold px-3 py-2 text-xs rounded-lg shadow-lg transition-all"
+                    title="Receive tokens"
+                  >
+                    📥 Receive
+                  </button>
                 </div>
               </div>
             ))}

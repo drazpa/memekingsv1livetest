@@ -15,13 +15,13 @@ export default function ReceiveTokenModal({ token, wallet, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl shadow-2xl max-w-md w-full border border-slate-700">
+      <div className="glass rounded-xl shadow-2xl max-w-md w-full border border-purple-500/30">
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-white">Receive Tokens</h2>
+            <h2 className="text-2xl font-bold text-purple-200">Receive Tokens</h2>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white text-2xl"
+              className="text-purple-400 hover:text-purple-200 text-2xl"
             >
               ×
             </button>
@@ -31,8 +31,8 @@ export default function ReceiveTokenModal({ token, wallet, onClose }) {
             <div className="flex items-center justify-center gap-3 mb-4">
               <TokenIcon token={token} size="lg" />
               <div>
-                <h3 className="text-xl font-bold text-white">{token.token_name}</h3>
-                <p className="text-sm text-slate-400">{token.currency_code}</p>
+                <h3 className="text-xl font-bold text-purple-200">{token.token_name}</h3>
+                <p className="text-sm text-purple-400">{token.currency_code}</p>
               </div>
             </div>
           </div>
@@ -47,7 +47,7 @@ export default function ReceiveTokenModal({ token, wallet, onClose }) {
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-purple-300 mb-2">
               Your Wallet Address
             </label>
             <div className="flex gap-2">
@@ -55,14 +55,14 @@ export default function ReceiveTokenModal({ token, wallet, onClose }) {
                 type="text"
                 value={wallet.address}
                 readOnly
-                className="flex-1 px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white font-mono text-sm"
+                className="flex-1 px-4 py-2 bg-purple-900/30 border border-purple-500/30 rounded-lg text-purple-200 font-mono text-sm"
               />
               <button
                 onClick={copyToClipboard}
                 className={`px-4 py-2 rounded-lg font-medium transition-all ${
                   copied
                     ? 'bg-green-500 text-white'
-                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                    : 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white'
                 }`}
               >
                 {copied ? '✓ Copied' : '📋 Copy'}
@@ -79,7 +79,7 @@ export default function ReceiveTokenModal({ token, wallet, onClose }) {
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg transition-all"
+              className="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold py-3 rounded-lg transition-all"
             >
               Close
             </button>
