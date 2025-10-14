@@ -1424,11 +1424,11 @@ export default function Dashboard() {
           <div className="relative swap-dropdown" onClick={(e) => { e.stopPropagation(); }}>
             <button
               onClick={() => setSwapDropdownOpen(swapDropdownOpen === token.id ? null : token.id)}
-              className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold text-xs px-2 py-1 rounded shadow-md transition-all duration-300 flex items-center gap-1"
+              className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white font-bold text-xs px-3 py-2 rounded-lg shadow-lg transition-all duration-300 flex items-center gap-1.5"
               title="Swap options"
             >
               <span>💱 Swap</span>
-              <svg className={`w-3 h-3 transition-transform ${swapDropdownOpen === token.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-3.5 h-3.5 transition-transform ${swapDropdownOpen === token.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
@@ -1475,7 +1475,7 @@ export default function Dashboard() {
             )}
           </div>
           <button
-            className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold text-xs px-2 py-1 rounded shadow-md shadow-purple-500/50 hover:shadow-purple-500/70"
+            className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-bold text-xs px-3 py-2 rounded-lg shadow-lg shadow-purple-500/50 hover:shadow-purple-500/70"
             onClick={(e) => { e.stopPropagation(); tweetToken(token); }}
             title="Post on X"
           >
