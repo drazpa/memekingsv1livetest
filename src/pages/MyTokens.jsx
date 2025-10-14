@@ -26,7 +26,7 @@ export default function MyTokens() {
     lpValueChange24h: 0
   });
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('24hChange');
+  const [sortBy, setSortBy] = useState('value');
   const [sortOrder, setSortOrder] = useState('desc');
   const [favorites, setFavorites] = useState([]);
   const [showLPTokens, setShowLPTokens] = useState(true);
