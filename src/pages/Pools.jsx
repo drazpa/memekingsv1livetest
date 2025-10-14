@@ -62,6 +62,17 @@ export default function Pools() {
     }
   }, [connectedWallet]);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (swapDropdownOpen && !event.target.closest('.swap-dropdown')) {
+        setSwapDropdownOpen(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [swapDropdownOpen]);
+
   const loadConnectedWallet = () => {
     const stored = localStorage.getItem('connectedWallet');
     if (stored) {
@@ -393,31 +404,31 @@ export default function Pools() {
     const marketCap = calculateMarketCap(token);
 
     return (
-      <div className="glass rounded-lg p-4 sm:p-6 space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <TokenIcon token={token} size="3xl" />
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg sm:text-xl font-bold text-purple-200">{token.token_name}/XRP</h3>
+      <div className="glass rounded-lg p-3 sm:p-6 space-y-3 sm:space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <TokenIcon token={token} size="lg" className="flex-shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h3 className="text-sm sm:text-lg md:text-xl font-bold text-purple-200 truncate">{token.token_name}/XRP</h3>
                 <button
                   onClick={(e) => toggleFavorite(token.id, e)}
-                  className="text-lg hover:scale-110 transition-transform"
+                  className="text-base sm:text-lg hover:scale-110 transition-transform flex-shrink-0"
                 >
                   {favorites.includes(token.id) ? '⭐' : '☆'}
                 </button>
               </div>
-              <p className="text-purple-400 text-sm">AMM Pool</p>
+              <p className="text-purple-400 text-xs sm:text-sm">AMM Pool</p>
             </div>
           </div>
           <div className="text-left sm:text-right w-full sm:w-auto">
-            <div className="flex items-center gap-2">
-              <div>
-                <div className="text-xl sm:text-2xl font-bold text-purple-200 font-mono break-all">{livePrice.toFixed(8)}</div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="min-w-0">
+                <div className="text-base sm:text-xl md:text-2xl font-bold text-purple-200 font-mono truncate">{livePrice.toFixed(8)}</div>
                 <div className="text-green-400 text-xs">${(livePrice * xrpUsdPrice).toFixed(6)}</div>
               </div>
               {token.amm_pool_created && (
-                <span className={`text-xs font-medium px-2 py-1 rounded whitespace-nowrap ${
+                <span className={`text-xs font-medium px-1.5 sm:px-2 py-1 rounded whitespace-nowrap flex-shrink-0 ${
                   parseFloat(calculate24hChange(token)) >= 0
                     ? 'text-green-300 bg-green-500/10'
                     : 'text-red-300 bg-red-500/10'
@@ -432,43 +443,43 @@ export default function Pools() {
 
         {poolData ? (
           <>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="glass rounded-lg p-4">
-                <div className="text-purple-400 text-xs mb-1">XRP Liquidity</div>
-                <div className="text-lg font-bold text-purple-200">{poolData.xrpAmount.toFixed(2)}</div>
-                <div className="text-green-400 text-xs">${(poolData.xrpAmount * xrpUsdPrice).toFixed(2)}</div>
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+              <div className="glass rounded-lg p-2 sm:p-4">
+                <div className="text-purple-400 text-xs mb-0.5 sm:mb-1">XRP Liquidity</div>
+                <div className="text-sm sm:text-lg font-bold text-purple-200 truncate">{poolData.xrpAmount.toFixed(2)}</div>
+                <div className="text-green-400 text-xs truncate">${(poolData.xrpAmount * xrpUsdPrice).toFixed(2)}</div>
               </div>
-              <div className="glass rounded-lg p-4">
-                <div className="text-purple-400 text-xs mb-1">24h Volume</div>
-                <div className="text-lg font-bold text-purple-200">{poolData.volume24h ? poolData.volume24h.toFixed(2) : '0'} XRP</div>
-                <div className="text-green-400 text-xs">${((poolData.volume24h || 0) * xrpUsdPrice).toFixed(2)}</div>
+              <div className="glass rounded-lg p-2 sm:p-4">
+                <div className="text-purple-400 text-xs mb-0.5 sm:mb-1">24h Volume</div>
+                <div className="text-sm sm:text-lg font-bold text-purple-200 truncate">{poolData.volume24h ? poolData.volume24h.toFixed(2) : '0'} XRP</div>
+                <div className="text-green-400 text-xs truncate">${((poolData.volume24h || 0) * xrpUsdPrice).toFixed(2)}</div>
               </div>
-              <div className="glass rounded-lg p-4">
-                <div className="text-purple-400 text-xs mb-1">LP Tokens</div>
-                <div className="text-lg font-bold text-purple-200">{poolData.lpTokens.toFixed(2)}</div>
+              <div className="glass rounded-lg p-2 sm:p-4">
+                <div className="text-purple-400 text-xs mb-0.5 sm:mb-1">LP Tokens</div>
+                <div className="text-sm sm:text-lg font-bold text-purple-200 truncate">{poolData.lpTokens.toFixed(2)}</div>
               </div>
-              <div className="glass rounded-lg p-4">
-                <div className="text-purple-400 text-xs mb-1">Market Cap</div>
-                <div className="text-lg font-bold text-purple-200">
+              <div className="glass rounded-lg p-2 sm:p-4">
+                <div className="text-purple-400 text-xs mb-0.5 sm:mb-1">Market Cap</div>
+                <div className="text-sm sm:text-lg font-bold text-purple-200 truncate">
                   {marketCap.toFixed(2)} XRP
                 </div>
               </div>
             </div>
 
             {lpBalance && (
-              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div>
-                    <div className="text-green-300 text-sm font-medium mb-1">Your LP Position</div>
-                    <div className="text-green-200 text-xs">
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-2 sm:p-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-green-300 text-xs sm:text-sm font-medium mb-0.5 sm:mb-1">Your LP Position</div>
+                    <div className="text-green-200 text-xs truncate">
                       {lpBalance.balance.toFixed(4)} LP Tokens ({lpBalance.share.toFixed(4)}% of pool)
                     </div>
                   </div>
-                  <div className="text-left sm:text-right">
-                    <div className="text-green-200 font-bold">
+                  <div className="text-left sm:text-right flex-shrink-0">
+                    <div className="text-green-200 text-sm sm:text-base font-bold truncate">
                       ~{(poolData.xrpAmount * lpBalance.share / 100).toFixed(4)} XRP
                     </div>
-                    <div className="text-green-400 text-xs">${((poolData.xrpAmount * lpBalance.share / 100) * xrpUsdPrice).toFixed(2)}</div>
+                    <div className="text-green-400 text-xs truncate">${((poolData.xrpAmount * lpBalance.share / 100) * xrpUsdPrice).toFixed(2)}</div>
                     <div className="text-green-300 text-xs">Your Share Value</div>
                   </div>
                 </div>
@@ -481,16 +492,16 @@ export default function Pools() {
                   e.stopPropagation();
                   setSwapDropdownOpen(swapDropdownOpen === token.id ? null : token.id);
                 }}
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 rounded-lg shadow-md shadow-blue-500/50 hover:shadow-blue-500/70 flex items-center justify-center gap-2"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-2.5 sm:py-3 rounded-lg shadow-md shadow-blue-500/50 hover:shadow-blue-500/70 flex items-center justify-center gap-2 text-sm sm:text-base"
               >
                 💱 Swap
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-4 h-4 transition-transform ${swapDropdownOpen === token.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
 
               {swapDropdownOpen === token.id && (
-                <div className="absolute top-full left-0 right-0 mt-2 glass bg-gradient-to-br from-purple-900/95 to-purple-800/95 border border-purple-500/30 rounded-lg shadow-xl z-[9999] overflow-hidden">
+                <div className="absolute bottom-full left-0 right-0 mb-2 glass bg-gradient-to-br from-purple-900/95 to-purple-800/95 border border-purple-500/30 rounded-lg shadow-xl z-[9999] overflow-hidden">
                   <button
                     onClick={() => {
                       setSwapDropdownOpen(null);
