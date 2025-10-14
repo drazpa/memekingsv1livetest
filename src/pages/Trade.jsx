@@ -1288,6 +1288,91 @@ export default function Trade({ preselectedToken = null }) {
     };
   };
 
+  const executeDeposit = async () => {
+    if (!connectedWallet || !connectedWallet.seed) {
+      toast.error('Wallet seed required for deposit');
+      return;
+    }
+
+    if (!depositAmount || !depositTokenAmount || parseFloat(depositAmount) <= 0 || parseFloat(depositTokenAmount) <= 0) {
+      toast.error('Enter valid amounts for both XRP and tokens');
+      return;
+    }
+
+    try {
+      setDepositing(true);
+
+      const client = new xrpl.Client('wss://xrplcluster.com');
+      await client.connect();
+
+      const wallet = xrpl.Wallet.fromSeed(connectedWallet.seed);
+
+      const currencyHex = selectedToken.currency_code.length > 3
+        ? Buffer.from(selectedToken.currency_code, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+        : selectedToken.currency_code;
+
+      const depositTx = {
+        TransactionType: 'AMMDeposit',
+        Account: connectedWallet.address,
+        Asset: { currency: 'XRP' },
+        Asset2: { currency: currencyHex, issuer: selectedToken.issuer_address },
+        Amount: xrpl.xrpToDrops(depositAmount),
+        Amount2: {
+          currency: currencyHex,
+          issuer: selectedToken.issuer_address,
+          value: depositTokenAmount
+        },
+        Flags: 1048576
+      };
+
+      console.log('Deposit TX:', depositTx);
+
+      const prepared = await client.autofill(depositTx);
+      const signed = wallet.sign(prepared);
+      const result = await client.submitAndWait(signed.tx_blob, { timeout: 45000 });
+
+      if (result.result.meta.TransactionResult === 'tesSUCCESS') {
+        const feeResult = await sendTradingFee(client, wallet);
+
+        toast.success((t) => (
+          <div className="flex flex-col gap-2">
+            <div className="font-semibold">Deposit Successful!</div>
+            <div className="text-sm">
+              Deposited {depositAmount} XRP and {depositTokenAmount} {selectedToken.token_name} to pool
+            </div>
+            <div className="text-xs opacity-75">
+              Platform fee: {TRADING_FEE} XRP
+            </div>
+            <div className="text-xs">
+              <XRPScanLink type="tx" value={result.result.hash} network="mainnet" />
+            </div>
+          </div>
+        ), {
+          duration: 8000,
+          style: {
+            background: '#065f46',
+            color: '#d1fae5',
+            border: '1px solid #10b981',
+          },
+        });
+
+        setDepositAmount('');
+        setDepositTokenAmount('');
+        await fetchLpPosition();
+        await fetchTokenBalance();
+      } else {
+        throw new Error(`Deposit failed: ${result.result.meta.TransactionResult}`);
+      }
+
+      await client.disconnect();
+    } catch (error) {
+      console.error('Deposit error:', error);
+      toast.error('Deposit failed: ' + error.message);
+    } finally {
+      setDepositing(false);
+    }
+  };
+
   const executeWithdraw = async () => {
     if (!connectedWallet || !connectedWallet.seed) {
       toast.error('Wallet seed required for withdrawal');
@@ -1454,8 +1539,8 @@ export default function Trade({ preselectedToken = null }) {
 
       let payment;
       if (tradeType === 'buy') {
-        const tokenAmountValue = parseFloat(estimate.tokenAmount) / slippageMultiplier;
-        const xrpAmountValue = parseFloat(estimate.xrpAmount) * slippageMultiplier;
+        const tokenAmountTarget = parseFloat(estimate.tokenAmount);
+        const xrpMaxSpend = parseFloat(estimate.xrpAmount) * slippageMultiplier;
 
         payment = {
           TransactionType: 'Payment',
@@ -1464,24 +1549,26 @@ export default function Trade({ preselectedToken = null }) {
           Amount: {
             currency: currencyHex,
             issuer: selectedToken.issuer_address,
-            value: sanitizeToken(tokenAmountValue)
+            value: sanitizeToken(tokenAmountTarget)
           },
-          SendMax: xrpl.xrpToDrops(sanitizeXRP(xrpAmountValue).toString())
+          SendMax: xrpl.xrpToDrops(sanitizeXRP(xrpMaxSpend).toString()),
+          Flags: 131072
         };
       } else {
-        const tokenAmountValue = parseFloat(estimate.tokenAmount) * slippageMultiplier;
-        const xrpAmountValue = parseFloat(estimate.xrpAmount) / slippageMultiplier;
+        const tokenAmountToSell = parseFloat(estimate.tokenAmount);
+        const xrpMinReceive = parseFloat(estimate.xrpAmount) * (1 - (parseFloat(slippage) / 100));
 
         payment = {
           TransactionType: 'Payment',
           Account: connectedWallet.address,
           Destination: connectedWallet.address,
-          Amount: xrpl.xrpToDrops(sanitizeXRP(xrpAmountValue).toString()),
+          Amount: xrpl.xrpToDrops(sanitizeXRP(parseFloat(estimate.xrpAmount)).toString()),
           SendMax: {
             currency: currencyHex,
             issuer: selectedToken.issuer_address,
-            value: sanitizeToken(tokenAmountValue)
-          }
+            value: sanitizeToken(tokenAmountToSell * slippageMultiplier)
+          },
+          DeliverMin: xrpl.xrpToDrops(sanitizeXRP(xrpMinReceive).toString())
         };
       }
 
@@ -2507,6 +2594,50 @@ export default function Trade({ preselectedToken = null }) {
                             <span className="text-purple-300">${(parseFloat(lpPosition.tokens) * currentPrice * xrpUsdPrice).toFixed(2)}</span>
                           </div>
                         </div>
+                      </div>
+
+                      <div className="space-y-3 mt-6 pt-6 border-t border-purple-500/20">
+                        <h4 className="font-bold text-purple-200 mb-3">Deposit to Pool</h4>
+
+                        <div>
+                          <label className="block text-purple-300 mb-2">XRP Amount</label>
+                          <input
+                            type="number"
+                            value={depositAmount}
+                            onChange={(e) => setDepositAmount(e.target.value)}
+                            placeholder="0.00"
+                            step="0.000001"
+                            className="input w-full text-purple-200 text-lg"
+                          />
+                          <div className="flex justify-between text-xs text-purple-400 mt-1">
+                            <div>Balance: {xrpBalance.toFixed(4)} XRP</div>
+                            <div className="text-green-400">${(xrpBalance * xrpUsdPrice).toFixed(2)} USD</div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-purple-300 mb-2">{selectedToken.token_name} Amount</label>
+                          <input
+                            type="number"
+                            value={depositTokenAmount}
+                            onChange={(e) => setDepositTokenAmount(e.target.value)}
+                            placeholder="0.00"
+                            step="0.000001"
+                            className="input w-full text-purple-200 text-lg"
+                          />
+                          <div className="flex justify-between text-xs text-purple-400 mt-1">
+                            <div>Balance: {parseFloat(tokenBalance).toFixed(4)} {selectedToken.token_name}</div>
+                            <div className="text-green-400">≈ {(parseFloat(tokenBalance) * currentPrice).toFixed(4)} XRP</div>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={executeDeposit}
+                          disabled={!depositAmount || !depositTokenAmount || parseFloat(depositAmount) <= 0 || parseFloat(depositTokenAmount) <= 0 || depositing}
+                          className="w-full py-4 rounded-lg font-bold text-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                          {depositing ? 'Depositing...' : '💰 Deposit to Pool'}
+                        </button>
                       </div>
 
                       <div className="space-y-3 mt-6 pt-6 border-t border-purple-500/20">
