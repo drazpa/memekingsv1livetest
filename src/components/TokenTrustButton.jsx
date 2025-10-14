@@ -547,14 +547,14 @@ export function TokenTrustButton({
       </button>
 
       {dropdownOpen && (
-        <div className="absolute top-full left-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-[9999] overflow-hidden">
+        <div className="absolute bottom-full left-0 mb-2 w-64 glass bg-gradient-to-br from-purple-900/95 to-purple-800/95 border border-purple-500/30 rounded-lg shadow-xl z-[9999] overflow-hidden">
           <button
             onClick={() => {
               setDropdownOpen(false);
               handleSetupTrustline();
             }}
             disabled={loading || hasTrustline}
-            className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-3 border-b border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3 border-b border-purple-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="w-8 h-8 rounded-lg bg-green-600/20 flex items-center justify-center text-green-400">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -562,8 +562,8 @@ export function TokenTrustButton({
               </svg>
             </div>
             <div className="flex-1">
-              <div className="text-white font-medium">Setup {token.symbol || token.name}</div>
-              <div className="text-gray-400 text-xs">Add this token trustline</div>
+              <div className="text-purple-100 font-medium">Setup</div>
+              <div className="text-purple-300 text-xs">Add this token trustline</div>
             </div>
           </button>
 
@@ -573,7 +573,7 @@ export function TokenTrustButton({
               handleRemoveTrustline();
             }}
             disabled={loading || !hasTrustline || tokenBalance > 0}
-            className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-3 border-b border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3 border-b border-purple-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="w-8 h-8 rounded-lg bg-red-600/20 flex items-center justify-center text-red-400">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -581,8 +581,8 @@ export function TokenTrustButton({
               </svg>
             </div>
             <div className="flex-1">
-              <div className="text-white font-medium">Remove {token.symbol || token.name}</div>
-              <div className="text-gray-400 text-xs">
+              <div className="text-purple-100 font-medium">Remove</div>
+              <div className="text-purple-300 text-xs">
                 {tokenBalance > 0 ? 'Balance must be 0' : 'Remove empty trustline'}
               </div>
             </div>
@@ -592,7 +592,7 @@ export function TokenTrustButton({
             href={`https://xrpscan.com/account/${getIssuerAddress(token)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full px-4 py-3 text-left hover:bg-slate-700 transition-colors flex items-center gap-3"
+            className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3"
             onClick={() => setDropdownOpen(false)}
           >
             <div className="w-8 h-8 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-400">
@@ -601,8 +601,8 @@ export function TokenTrustButton({
               </svg>
             </div>
             <div className="flex-1">
-              <div className="text-white font-medium">XRPScan Link</div>
-              <div className="text-gray-400 text-xs">View issuer details</div>
+              <div className="text-purple-100 font-medium">XRPScan Link</div>
+              <div className="text-purple-300 text-xs">View issuer details</div>
             </div>
           </a>
         </div>
