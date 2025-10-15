@@ -369,7 +369,7 @@ export default function Trade({ preselectedToken = null }) {
     }
 
     try {
-      const basePrice = calculatePrice(selectedToken);
+      const basePrice = livePrice > 0 ? livePrice : calculatePrice(selectedToken);
 
       if (!basePrice || isNaN(basePrice) || basePrice <= 0) {
         console.error('Invalid base price:', basePrice);
@@ -448,53 +448,84 @@ export default function Trade({ preselectedToken = null }) {
       setLivePrice(newPrice);
       setLastPriceUpdate(Date.now());
 
+      if (!priceSeriesRef.current || chartDataRef.current.length === 0) return;
+
       const lastCandle = chartDataRef.current[chartDataRef.current.length - 1];
       const now = Math.floor(Date.now() / 1000);
 
-    if (now - lastCandle.time >= 60) {
-      const newCandle = {
-        time: now,
-        value: newPrice,
-        open: lastCandle.close || newPrice,
-        high: Math.max(newPrice, lastCandle.close || newPrice) * 1.002,
-        low: Math.min(newPrice, lastCandle.close || newPrice) * 0.998,
-        close: newPrice,
-        volume: Math.random() * 5000 + 500
-      };
+      if (now - lastCandle.time >= 60) {
+        const newCandle = {
+          time: now,
+          value: newPrice,
+          open: lastCandle.close || newPrice,
+          high: Math.max(newPrice, lastCandle.close || newPrice),
+          low: Math.min(newPrice, lastCandle.close || newPrice),
+          close: newPrice,
+          volume: Math.abs(xrpAmount - (chartDataRef.current[chartDataRef.current.length - 2]?.volume || 0))
+        };
 
-      chartDataRef.current.push(newCandle);
+        chartDataRef.current.push(newCandle);
 
-      if (chartDataRef.current.length > 500) {
-        chartDataRef.current.shift();
-      }
-
-      try {
-        if (chartType === 'area' || chartType === 'line' || chartType === 'baseline') {
-          priceSeriesRef.current.update({
-            time: newCandle.time,
-            value: newCandle.value
-          });
-        } else {
-          priceSeriesRef.current.update({
-            time: newCandle.time,
-            open: newCandle.open,
-            high: newCandle.high,
-            low: newCandle.low,
-            close: newCandle.close
-          });
+        if (chartDataRef.current.length > 500) {
+          chartDataRef.current.shift();
         }
 
-        if (volumeSeriesRef.current) {
-          volumeSeriesRef.current.update({
-            time: newCandle.time,
-            value: newCandle.volume,
-            color: newCandle.close >= newCandle.open ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'
-          });
+        try {
+          if (chartType === 'area' || chartType === 'line' || chartType === 'baseline') {
+            priceSeriesRef.current.update({
+              time: newCandle.time,
+              value: newCandle.value
+            });
+          } else {
+            priceSeriesRef.current.update({
+              time: newCandle.time,
+              open: newCandle.open,
+              high: newCandle.high,
+              low: newCandle.low,
+              close: newCandle.close
+            });
+          }
+
+          if (volumeSeriesRef.current) {
+            volumeSeriesRef.current.update({
+              time: newCandle.time,
+              value: newCandle.volume,
+              color: newCandle.close >= newCandle.open ? 'rgba(34, 197, 94, 0.5)' : 'rgba(239, 68, 68, 0.5)'
+            });
+          }
+        } catch (error) {
+          console.error('Error updating chart:', error);
         }
-      } catch (error) {
-        console.error('Error updating chart:', error);
+      } else {
+        const updatedCandle = {
+          ...lastCandle,
+          value: newPrice,
+          close: newPrice,
+          high: Math.max(lastCandle.high, newPrice),
+          low: Math.min(lastCandle.low, newPrice)
+        };
+
+        chartDataRef.current[chartDataRef.current.length - 1] = updatedCandle;
+
+        try {
+          if (chartType === 'area' || chartType === 'line' || chartType === 'baseline') {
+            priceSeriesRef.current.update({
+              time: updatedCandle.time,
+              value: updatedCandle.value
+            });
+          } else {
+            priceSeriesRef.current.update({
+              time: updatedCandle.time,
+              open: updatedCandle.open,
+              high: updatedCandle.high,
+              low: updatedCandle.low,
+              close: updatedCandle.close
+            });
+          }
+        } catch (error) {
+          console.error('Error updating current candle:', error);
+        }
       }
-    }
     } catch (error) {
       console.error('Error fetching real-time price:', error);
     }
