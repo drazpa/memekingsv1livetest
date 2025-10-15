@@ -13,6 +13,7 @@ const SECONDS_PER_YEAR = 31536000;
 const CLAIM_FEE = 0.01;
 const FUND_ADDRESS = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
 const FUND_SEED = 'sEd7W72aANTbLTG98XDhU1yfotPJdhu';
+const ADMIN_ISSUER_ADDRESS = 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6';
 
 export default function Vault() {
   const [tokens, setTokens] = useState([]);
@@ -174,6 +175,7 @@ export default function Vault() {
       const { data } = await supabase
         .from('meme_tokens')
         .select('*')
+        .eq('issuer_address', ADMIN_ISSUER_ADDRESS)
         .order('created_at', { ascending: false });
 
       const tokenList = data || [];
@@ -182,7 +184,7 @@ export default function Vault() {
       // Cache the data
       localStorage.setItem('vault_tokens_cache', JSON.stringify(tokenList));
       localStorage.setItem('vault_tokens_cache_time', Date.now().toString());
-      console.log('💾 Cached tokens list for Vault');
+      console.log('💾 Cached admin tokens list for Vault');
     } catch (error) {
       console.error('Error loading tokens from DB:', error);
     }
