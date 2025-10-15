@@ -67,12 +67,17 @@ export default function DashboardRewardsWidget({ wallet, xrpPrice = 2.50 }) {
     );
   }
 
-  if (!rewards || rewards.totalRewards === 0) {
+  if (!rewards) {
     return null;
   }
 
+  // Show widget even with 0 rewards to inform users about the system
+  const hasRewards = rewards.totalRewards > 0;
+
   return (
-    <div className="glass rounded-lg p-4 sm:p-6 relative overflow-hidden">
+    <div className={`glass rounded-lg p-4 sm:p-6 relative overflow-hidden ${
+      rewards.totalUnclaimed > 0 ? 'border-2 border-green-500/50 shadow-lg shadow-green-500/20' : 'border border-purple-500/30'
+    }`}>
       {rewards.totalUnclaimed > 0 && (
         <div
           className="absolute inset-0 opacity-30"
@@ -115,13 +120,22 @@ export default function DashboardRewardsWidget({ wallet, xrpPrice = 2.50 }) {
               {claiming ? '⏳ Claiming...' : `💰 Claim ${rewards.totalUnclaimed.toFixed(2)} XRP`}
             </button>
           </>
-        ) : (
+        ) : hasRewards ? (
           <>
             <div className="text-purple-300 text-xs sm:text-sm mb-1">
               Total Earned: {rewards.totalRewards.toFixed(2)} XRP
             </div>
             <div className="text-purple-400 text-xs">
               {rewards.tokenCount} tokens created | All claimed!
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-purple-400 text-xs sm:text-sm mb-2">
+              Start earning rewards now!
+            </div>
+            <div className="text-purple-300 text-xs">
+              Create tokens on the Memes page to earn 0.10 XRP per token
             </div>
           </>
         )}
