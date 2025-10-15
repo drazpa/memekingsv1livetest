@@ -165,51 +165,51 @@ export default function Sidebar({ currentPage, onNavigate }) {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-purple-500/20 space-y-3">
+        <div className="p-4 border-t border-purple-500/20 space-y-2">
           {connectedWallet && (
-            <div className="glass rounded-lg p-4 bg-green-500/10 border border-green-500/30">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-                <span className="text-green-300 text-xs font-medium">Connected Wallet</span>
+            <div className="glass rounded-lg p-2 bg-green-500/10 border border-green-500/30">
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
+                <span className="text-green-300 text-[10px] font-medium">Connected Wallet</span>
               </div>
-              <div className="text-purple-200 font-bold text-sm mb-1">{connectedWallet.name}</div>
-              <div className="text-purple-300 text-xs font-mono break-all">
+              <div className="text-purple-200 font-bold text-xs mb-0.5">{connectedWallet.name}</div>
+              <div className="text-purple-300 text-[10px] font-mono break-all">
                 {connectedWallet.address.slice(0, 10)}...{connectedWallet.address.slice(-8)}
               </div>
-              <div className="text-purple-400 text-xs mt-2">
+              <div className="text-purple-400 text-[10px] mt-1">
                 {walletBalance.toFixed(3)} XRP
               </div>
             </div>
           )}
 
-          <div className="glass rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-purple-300 text-sm font-medium">XRP/USD</span>
+          <div className="glass rounded-lg p-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-purple-300 text-[10px] font-medium">XRP/USD</span>
               {!loading && xrpPrice && (
-                <span className={`text-xs font-medium ${xrpPrice.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                <span className={`text-[10px] font-medium ${xrpPrice.change >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   {xrpPrice.change >= 0 ? '↑' : '↓'} {Math.abs(xrpPrice.change).toFixed(2)}%
                 </span>
               )}
             </div>
             {loading ? (
-              <div className="text-purple-400 text-lg animate-pulse">Loading...</div>
+              <div className="text-purple-400 text-xs animate-pulse">Loading...</div>
             ) : xrpPrice ? (
-              <div className="text-2xl font-bold text-purple-200">
+              <div className="text-lg font-bold text-purple-200">
                 ${xrpPrice.price.toFixed(4)}
               </div>
             ) : (
-              <div className="text-purple-400 text-sm">Unable to load</div>
+              <div className="text-purple-400 text-[10px]">Unable to load</div>
             )}
           </div>
 
-          <div ref={networkDropdownRef} className="glass rounded-lg p-4 relative">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-purple-300 text-sm font-medium">Network Node</span>
-              <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
+          <div ref={networkDropdownRef} className="glass rounded-lg p-2 relative">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-purple-300 text-[10px] font-medium">Network Node</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></div>
             </div>
             <button
               onClick={() => setShowNetworkDropdown(!showNetworkDropdown)}
-              className="w-full flex items-center justify-between text-purple-200 text-sm hover:text-purple-100 transition-colors"
+              className="w-full flex items-center justify-between text-purple-200 text-[10px] hover:text-purple-100 transition-colors"
             >
               <span className="truncate">{selectedNetwork?.name || 'Loading...'}</span>
               <span className="ml-2">{showNetworkDropdown ? '▲' : '▼'}</span>
@@ -291,27 +291,27 @@ export default function Sidebar({ currentPage, onNavigate }) {
 
             {/* Mobile Wallet Info */}
             {connectedWallet && (
-              <div className="glass rounded-lg p-4 bg-green-500/10 border border-green-500/30 mt-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-                  <span className="text-green-300 text-xs font-medium">Connected Wallet</span>
+              <div className="glass rounded-lg p-2 bg-green-500/10 border border-green-500/30 mt-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
+                  <span className="text-green-300 text-[10px] font-medium">Connected Wallet</span>
                 </div>
-                <div className="text-purple-200 font-bold text-sm mb-1">{connectedWallet.name}</div>
-                <div className="text-purple-300 text-xs font-mono break-all">
+                <div className="text-purple-200 font-bold text-xs mb-0.5">{connectedWallet.name}</div>
+                <div className="text-purple-300 text-[10px] font-mono break-all">
                   {connectedWallet.address.slice(0, 10)}...{connectedWallet.address.slice(-8)}
                 </div>
-                <div className="text-purple-400 text-xs mt-2">
+                <div className="text-purple-400 text-[10px] mt-1">
                   {walletBalance.toFixed(3)} XRP
                 </div>
               </div>
             )}
 
             {/* Mobile XRP Price */}
-            <div className="glass rounded-lg p-4 mt-2">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-purple-300 text-sm font-medium">XRP/USD</span>
+            <div className="glass rounded-lg p-2 mt-1">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-purple-300 text-[10px] font-medium">XRP/USD</span>
                 {!loading && xrpPrice && (
-                  <span className={`text-xs font-medium ${
+                  <span className={`text-[10px] font-medium ${
                     xrpPrice.change >= 0 ? 'text-green-400' : 'text-red-400'
                   }`}>
                     {xrpPrice.change >= 0 ? '↑' : '↓'} {Math.abs(xrpPrice.change).toFixed(2)}%
@@ -319,13 +319,13 @@ export default function Sidebar({ currentPage, onNavigate }) {
                 )}
               </div>
               {loading ? (
-                <div className="text-purple-400 text-lg animate-pulse">Loading...</div>
+                <div className="text-purple-400 text-xs animate-pulse">Loading...</div>
               ) : xrpPrice ? (
-                <div className="text-2xl font-bold text-purple-200">
+                <div className="text-lg font-bold text-purple-200">
                   ${xrpPrice.price.toFixed(4)}
                 </div>
               ) : (
-                <div className="text-purple-400 text-sm">Unable to load</div>
+                <div className="text-purple-400 text-[10px]">Unable to load</div>
               )}
             </div>
           </div>

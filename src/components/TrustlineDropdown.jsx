@@ -3,6 +3,7 @@ import { Buffer } from 'buffer';
 import { Wallet as XrplWallet, Client } from 'xrpl';
 import toast from 'react-hot-toast';
 import { supabase } from '../utils/supabase';
+import AddTokenModal from './AddTokenModal';
 
 export function TrustlineDropdown({
   wallet,
@@ -15,6 +16,7 @@ export function TrustlineDropdown({
   const [showPinModal, setShowPinModal] = useState(false);
   const [pinAction, setPinAction] = useState(null);
   const [pinInput, setPinInput] = useState('');
+  const [showAddTokenModal, setShowAddTokenModal] = useState(false);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -203,8 +205,19 @@ export function TrustlineDropdown({
     setIsOpen(false);
   };
 
+  const handleAddToken = () => {
+    setIsOpen(false);
+    setShowAddTokenModal(true);
+  };
+
   return (
-    <div className="relative inline-block z-50" ref={dropdownRef}>
+    <>
+      <AddTokenModal
+        isOpen={showAddTokenModal}
+        onClose={() => setShowAddTokenModal(false)}
+        wallet={wallet}
+      />
+      <div className="relative inline-block z-50" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={loading}
@@ -275,9 +288,25 @@ export function TrustlineDropdown({
                 <div className="text-xs text-purple-400">View issuer details</div>
               </div>
             </button>
+
+            <button
+              onClick={handleAddToken}
+              className="w-full text-left px-4 py-3 text-sm text-white hover:bg-gradient-to-r hover:from-purple-600 hover:to-purple-500 transition-all flex items-center gap-3 border-t border-purple-500/20 bg-purple-600/20"
+            >
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <div>
+                <div className="font-semibold">+ Add Token</div>
+                <div className="text-xs text-purple-300">List your token (1 XRP)</div>
+              </div>
+            </button>
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
