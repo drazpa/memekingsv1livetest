@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase';
 import { Wallet as XrplWallet } from 'xrpl';
 import { getClient, submitWithRetry } from '../utils/xrplClient';
 import { encodeCurrencyCode } from '../utils/currencyUtils';
+import { uploadImageToPinata } from '../utils/pinata';
 
 const LISTING_FEE = 1;
 const FEATURED_FEE_OPTIONS = [
@@ -18,6 +19,11 @@ const PLATFORM_WALLET = 'rphatRpwXc8wk6PdmR5SDt6kLMqb2M3Ckj';
 export default function AddTokenModal({ isOpen, onClose, wallet }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  const isAdminWallet = wallet?.address === PLATFORM_WALLET;
   const [formData, setFormData] = useState({
     tokenName: '',
     currencyCode: '',
@@ -42,6 +48,8 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
   useEffect(() => {
     if (isOpen) {
       setStep(1);
+      setImageFile(null);
+      setImagePreview(null);
       setFormData({
         tokenName: '',
         currencyCode: '',
@@ -65,12 +73,34 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
   }, [isOpen]);
 
   const getTotalFee = () => {
+    if (isAdminWallet) return 0;
+
     let total = LISTING_FEE;
     if (formData.addFeatured && formData.featuredDuration) {
       const featured = FEATURED_FEE_OPTIONS.find(opt => opt.days === formData.featuredDuration);
       total += featured.price;
     }
     return total;
+  };
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image must be less than 5MB');
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select an image file');
+        return;
+      }
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const validateStep1 = () => {
@@ -187,26 +217,47 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
 
     setLoading(true);
     try {
-      const xrplWallet = XrplWallet.fromSeed(wallet.seed);
-      const client = await getClient();
+      let imageUrl = formData.imageUrl;
 
-      const payment = {
-        TransactionType: 'Payment',
-        Account: xrplWallet.address,
-        Amount: String(totalFee * 1000000),
-        Destination: PLATFORM_WALLET,
-        Memos: [{
-          Memo: {
-            MemoData: Buffer.from(`Token Listing: ${formData.tokenName}`).toString('hex').toUpperCase(),
-            MemoType: Buffer.from('token-listing').toString('hex').toUpperCase()
-          }
-        }]
-      };
+      if (imageFile) {
+        setUploadingImage(true);
+        try {
+          imageUrl = await uploadImageToPinata(imageFile);
+          toast.success('Image uploaded successfully!');
+        } catch (error) {
+          console.error('Image upload error:', error);
+          toast.error('Failed to upload image. Continuing without image.');
+        } finally {
+          setUploadingImage(false);
+        }
+      }
 
-      const result = await submitWithRetry(payment, xrplWallet);
+      let txHash = null;
 
-      if (result.result.meta.TransactionResult !== 'tesSUCCESS') {
-        throw new Error('Payment transaction failed');
+      if (!isAdminWallet && totalFee > 0) {
+        const xrplWallet = XrplWallet.fromSeed(wallet.seed);
+        const client = await getClient();
+
+        const payment = {
+          TransactionType: 'Payment',
+          Account: xrplWallet.address,
+          Amount: String(totalFee * 1000000),
+          Destination: PLATFORM_WALLET,
+          Memos: [{
+            Memo: {
+              MemoData: Buffer.from(`Token Listing: ${formData.tokenName}`).toString('hex').toUpperCase(),
+              MemoType: Buffer.from('token-listing').toString('hex').toUpperCase()
+            }
+          }]
+        };
+
+        const result = await submitWithRetry(payment, xrplWallet);
+
+        if (result.result.meta.TransactionResult !== 'tesSUCCESS') {
+          throw new Error('Payment transaction failed');
+        }
+
+        txHash = result.result.hash;
       }
 
       const currencyHex = encodeCurrencyCode(formData.currencyCode);
@@ -224,7 +275,7 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
           category: formData.category,
           twitter_handle: formData.twitterHandle || null,
           website_url: formData.websiteUrl || null,
-          image_url: formData.imageUrl || null,
+          image_url: imageUrl || null,
           amm_pool_created: formData.hasAmmPool,
           amm_asset_amount: formData.hasAmmPool ? parseFloat(formData.ammAssetAmount) : null,
           amm_xrp_amount: formData.hasAmmPool ? parseFloat(formData.ammXrpAmount) : null,
@@ -232,7 +283,7 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
           amm_lp_token_balance: formData.hasAmmPool ? parseFloat(formData.ammLpTokenBalance) : null,
           amm_trading_fee: formData.hasAmmPool ? parseInt(formData.ammTradingFee) : null,
           status: 'listed',
-          tx_hash: result.result.hash
+          tx_hash: txHash
         })
         .select()
         .single();
@@ -253,7 +304,7 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
             duration_days: featuredOption.days,
             amount_xrp: featuredOption.price,
             status: 'active',
-            tx_hash: result.result.hash,
+            tx_hash: txHash,
             expires_at: expiresAt.toISOString()
           });
 
@@ -263,7 +314,11 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
           .eq('id', tokenData.id);
       }
 
-      toast.success(`Token added successfully! Fee: ${totalFee} XRP`);
+      if (isAdminWallet) {
+        toast.success('Token added successfully! (Admin - No Fee)');
+      } else {
+        toast.success(`Token added successfully! Fee: ${totalFee} XRP`);
+      }
       onClose();
       window.location.reload();
     } catch (error) {
@@ -432,14 +487,56 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
             </div>
 
             <div>
-              <label className="block text-purple-300 text-sm mb-2">Image URL</label>
-              <input
-                type="url"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                placeholder="https://example.com/token-image.png"
-                className="w-full px-4 py-3 bg-purple-900/20 border border-purple-500/30 rounded-lg text-white placeholder-purple-500"
-              />
+              <label className="block text-purple-300 text-sm mb-2">Token Image</label>
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <label className="flex-1 cursor-pointer">
+                    <div className="w-full px-4 py-3 bg-purple-900/20 border border-purple-500/30 rounded-lg text-white hover:border-purple-500/50 transition-colors flex items-center justify-center gap-2">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span>{imageFile ? imageFile.name : 'Upload Image (Max 5MB)'}</span>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {imagePreview && (
+                  <div className="relative w-32 h-32 mx-auto">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-full object-cover rounded-lg border-2 border-purple-500/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageFile(null);
+                        setImagePreview(null);
+                      }}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white text-sm"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+
+                <div className="text-center text-purple-400 text-xs">OR</div>
+
+                <input
+                  type="url"
+                  value={formData.imageUrl}
+                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                  placeholder="https://example.com/token-image.png"
+                  disabled={!!imageFile}
+                  className="w-full px-4 py-3 bg-purple-900/20 border border-purple-500/30 rounded-lg text-white placeholder-purple-500 disabled:opacity-50"
+                />
+              </div>
             </div>
           </div>
         )}
@@ -565,6 +662,18 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
           <div className="space-y-4">
             <h3 className="text-white font-semibold">Featured Listing (Optional)</h3>
 
+            {isAdminWallet && (
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                <h4 className="text-green-300 font-semibold mb-2 flex items-center gap-2">
+                  <span>👑</span>
+                  Admin Wallet Detected
+                </h4>
+                <p className="text-green-200 text-sm">
+                  You are using the platform admin wallet. All listing fees are waived for admin submissions.
+                </p>
+              </div>
+            )}
+
             <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-lg p-4">
               <h4 className="text-purple-200 font-semibold mb-2">Get Featured Spotlight</h4>
               <p className="text-purple-300 text-sm mb-3">
@@ -601,23 +710,34 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
               </div>
             )}
 
-            <div className="bg-gray-800/50 rounded-lg p-4 border border-purple-500/20">
+            <div className={`rounded-lg p-4 border ${isAdminWallet ? 'bg-green-500/10 border-green-500/30' : 'bg-gray-800/50 border-purple-500/20'}`}>
               <div className="flex items-center justify-between text-lg font-bold">
-                <span className="text-purple-200">Total Fee:</span>
-                <span className="text-white">{getTotalFee()} XRP</span>
+                <span className={isAdminWallet ? "text-green-200" : "text-purple-200"}>Total Fee:</span>
+                <span className="text-white">
+                  {isAdminWallet ? (
+                    <span className="flex items-center gap-2">
+                      <span className="line-through text-gray-500">{LISTING_FEE + (formData.addFeatured && formData.featuredDuration ? FEATURED_FEE_OPTIONS.find(opt => opt.days === formData.featuredDuration)?.price || 0 : 0)} XRP</span>
+                      <span className="text-green-400">FREE</span>
+                    </span>
+                  ) : (
+                    `${getTotalFee()} XRP`
+                  )}
+                </span>
               </div>
-              <div className="mt-3 pt-3 border-t border-purple-500/20 space-y-1 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-purple-300">Listing Fee</span>
-                  <span className="text-purple-200">{LISTING_FEE} XRP</span>
-                </div>
-                {formData.addFeatured && formData.featuredDuration > 0 && (
+              {!isAdminWallet && (
+                <div className="mt-3 pt-3 border-t border-purple-500/20 space-y-1 text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="text-purple-300">Featured ({FEATURED_FEE_OPTIONS.find(opt => opt.days === formData.featuredDuration)?.label})</span>
-                    <span className="text-purple-200">{FEATURED_FEE_OPTIONS.find(opt => opt.days === formData.featuredDuration)?.price} XRP</span>
+                    <span className="text-purple-300">Listing Fee</span>
+                    <span className="text-purple-200">{LISTING_FEE} XRP</span>
                   </div>
-                )}
-              </div>
+                  {formData.addFeatured && formData.featuredDuration > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-purple-300">Featured ({FEATURED_FEE_OPTIONS.find(opt => opt.days === formData.featuredDuration)?.label})</span>
+                      <span className="text-purple-200">{FEATURED_FEE_OPTIONS.find(opt => opt.days === formData.featuredDuration)?.price} XRP</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -641,10 +761,10 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
           ) : (
             <button
               onClick={handleSubmit}
-              disabled={loading || !wallet}
+              disabled={loading || uploadingImage || !wallet}
               className="flex-1 px-6 py-3 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-500 hover:to-green-400 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Processing...' : `Submit & Pay ${getTotalFee()} XRP`}
+              {uploadingImage ? 'Uploading Image...' : loading ? 'Processing...' : isAdminWallet ? 'Submit (Admin - No Fee)' : `Submit & Pay ${getTotalFee()} XRP`}
             </button>
           )}
         </div>
