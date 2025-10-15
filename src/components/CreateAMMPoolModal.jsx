@@ -4,6 +4,7 @@ import { supabase } from '../utils/supabase';
 import { Wallet as XrplWallet } from 'xrpl';
 import { getClient, submitWithRetry } from '../utils/xrplClient';
 import { encodeCurrencyCode } from '../utils/currencyUtils';
+import { ProgressModal } from './ProgressModal';
 
 const AMM_CREATION_FEE = 0.10;
 
@@ -11,6 +12,8 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [tokens, setTokens] = useState([]);
+  const [progressSteps, setProgressSteps] = useState([]);
+  const [showProgress, setShowProgress] = useState(false);
   const [formData, setFormData] = useState({
     selectedToken: null,
     tokenAmount: '',
@@ -96,7 +99,13 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
       const token = formData.selectedToken;
       const currencyHex = token.currency_hex || encodeCurrencyCode(token.currency_code);
 
-      if (token.receiver_address && token.receiver_address !== wallet.address) {
+      const isIssuer = token.issuer_address === wallet.address;
+      const isReceiver = token.receiver_address === wallet.address;
+      const shouldPayFee = !isIssuer && !isReceiver;
+
+      if (shouldPayFee && token.receiver_address) {
+        setShowProgress(true);
+        setProgressSteps([{ message: 'Paying AMM creation fee...', status: 'pending' }]);
         const feePayment = {
           TransactionType: 'Payment',
           Account: xrplWallet.address,
@@ -116,7 +125,15 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
           throw new Error('Fee payment failed');
         }
 
+        setProgressSteps([{ message: 'Paying AMM creation fee...', status: 'complete' }]);
         toast.success(`${AMM_CREATION_FEE} XRP fee paid to token receiver`);
+      }
+
+      if (showProgress) {
+        setProgressSteps(prev => [...prev, { message: 'Creating AMM pool on XRPL...', status: 'pending' }]);
+      } else {
+        setShowProgress(true);
+        setProgressSteps([{ message: 'Creating AMM pool on XRPL...', status: 'pending' }]);
       }
 
       const amount = {
@@ -143,6 +160,12 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
         throw new Error(`Transaction failed: ${result.result.meta.TransactionResult}`);
       }
 
+      setProgressSteps(prev => {
+        const newSteps = [...prev];
+        newSteps[newSteps.length - 1] = { ...newSteps[newSteps.length - 1], status: 'complete' };
+        return [...newSteps, { message: 'Updating database...', status: 'pending' }];
+      });
+
       await supabase
         .from('meme_tokens')
         .update({
@@ -154,9 +177,18 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
         })
         .eq('id', token.id);
 
-      toast.success('AMM Pool created successfully!');
-      onClose();
-      window.location.reload();
+      setProgressSteps(prev => {
+        const newSteps = [...prev];
+        newSteps[newSteps.length - 1] = { ...newSteps[newSteps.length - 1], status: 'complete' };
+        return newSteps;
+      });
+
+      setTimeout(() => {
+        toast.success('AMM Pool created successfully!');
+        onClose();
+        setShowProgress(false);
+        window.location.reload();
+      }, 1500);
     } catch (error) {
       console.error('Error creating AMM pool:', error);
 
@@ -174,6 +206,18 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
       }
 
       toast.error(errorMessage);
+      if (showProgress) {
+        setProgressSteps(prev => {
+          const newSteps = [...prev];
+          if (newSteps.length > 0) {
+            newSteps[newSteps.length - 1] = { ...newSteps[newSteps.length - 1], status: 'error' };
+          }
+          return newSteps;
+        });
+        setTimeout(() => {
+          setShowProgress(false);
+        }, 3000);
+      }
     } finally {
       setLoading(false);
     }
@@ -225,7 +269,7 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
                 <li>• Provide initial liquidity (Token + XRP)</li>
                 <li>• The pool will be created on the XRPL blockchain</li>
                 <li>• You'll receive LP tokens representing your share</li>
-                <li>• Fee: {AMM_CREATION_FEE} XRP (FREE if you're the token receiver)</li>
+                <li>• Fee: {AMM_CREATION_FEE} XRP (FREE for token issuer/receiver)</li>
               </ul>
             </div>
 
@@ -365,25 +409,33 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
                 <div className="text-white">{formData.tradingFee / 100}%</div>
               </div>
 
-              {formData.selectedToken?.receiver_address && formData.selectedToken.receiver_address !== wallet?.address && (
-                <div className="glass rounded-lg p-4 bg-blue-500/10 border-blue-500/30">
-                  <div className="text-blue-400 text-sm mb-1">AMM Creation Fee</div>
-                  <div className="text-white font-semibold">{AMM_CREATION_FEE} XRP</div>
-                  <div className="text-blue-300 text-xs mt-1">
-                    Paid to token receiver: {formData.selectedToken.receiver_address.slice(0, 8)}...{formData.selectedToken.receiver_address.slice(-6)}
-                  </div>
-                </div>
-              )}
+{(() => {
+                const isIssuer = formData.selectedToken?.issuer_address === wallet?.address;
+                const isReceiver = formData.selectedToken?.receiver_address === wallet?.address;
+                const shouldPayFee = !isIssuer && !isReceiver;
 
-              {(!formData.selectedToken?.receiver_address || formData.selectedToken.receiver_address === wallet?.address) && (
-                <div className="glass rounded-lg p-4 bg-green-500/10 border-green-500/30">
-                  <div className="text-green-400 text-sm mb-1">AMM Creation Fee</div>
-                  <div className="text-green-200 font-semibold">FREE</div>
-                  <div className="text-green-300 text-xs mt-1">
-                    No fee for token receiver wallet
-                  </div>
-                </div>
-              )}
+                if (shouldPayFee && formData.selectedToken?.receiver_address) {
+                  return (
+                    <div className="glass rounded-lg p-4 bg-blue-500/10 border-blue-500/30">
+                      <div className="text-blue-400 text-sm mb-1">AMM Creation Fee</div>
+                      <div className="text-white font-semibold">{AMM_CREATION_FEE} XRP</div>
+                      <div className="text-blue-300 text-xs mt-1">
+                        Paid to token receiver: {formData.selectedToken.receiver_address.slice(0, 8)}...{formData.selectedToken.receiver_address.slice(-6)}
+                      </div>
+                    </div>
+                  );
+                } else {
+                  return (
+                    <div className="glass rounded-lg p-4 bg-green-500/10 border-green-500/30">
+                      <div className="text-green-400 text-sm mb-1">AMM Creation Fee</div>
+                      <div className="text-green-200 font-semibold">FREE</div>
+                      <div className="text-green-300 text-xs mt-1">
+                        {isIssuer ? 'No fee for token issuer' : 'No fee for token receiver'}
+                      </div>
+                    </div>
+                  );
+                }
+              })()}
             </div>
 
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
@@ -424,6 +476,8 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
           )}
         </div>
       </div>
+
+      <ProgressModal isOpen={showProgress} steps={progressSteps} />
     </div>
   );
 }
