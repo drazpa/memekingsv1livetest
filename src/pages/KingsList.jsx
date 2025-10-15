@@ -23,20 +23,37 @@ export default function KingsList() {
         .select('*')
         .order('created_at', { ascending: true });
 
-      if (tokensError) throw tokensError;
+      if (tokensError) {
+        console.error('Error loading tokens:', tokensError);
+        throw tokensError;
+      }
+
+      if (!tokensData || tokensData.length === 0) {
+        console.log('No tokens found in database');
+        setKings([]);
+        setLoading(false);
+        return;
+      }
+
+      console.log(`Found ${tokensData.length} tokens, checking holders...`);
 
       const kingsData = [];
-      for (const token of tokensData || []) {
-        const { data: holderData } = await supabase
+      for (const token of tokensData) {
+        const { data: holderData, error: holderError } = await supabase
           .from('token_holders')
           .select('*')
           .eq('token_id', token.id)
           .order('rank', { ascending: true })
           .limit(1);
 
+        if (holderError) {
+          console.error(`Error loading holder for token ${token.name}:`, holderError);
+          continue;
+        }
+
         if (holderData && holderData.length > 0) {
           const holder = holderData[0];
-          const balance = parseFloat(holder.balance);
+          const balance = parseFloat(holder.balance) || 0;
           const price = parseFloat(token.current_price) || 0;
           const xrpValue = balance * price;
 
@@ -48,10 +65,11 @@ export default function KingsList() {
         }
       }
 
+      console.log(`Found ${kingsData.length} kings with holder data`);
       setKings(kingsData);
     } catch (error) {
       console.error('Error loading kings:', error);
-      toast.error('Failed to load kings list');
+      toast.error(`Failed to load kings list: ${error.message}`);
     } finally {
       setLoading(false);
     }
