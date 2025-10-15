@@ -16,6 +16,12 @@ export default function XRPRewards() {
     pending: 0,
     lifetimeEarnings: 0
   });
+  const [earningStats, setEarningStats] = useState({
+    tokensCreated: 0,
+    botsCreated: 0,
+    tradesExecuted: 0,
+    rewardsByType: {}
+  });
   const [globalStats, setGlobalStats] = useState({
     totalXRPPaid: 0,
     totalXRPClaimed: 0,
@@ -152,6 +158,31 @@ export default function XRPRewards() {
         totalClaimed,
         pending,
         lifetimeEarnings: totalEarned
+      });
+
+      const rewardsByType = {};
+      let tokensCreated = 0;
+      let botsCreated = 0;
+      let tradesExecuted = 0;
+
+      data?.forEach(reward => {
+        const type = reward.reward_type || 'other';
+        if (!rewardsByType[type]) {
+          rewardsByType[type] = { count: 0, total: 0 };
+        }
+        rewardsByType[type].count++;
+        rewardsByType[type].total += parseFloat(reward.amount);
+
+        if (type === 'token_creation') tokensCreated++;
+        if (type === 'bot_creation') botsCreated++;
+        if (type === 'trade') tradesExecuted++;
+      });
+
+      setEarningStats({
+        tokensCreated,
+        botsCreated,
+        tradesExecuted,
+        rewardsByType
       });
 
       prepareChartData(data || []);
@@ -447,7 +478,139 @@ export default function XRPRewards() {
         </div>
       </div>
 
-      <h3 className="text-xl font-bold text-purple-200 mb-4">💰 Your Rewards</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="glass rounded-lg p-6">
+          <h3 className="text-xl font-bold text-purple-200 mb-4">💡 How to Earn XRP Rewards</h3>
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3 bg-purple-900/20 rounded-lg border border-purple-500/20">
+              <div className="text-2xl">🪙</div>
+              <div>
+                <div className="text-purple-200 font-semibold">Create Tokens</div>
+                <div className="text-purple-400 text-sm">Earn XRP rewards when you create new tokens on the platform</div>
+                <div className="text-green-400 text-xs mt-1">✓ Instant reward upon token creation</div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 bg-blue-900/20 rounded-lg border border-blue-500/20">
+              <div className="text-2xl">🤖</div>
+              <div>
+                <div className="text-blue-200 font-semibold">Create Trading Bots</div>
+                <div className="text-blue-400 text-sm">Get 0.10 XRP reward for each trading bot you create</div>
+                <div className="text-green-400 text-xs mt-1">✓ Automated trading + rewards</div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 bg-green-900/20 rounded-lg border border-green-500/20">
+              <div className="text-2xl">💱</div>
+              <div>
+                <div className="text-green-200 font-semibold">Execute Trades</div>
+                <div className="text-green-400 text-sm">Earn rewards for trading activity on the platform</div>
+                <div className="text-green-400 text-xs mt-1">✓ Trade more, earn more</div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 bg-yellow-900/20 rounded-lg border border-yellow-500/20">
+              <div className="text-2xl">🎯</div>
+              <div>
+                <div className="text-yellow-200 font-semibold">Milestones & Referrals</div>
+                <div className="text-yellow-400 text-sm">Unlock bonus rewards by reaching platform milestones</div>
+                <div className="text-green-400 text-xs mt-1">✓ Extra earning opportunities</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="glass rounded-lg p-6">
+          <h3 className="text-xl font-bold text-purple-200 mb-4">📈 Your Earning Activity</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-purple-900/20 rounded-lg border border-purple-500/20">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center text-2xl">
+                  🪙
+                </div>
+                <div>
+                  <div className="text-purple-200 font-semibold">Tokens Created</div>
+                  <div className="text-purple-400 text-sm">{earningStats.tokensCreated} tokens</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-purple-200">
+                  {earningStats.rewardsByType.token_creation?.total?.toFixed(2) || '0.00'} XRP
+                </div>
+                <div className="text-purple-400 text-xs">
+                  {earningStats.rewardsByType.token_creation?.count || 0} rewards
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-blue-900/20 rounded-lg border border-blue-500/20">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center text-2xl">
+                  🤖
+                </div>
+                <div>
+                  <div className="text-blue-200 font-semibold">Bots Created</div>
+                  <div className="text-blue-400 text-sm">{earningStats.botsCreated} bots</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-blue-200">
+                  {earningStats.rewardsByType.bot_creation?.total?.toFixed(2) || '0.00'} XRP
+                </div>
+                <div className="text-blue-400 text-xs">
+                  {earningStats.rewardsByType.bot_creation?.count || 0} rewards
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-green-900/20 rounded-lg border border-green-500/20">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-lg bg-green-500/20 flex items-center justify-center text-2xl">
+                  💱
+                </div>
+                <div>
+                  <div className="text-green-200 font-semibold">Trades Executed</div>
+                  <div className="text-green-400 text-sm">{earningStats.tradesExecuted} trades</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-green-200">
+                  {earningStats.rewardsByType.trade?.total?.toFixed(2) || '0.00'} XRP
+                </div>
+                <div className="text-green-400 text-xs">
+                  {earningStats.rewardsByType.trade?.count || 0} rewards
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-yellow-900/20 rounded-lg border border-yellow-500/20">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-lg bg-yellow-500/20 flex items-center justify-center text-2xl">
+                  🎯
+                </div>
+                <div>
+                  <div className="text-yellow-200 font-semibold">Other Rewards</div>
+                  <div className="text-yellow-400 text-sm">Milestones & bonuses</div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-bold text-yellow-200">
+                  {(Object.entries(earningStats.rewardsByType)
+                    .filter(([type]) => !['token_creation', 'bot_creation', 'trade'].includes(type))
+                    .reduce((sum, [, data]) => sum + (data.total || 0), 0)).toFixed(2)} XRP
+                </div>
+                <div className="text-yellow-400 text-xs">
+                  {Object.entries(earningStats.rewardsByType)
+                    .filter(([type]) => !['token_creation', 'bot_creation', 'trade'].includes(type))
+                    .reduce((sum, [, data]) => sum + (data.count || 0), 0)} rewards
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3 className="text-xl font-bold text-purple-200 mb-4">💰 Your Rewards Summary</h3>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass rounded-lg p-6">
