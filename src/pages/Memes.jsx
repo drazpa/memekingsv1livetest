@@ -1189,6 +1189,23 @@ export default function Memes() {
         tokenId: insertedToken?.id
       });
 
+      // Award 0.10 XRP reward for token creation
+      if (connectedWallet) {
+        try {
+          await supabase
+            .from('token_creation_rewards')
+            .insert([{
+              wallet_address: connectedWallet.address,
+              token_id: insertedToken.id,
+              reward_amount: 0.10,
+              claimed: false
+            }]);
+          console.log('✅ Reward recorded: 0.10 XRP for', connectedWallet.address);
+        } catch (rewardError) {
+          console.error('Failed to record reward:', rewardError);
+        }
+      }
+
       setNewToken({ name: '', issuer: '', supply: '1000000', xrpLocked: '1', image: null, imageUrl: '', tfTransferable: false, requireDestTag: false, description: '', twitterHandle: '', websiteUrl: '' });
       setImagePreview(null);
       setAddMode('manual');

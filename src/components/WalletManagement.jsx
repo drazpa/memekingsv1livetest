@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import * as xrpl from 'xrpl';
 import { TrustlineDropdown } from './TrustlineDropdown';
 import { PinProtection } from './PinProtection';
+import WalletRewards from './WalletRewards';
 
 export default function WalletManagement() {
   const [wallets, setWallets] = useState([]);
@@ -514,6 +515,8 @@ export default function WalletManagement() {
           {filterFavorites ? '⭐ Favorites Only' : '☆ Show All'}
         </button>
       </div>
+
+      {connectedWallet && <WalletRewards wallet={connectedWallet} xrpPrice={2.50} />}
 
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

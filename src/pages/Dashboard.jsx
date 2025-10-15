@@ -15,6 +15,7 @@ import { setFeaturedPosition, promoteToFeatured } from '../utils/featuredTokens'
 import { CategoryBadge, calculateDaysOnMarket, CATEGORIES } from '../utils/categoryUtils';
 import FeaturedSpotModal from '../components/FeaturedSpotModal';
 import TokenSelectionModal from '../components/TokenSelectionModal';
+import DashboardRewardsWidget from '../components/DashboardRewardsWidget';
 
 const ISSUER_SEED = 'sEd7bAfzqZWKxaatJpoWzTvENyaTg1Y';
 const ISSUER_ADDRESS = 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6';
@@ -1692,6 +1693,8 @@ export default function Dashboard() {
           </a>
         </div>
       </div>
+
+      {connectedWallet && <DashboardRewardsWidget wallet={connectedWallet} xrpPrice={xrpUsdPrice} />}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <div className="glass rounded-lg p-4 sm:p-6">
