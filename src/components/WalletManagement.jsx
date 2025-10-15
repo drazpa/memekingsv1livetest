@@ -5,6 +5,7 @@ import * as xrpl from 'xrpl';
 import { TrustlineDropdown } from './TrustlineDropdown';
 import { PinProtection } from './PinProtection';
 import WalletRewards from './WalletRewards';
+import WalletRewardsCompact from './WalletRewardsCompact';
 
 export default function WalletManagement() {
   const [wallets, setWallets] = useState([]);
@@ -632,6 +633,8 @@ export default function WalletManagement() {
                     <div className="text-purple-300 text-sm">{wallet.notes}</div>
                   </div>
                 )}
+
+                <WalletRewardsCompact wallet={wallet} xrpPrice={2.50} />
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-purple-500/20">
@@ -669,6 +672,7 @@ export default function WalletManagement() {
                 <th className="text-left px-6 py-4 text-purple-300 font-medium">Seed</th>
                 <th className="text-left px-6 py-4 text-purple-300 font-medium">Purpose</th>
                 <th className="text-left px-6 py-4 text-purple-300 font-medium">Balance</th>
+                <th className="text-left px-6 py-4 text-purple-300 font-medium">Rewards</th>
                 <th className="text-left px-6 py-4 text-purple-300 font-medium">Connection</th>
                 <th className="text-left px-6 py-4 text-purple-300 font-medium">Actions</th>
               </tr>
@@ -742,6 +746,11 @@ export default function WalletManagement() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-purple-200 font-bold">{wallet.balance_xrp || 0} XRP</td>
+                  <td className="px-6 py-4">
+                    <div className="max-w-xs">
+                      <WalletRewardsCompact wallet={wallet} xrpPrice={2.50} />
+                    </div>
+                  </td>
                   <td className="px-6 py-4">
                     {connectedWallet?.id === wallet.id ? (
                       <button
