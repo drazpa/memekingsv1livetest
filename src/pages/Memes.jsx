@@ -910,13 +910,28 @@ export default function Memes() {
 
     try {
       setCurrentProgressStep(0);
+      const feeHash = await payCreationFee();
+      const updatedSteps0 = [...steps];
+      updatedSteps0[0] = { ...updatedSteps0[0], txHash: feeHash };
+      setProgressSteps(updatedSteps0);
+
+      setCurrentProgressStep(1);
       const client = new xrpl.Client('wss://xrplcluster.com');
       await client.connect();
 
-      const issuerWallet = xrpl.Wallet.fromSeed(ISSUER_SEED);
-      const receiverWallet = xrpl.Wallet.fromSeed(RECEIVER_SEED);
+      let issuerWallet, receiverWallet;
+      if (walletConfigMode === 'admin') {
+        issuerWallet = xrpl.Wallet.fromSeed(ISSUER_SEED);
+        receiverWallet = xrpl.Wallet.fromSeed(RECEIVER_SEED);
+      } else {
+        if (!selectedIssuerWallet || !selectedReceiverWallet) {
+          throw new Error('Please select both issuer and receiver wallets');
+        }
+        issuerWallet = xrpl.Wallet.fromSeed(selectedIssuerWallet.encrypted_seed);
+        receiverWallet = xrpl.Wallet.fromSeed(selectedReceiverWallet.encrypted_seed);
+      }
 
-      setCurrentProgressStep(1);
+      setCurrentProgressStep(2);
 
       try {
         await client.request({
@@ -926,8 +941,8 @@ export default function Memes() {
       } catch (e) {
         if (e.data?.error === 'actNotFound') {
           const errorStep = [...steps];
-          errorStep[1] = {
-            ...errorStep[1],
+          errorStep[2] = {
+            ...errorStep[2],
             description: `Error: Issuer wallet not funded. Address: ${issuerWallet.address}`,
             error: true
           };
@@ -947,8 +962,8 @@ export default function Memes() {
       } catch (e) {
         if (e.data?.error === 'actNotFound') {
           const errorStep = [...steps];
-          errorStep[1] = {
-            ...errorStep[1],
+          errorStep[2] = {
+            ...errorStep[2],
             description: `Error: Receiver wallet not funded. Address: ${receiverWallet.address}`,
             error: true
           };
@@ -960,7 +975,7 @@ export default function Memes() {
         }
       }
 
-      setCurrentProgressStep(2);
+      setCurrentProgressStep(3);
 
       if (!newToken.tfTransferable) {
         const accountSetTx = {
@@ -1005,10 +1020,10 @@ export default function Memes() {
       }
 
       const updatedSteps = [...steps];
-      updatedSteps[2] = { ...updatedSteps[2], txHash: trustResult.result.hash };
+      updatedSteps[3] = { ...updatedSteps[2], txHash: trustResult.result.hash };
       setProgressSteps(updatedSteps);
 
-      setCurrentProgressStep(3);
+      setCurrentProgressStep(4);
       const paymentTx = {
         TransactionType: 'Payment',
         Account: issuerWallet.address,
@@ -2232,18 +2247,101 @@ export default function Memes() {
               </div>
 
               <div className="glass rounded-lg p-4">
-                <h4 className="text-purple-200 font-medium mb-2">Wallet Configuration</h4>
-                <div className="space-y-2 text-sm text-purple-300">
-                  <p><span className="font-medium">Issuer:</span> {ISSUER_ADDRESS}</p>
-                  <p><span className="font-medium">Receiver:</span> {RECEIVER_ADDRESS}</p>
+                <h4 className="text-purple-200 font-medium mb-3">Wallet Configuration</h4>
+                <div className="flex gap-2 mb-3">
+                  <button
+                    onClick={() => setWalletConfigMode('admin')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      walletConfigMode === 'admin'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-purple-900/20 text-purple-300 hover:bg-purple-900/40'
+                    }`}
+                  >
+                    Admin Token
+                  </button>
+                  <button
+                    onClick={() => setWalletConfigMode('custom')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      walletConfigMode === 'custom'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-purple-900/20 text-purple-300 hover:bg-purple-900/40'
+                    }`}
+                  >
+                    Custom Wallet
+                  </button>
                 </div>
+
+                {walletConfigMode === 'admin' ? (
+                  <div className="space-y-2 text-sm text-purple-300">
+                    <p><span className="font-medium">Issuer:</span> {ISSUER_ADDRESS}</p>
+                    <p><span className="font-medium">Receiver:</span> {RECEIVER_ADDRESS}</p>
+                    <p className="text-xs text-purple-400 mt-2">Using MEMEKINGS managed wallets for token creation</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-purple-300 mb-2 text-sm">Issuer Wallet</label>
+                      <select
+                        value={selectedIssuerWallet?.id || ''}
+                        onChange={(e) => {
+                          if (e.target.value === 'connected') {
+                            setSelectedIssuerWallet({ id: 'connected', address: connectedWallet.address, encrypted_seed: connectedWallet.seed });
+                          } else {
+                            const wallet = userWallets.find(w => w.id === e.target.value);
+                            setSelectedIssuerWallet(wallet || null);
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 text-sm"
+                      >
+                        <option value="">Select issuer wallet...</option>
+                        {connectedWallet && (
+                          <option value="connected">{connectedWallet.address} (Connected)</option>
+                        )}
+                        {userWallets.map((wallet) => (
+                          <option key={wallet.id} value={wallet.id}>
+                            {wallet.name} - {wallet.address.substring(0, 10)}...
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-purple-300 mb-2 text-sm">Receiver Wallet</label>
+                      <select
+                        value={selectedReceiverWallet?.id || ''}
+                        onChange={(e) => {
+                          if (e.target.value === 'connected') {
+                            setSelectedReceiverWallet({ id: 'connected', address: connectedWallet.address, encrypted_seed: connectedWallet.seed });
+                          } else if (e.target.value === 'default') {
+                            setSelectedReceiverWallet({ id: 'default', address: RECEIVER_ADDRESS, encrypted_seed: 'sEd7W72aANTbLTG98XDhU1yfotPJdhu' });
+                          } else {
+                            const wallet = userWallets.find(w => w.id === e.target.value);
+                            setSelectedReceiverWallet(wallet || null);
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 text-sm"
+                      >
+                        <option value="">Select receiver wallet...</option>
+                        {connectedWallet && (
+                          <option value="connected">{connectedWallet.address} (Connected)</option>
+                        )}
+                        <option value="default">{RECEIVER_ADDRESS} (Platform Default)</option>
+                        {userWallets.map((wallet) => (
+                          <option key={wallet.id} value={wallet.id}>
+                            {wallet.name} - {wallet.address.substring(0, 10)}...
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <p className="text-xs text-purple-400">Token will be issued from your selected wallets</p>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="flex gap-3 mt-6">
               <button
                 onClick={createCustomToken}
-                disabled={isCreating || uploadingImage}
+                disabled={isCreating || uploadingImage || (walletConfigMode === 'custom' && (!selectedIssuerWallet || !selectedReceiverWallet))}
                 className="btn-primary text-white px-6 py-2 rounded-lg font-medium flex-1 disabled:opacity-50"
               >
                 {uploadingImage ? (
@@ -2251,7 +2349,7 @@ export default function Memes() {
                 ) : isCreating ? (
                   <span>🔄 Creating...</span>
                 ) : (
-                  <span>🚀 Create Token</span>
+                  <span>🚀 Create Token (5 XRP)</span>
                 )}
               </button>
               <button
