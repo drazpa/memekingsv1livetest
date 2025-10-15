@@ -52,12 +52,23 @@ export default function KingsList() {
 
   const fetchTopHolder = async (tokenId) => {
     setFetching(prev => ({ ...prev, [tokenId]: true }));
+    let client = null;
 
     try {
       const token = tokens.find(t => t.id === tokenId);
-      if (!token) return;
+      if (!token) {
+        toast.error('Token not found');
+        setFetching(prev => ({ ...prev, [tokenId]: false }));
+        return;
+      }
 
-      const client = new Client('wss://xrplcluster.com');
+      if (!token.issuer_address) {
+        toast.error(`Token ${token.token_name} missing issuer address`);
+        setFetching(prev => ({ ...prev, [tokenId]: false }));
+        return;
+      }
+
+      client = new Client('wss://xrplcluster.com');
       await client.connect();
 
       try {
@@ -68,6 +79,9 @@ export default function KingsList() {
             account: token.issuer_address,
             peer: undefined,
             ledger_index: 'validated'
+          }).catch(err => {
+            console.error('Error fetching account lines:', err);
+            return { result: { lines: [] } };
           }),
           token.amm_account_id ? client.request({
             command: 'amm_info',
@@ -79,15 +93,23 @@ export default function KingsList() {
               currency: 'XRP'
             },
             ledger_index: 'validated'
-          }).catch(() => null) : Promise.resolve(null)
+          }).catch(err => {
+            console.error('Error fetching AMM info:', err);
+            return null;
+          }) : Promise.resolve(null)
         ]);
 
-        const trustlines = holderResponse.result.lines || [];
+        const trustlines = holderResponse?.result?.lines || [];
 
         if (trustlines.length === 0) {
-          toast.error('No holders found for this token');
+          console.log(`No trustlines found for ${token.token_name} (${token.issuer_address})`);
+          toast.error(`No holders found for ${token.token_name}`);
+          if (client) await client.disconnect();
+          setFetching(prev => ({ ...prev, [tokenId]: false }));
           return;
         }
+
+        console.log(`Found ${trustlines.length} trustlines for ${token.token_name}`);
 
         // Sort by balance descending
         trustlines.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
@@ -95,8 +117,12 @@ export default function KingsList() {
         const topLine = trustlines[0];
         const balance = parseFloat(topLine.balance);
 
+        console.log(`Top holder for ${token.token_name}: ${topLine.account} with balance ${balance}`);
+
         if (balance <= 0) {
-          toast.error('No positive balances found');
+          toast.error(`No positive balances found for ${token.token_name}`);
+          if (client) await client.disconnect();
+          setFetching(prev => ({ ...prev, [tokenId]: false }));
           return;
         }
 
@@ -192,12 +218,18 @@ export default function KingsList() {
         }));
 
         toast.success(`Found king for ${token.token_name}!`);
+      } catch (innerError) {
+        console.error('Error in fetchTopHolder inner block:', innerError);
+        toast.error(`Error: ${innerError.message || 'Failed to process holder data'}`);
       } finally {
-        await client.disconnect();
+        if (client) {
+          await client.disconnect();
+        }
       }
     } catch (error) {
-      console.error('Error fetching top holder:', error);
-      toast.error('Failed to fetch top holder');
+      console.error('Error fetching top holder (outer):', error);
+      const token = tokens.find(t => t.id === tokenId);
+      toast.error(`Failed to fetch top holder for ${token?.token_name || 'token'}: ${error.message}`);
     } finally {
       setFetching(prev => ({ ...prev, [tokenId]: false }));
     }
