@@ -823,6 +823,19 @@ export default function Memes() {
         metadata: { tokenName: newToken.name, issuer: issuerWallet.address, receiver: receiverWallet.address }
       });
 
+      // Award XRP reward for token creation
+      try {
+        await supabase.from('xrp_rewards').insert({
+          wallet_address: issuerWallet.address,
+          amount: 0.10,
+          reward_type: 'token_creation',
+          description: `Created token: ${newToken.name} (${currencyCode})`,
+          status: 'pending'
+        });
+      } catch (rewardError) {
+        console.error('Error creating reward:', rewardError);
+      }
+
       setNewToken({ name: '', issuer: '', supply: '1000000', xrpLocked: '1', image: null, imageUrl: '', tfTransferable: false, requireDestTag: false, description: '', twitterHandle: '', websiteUrl: '' });
       setImagePreview(null);
       setShowCreateModal(false);
