@@ -879,6 +879,10 @@ export default function Memes() {
       throw new Error('Connected wallet required to pay creation fee');
     }
 
+    if (connectedWallet.address === RECEIVER_ADDRESS) {
+      return 'FEE_WAIVED_ADMIN';
+    }
+
     const { getClient } = await import('../utils/xrplClient');
     const client = await getClient();
     const wallet = xrpl.Wallet.fromSeed(connectedWallet.seed);
@@ -2272,10 +2276,20 @@ export default function Memes() {
                         <p className="text-yellow-300/80 text-xs mt-1">You must connect your wallet to pay the 5 XRP creation fee when using Admin Token mode.</p>
                       </div>
                     )}
+                    {connectedWallet?.address === RECEIVER_ADDRESS && (
+                      <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                        <p className="text-green-300 text-xs font-medium">✓ Admin Wallet Connected</p>
+                        <p className="text-green-300/80 text-xs mt-1">Creation fee waived for admin wallet</p>
+                      </div>
+                    )}
                     <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
                       <p className="text-blue-300 text-xs font-medium">ℹ️ What happens during creation:</p>
                       <ul className="text-blue-300/80 text-xs mt-2 space-y-1 list-disc list-inside">
-                        <li>5 XRP fee is paid from your connected wallet</li>
+                        {connectedWallet?.address === RECEIVER_ADDRESS ? (
+                          <li>5 XRP creation fee waived (admin wallet)</li>
+                        ) : (
+                          <li>5 XRP fee is paid from your connected wallet</li>
+                        )}
                         <li>Token is issued by MEMEKINGS managed issuer</li>
                         <li>Tokens are sent to platform receiver wallet</li>
                         <li>Automatic trustline setup and liquidity pool creation</li>
@@ -2367,7 +2381,12 @@ export default function Memes() {
                 ) : isCreating ? (
                   <span>🔄 Creating...</span>
                 ) : (
-                  <span>🚀 Create Token (5 XRP)</span>
+                  <span>
+                    🚀 Create Token
+                    {connectedWallet?.address === RECEIVER_ADDRESS && walletConfigMode === 'admin'
+                      ? ' (Admin - Free)'
+                      : ' (5 XRP)'}
+                  </span>
                 )}
               </button>
               <button
