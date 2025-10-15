@@ -63,7 +63,6 @@ export default function Airdropper() {
 
   useEffect(() => {
     loadConnectedWallet();
-    loadAllTokens();
   }, []);
 
   useEffect(() => {
@@ -71,6 +70,7 @@ export default function Airdropper() {
       loadCampaigns();
       loadAnalytics();
       loadAvailableTokens();
+      loadAllTokens();
     }
   }, [connectedWallet]);
 
@@ -118,31 +118,46 @@ export default function Airdropper() {
   };
 
   const loadAllTokens = async () => {
+    if (!connectedWallet) return;
+
     try {
-      const { data, error } = await supabase
-        .from('tokens')
-        .select('currency_code, issuer_address, name, image_url')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      console.log('Loading wallet tokens for:', connectedWallet.address);
 
-      if (error) {
-        console.error('Supabase error loading tokens:', error);
-        return;
+      const client = new xrpl.Client('wss://xrplcluster.com');
+      await client.connect();
+
+      try {
+        const response = await client.request({
+          command: 'account_lines',
+          account: connectedWallet.address,
+          ledger_index: 'validated'
+        });
+
+        await client.disconnect();
+
+        const lines = response.result.lines || [];
+        console.log('Loaded wallet token lines:', lines.length);
+
+        const formattedTokens = lines
+          .filter(line => parseFloat(line.balance) > 0)
+          .map(line => ({
+            value: `${line.currency}:${line.account}`,
+            label: `${line.currency} (Balance: ${parseFloat(line.balance).toFixed(2)})`,
+            currency_code: line.currency,
+            issuer_address: line.account,
+            balance: parseFloat(line.balance)
+          }))
+          .sort((a, b) => b.balance - a.balance);
+
+        console.log('Setting allTokens with', formattedTokens.length, 'tokens');
+        setAllTokens(formattedTokens);
+      } catch (err) {
+        await client.disconnect();
+        throw err;
       }
-
-      console.log('Loaded tokens from database:', data?.length || 0);
-
-      const formattedTokens = (data || []).map(token => ({
-        value: `${token.currency_code}:${token.issuer_address}`,
-        label: `${token.currency_code} ${token.name ? '- ' + token.name : ''} (${token.issuer_address.slice(0, 8)}...)`,
-        currency_code: token.currency_code,
-        issuer_address: token.issuer_address
-      }));
-
-      console.log('Setting allTokens with', formattedTokens.length, 'tokens');
-      setAllTokens(formattedTokens);
     } catch (error) {
-      console.error('Error loading all tokens:', error);
+      console.error('Error loading wallet tokens:', error);
+      setAllTokens([]);
     }
   };
 
@@ -1468,7 +1483,7 @@ export default function Airdropper() {
                         </div>
 
                         <div>
-                          <label className="block text-xs text-slate-400 mb-1">Select from all tokens</label>
+                          <label className="block text-xs text-slate-400 mb-1">Select from your wallet tokens</label>
                           <select
                             onChange={(e) => {
                               const selected = allTokens.find(t => t.value === e.target.value);
@@ -1476,7 +1491,9 @@ export default function Airdropper() {
                             }}
                             className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm"
                           >
-                            <option value="">Choose a token...</option>
+                            <option value="">
+                              {allTokens.length === 0 ? 'Loading your tokens...' : 'Choose a token...'}
+                            </option>
                             {allTokens.map(token => (
                               <option key={token.value} value={token.value}>
                                 {token.label}
@@ -1748,7 +1765,7 @@ export default function Airdropper() {
                         </div>
 
                         <div>
-                          <label className="block text-xs text-slate-400 mb-1">Select from all tokens</label>
+                          <label className="block text-xs text-slate-400 mb-1">Select from your wallet tokens</label>
                           <select
                             onChange={(e) => {
                               const selected = allTokens.find(t => t.value === e.target.value);
@@ -1761,7 +1778,9 @@ export default function Airdropper() {
                             }}
                             className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm"
                           >
-                            <option value="">Choose a token...</option>
+                            <option value="">
+                              {allTokens.length === 0 ? 'Loading your tokens...' : 'Choose a token...'}
+                            </option>
                             {allTokens.map(token => (
                               <option key={token.value} value={token.value}>
                                 {token.label}
