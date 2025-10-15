@@ -5,7 +5,6 @@ import * as xrpl from 'xrpl';
 import { TrustlineDropdown } from './TrustlineDropdown';
 import { PinProtection } from './PinProtection';
 import MintEarningsChart from './MintEarningsChart';
-import WalletEarningsDisplay from './WalletEarningsDisplay';
 
 export default function WalletManagement() {
   const [wallets, setWallets] = useState([]);
@@ -634,7 +633,6 @@ export default function WalletManagement() {
                 <th className="text-left px-6 py-4 text-purple-300 font-medium">Seed</th>
                 <th className="text-left px-6 py-4 text-purple-300 font-medium">Purpose</th>
                 <th className="text-left px-6 py-4 text-purple-300 font-medium">Balance</th>
-                <th className="text-left px-6 py-4 text-purple-300 font-medium">Mint Earnings</th>
                 <th className="text-left px-6 py-4 text-purple-300 font-medium">Connection</th>
                 <th className="text-left px-6 py-4 text-purple-300 font-medium">Actions</th>
               </tr>
@@ -708,9 +706,6 @@ export default function WalletManagement() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-purple-200 font-bold">{wallet.balance_xrp || 0} XRP</td>
-                  <td className="px-6 py-4">
-                    <WalletEarningsDisplay walletAddress={wallet.address} />
-                  </td>
                   <td className="px-6 py-4">
                     {connectedWallet?.id === wallet.id ? (
                       <button
