@@ -1185,30 +1185,6 @@ export default function Memes() {
     }
   };
 
-  const handlePasswordSubmit = () => {
-    if (password !== 'divercity') {
-      toast.error('Incorrect password!');
-      return;
-    }
-
-    setShowPasswordModal(false);
-    setPassword('');
-    if (passwordAction === 'create') {
-      setShowCreateModal(true);
-    } else {
-      setShowAddModal(true);
-    }
-  };
-
-  const requestAddToken = () => {
-    setPasswordAction('add');
-    setShowPasswordModal(true);
-  };
-
-  const requestCreateToken = () => {
-    setPasswordAction('create');
-    setShowPasswordModal(true);
-  };
 
   const calculateMarketCap = (token) => {
     const price = getLivePrice(token);
@@ -1843,13 +1819,13 @@ export default function Memes() {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={requestAddToken}
+            onClick={() => setShowAddModal(true)}
             className="btn text-purple-300 px-6 py-3 rounded-lg font-medium"
           >
             + Add Token
           </button>
           <button
-            onClick={requestCreateToken}
+            onClick={() => setShowCreateModal(true)}
             className="btn-primary text-white px-6 py-3 rounded-lg font-medium"
           >
             🚀 Create Token
@@ -2060,48 +2036,6 @@ export default function Memes() {
           <p className="text-purple-400">
             {searchTerm ? 'Try a different search term' : 'Create your first token from the dashboard'}
           </p>
-        </div>
-      )}
-
-      {showPasswordModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="glass rounded-lg p-8 max-w-md w-full">
-            <h3 className="text-2xl font-bold text-purple-200 mb-4">Admin Access Required</h3>
-            <p className="text-purple-300 mb-6">
-              Enter password to {passwordAction === 'create' ? 'create tokens' : 'add tokens'}
-            </p>
-
-            <div className="mb-6">
-              <label className="block text-purple-300 mb-2">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
-                className="input w-full text-purple-200"
-                placeholder="Enter password"
-                autoFocus
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={handlePasswordSubmit}
-                className="btn-primary text-white px-6 py-2 rounded-lg font-medium flex-1"
-              >
-                Confirm
-              </button>
-              <button
-                onClick={() => {
-                  setShowPasswordModal(false);
-                  setPassword('');
-                }}
-                className="btn text-purple-300 px-6 py-2 rounded-lg font-medium"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
