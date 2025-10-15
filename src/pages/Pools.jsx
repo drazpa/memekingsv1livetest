@@ -5,6 +5,7 @@ import { Buffer } from 'buffer';
 import toast from 'react-hot-toast';
 import TokenIcon from '../components/TokenIcon';
 import { onTokenUpdate } from '../utils/tokenEvents';
+import CreateAMMPoolModal from '../components/CreateAMMPoolModal';
 
 export default function Pools() {
   const [tokens, setTokens] = useState([]);
@@ -21,6 +22,7 @@ export default function Pools() {
   const [favorites, setFavorites] = useState([]);
   const [xrpUsdPrice, setXrpUsdPrice] = useState(2.50);
   const [swapDropdownOpen, setSwapDropdownOpen] = useState(null);
+  const [showCreatePoolModal, setShowCreatePoolModal] = useState(false);
 
   useEffect(() => {
     const initialize = async () => {
@@ -775,14 +777,28 @@ export default function Pools() {
           <h2 className="text-3xl font-bold text-purple-200">AMM Pools</h2>
           <p className="text-purple-400 mt-1">Liquidity pools for all platform tokens</p>
         </div>
-        <button
-          onClick={fetchAllPoolsData}
-          disabled={refreshing}
-          className="btn text-purple-300 px-6 py-2 rounded-lg font-medium disabled:opacity-50"
-        >
-          {refreshing ? '🔄 Refreshing...' : '🔄 Refresh Pools'}
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowCreatePoolModal(true)}
+            className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white px-6 py-2 rounded-lg font-medium transition-all shadow-lg"
+          >
+            ➕ Create AMM LP Pool
+          </button>
+          <button
+            onClick={fetchAllPoolsData}
+            disabled={refreshing}
+            className="btn text-purple-300 px-6 py-2 rounded-lg font-medium disabled:opacity-50"
+          >
+            {refreshing ? '🔄 Refreshing...' : '🔄 Refresh Pools'}
+          </button>
+        </div>
       </div>
+
+      <CreateAMMPoolModal
+        isOpen={showCreatePoolModal}
+        onClose={() => setShowCreatePoolModal(false)}
+        wallet={connectedWallet}
+      />
 
       {!connectedWallet && (
         <div className="glass rounded-lg p-6 bg-yellow-500/10 border border-yellow-500/30">
