@@ -612,16 +612,18 @@ class AIAssistant {
   async handleMarketQuery() {
     try {
       const { data: tokens, error } = await supabase
-        .from('tokens')
+        .from('meme_tokens')
         .select('*')
+        .eq('status', 'active')
         .order('price_change_24h', { ascending: false, nullsFirst: false })
         .limit(10);
 
       if (error) throw error;
 
       const { count: totalTokens } = await supabase
-        .from('tokens')
-        .select('*', { count: 'exact', head: true });
+        .from('meme_tokens')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
 
       const { count: totalPools } = await supabase
         .from('liquidity_pools')
@@ -664,7 +666,7 @@ class AIAssistant {
           table: {
             headers: ['Token', 'Symbol', '24h Change', '24h Volume', 'Created'],
             rows: tokens?.slice(0, 5).map(token => [
-              token.name || 'Unknown',
+              token.token_name || 'Unknown',
               token.currency_code || 'N/A',
               token.price_change_24h ? `${token.price_change_24h > 0 ? '+' : ''}${token.price_change_24h.toFixed(2)}%` : 'N/A',
               token.volume_24h ? token.volume_24h.toFixed(2) : 'N/A',
@@ -886,9 +888,10 @@ class AIAssistant {
     }
 
     const { data: tokens } = await supabase
-      .from('tokens')
+      .from('meme_tokens')
       .select('*')
-      .order('name', { ascending: true })
+      .eq('status', 'active')
+      .order('token_name', { ascending: true })
       .limit(100);
 
     if (!tokens || tokens.length === 0) {
@@ -985,27 +988,28 @@ class AIAssistant {
     }
 
     const { data: tokens } = await supabase
-      .from('tokens')
-      .select('id, name, currency_code, issuer_address')
+      .from('meme_tokens')
+      .select('id, token_name, currency_code, issuer_address')
+      .eq('status', 'active')
       .limit(50);
 
     const lowerMessage = message?.toLowerCase() || '';
     const isSpecificToken = lowerMessage.includes('send') && tokens?.some(t =>
-      lowerMessage.includes(t.name.toLowerCase()) || lowerMessage.includes(t.currency_code.toLowerCase())
+      lowerMessage.includes(t.token_name.toLowerCase()) || lowerMessage.includes(t.currency_code.toLowerCase())
     );
 
     if (isSpecificToken) {
       const matchedToken = tokens.find(t =>
-        lowerMessage.includes(t.name.toLowerCase()) || lowerMessage.includes(t.currency_code.toLowerCase())
+        lowerMessage.includes(t.token_name.toLowerCase()) || lowerMessage.includes(t.currency_code.toLowerCase())
       );
 
       return {
-        content: `I'll help you send ${matchedToken.name} (${matchedToken.currency_code}). Please provide the details:`,
+        content: `I'll help you send ${matchedToken.token_name} (${matchedToken.currency_code}). Please provide the details:`,
         data: {
           execution: {
             type: 'send_token',
             icon: '📤',
-            title: `Send ${matchedToken.name}`,
+            title: `Send ${matchedToken.token_name}`,
             description: `Send ${matchedToken.currency_code} tokens to any XRPL address`,
             badge: 'Token Transfer',
             fields: [
@@ -1209,16 +1213,18 @@ class AIAssistant {
   async handleTokenStats() {
     try {
       const { data: tokens, error } = await supabase
-        .from('tokens')
+        .from('meme_tokens')
         .select('*')
+        .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(5);
 
       if (error) throw error;
 
       const { count: totalTokens } = await supabase
-        .from('tokens')
-        .select('*', { count: 'exact', head: true });
+        .from('meme_tokens')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
 
       return {
         content: 'Here are the latest token statistics:',
@@ -1236,7 +1242,7 @@ class AIAssistant {
           table: {
             headers: ['Token', 'Symbol', 'Created'],
             rows: tokens?.slice(0, 5).map(token => [
-              token.name || 'Unknown',
+              token.token_name || 'Unknown',
               token.currency_code || 'N/A',
               new Date(token.created_at).toLocaleDateString()
             ]) || []
@@ -1555,8 +1561,9 @@ class AIAssistant {
     }
 
     const { data: tokens } = await supabase
-      .from('tokens')
-      .select('id, name, currency_code')
+      .from('meme_tokens')
+      .select('id, token_name, currency_code')
+      .eq('status', 'active')
       .limit(50);
 
     return {
@@ -1574,7 +1581,7 @@ class AIAssistant {
               label: 'Select Token',
               type: 'select',
               required: true,
-              options: tokens?.map(t => ({ value: t.id, label: `${t.name} (${t.currency_code})` })) || [],
+              options: tokens?.map(t => ({ value: t.id, label: `${t.token_name} (${t.currency_code})` })) || [],
               hint: 'Choose which token to buy'
             },
             {
@@ -1626,8 +1633,9 @@ class AIAssistant {
     }
 
     const { data: tokens } = await supabase
-      .from('tokens')
-      .select('id, name, currency_code')
+      .from('meme_tokens')
+      .select('id, token_name, currency_code')
+      .eq('status', 'active')
       .limit(50);
 
     return {
@@ -1645,7 +1653,7 @@ class AIAssistant {
               label: 'Select Token',
               type: 'select',
               required: true,
-              options: tokens?.map(t => ({ value: t.id, label: `${t.name} (${t.currency_code})` })) || [],
+              options: tokens?.map(t => ({ value: t.id, label: `${t.token_name} (${t.currency_code})` })) || [],
               hint: 'Choose which token to sell'
             },
             {
@@ -1697,8 +1705,9 @@ class AIAssistant {
     }
 
     const { data: tokens } = await supabase
-      .from('tokens')
-      .select('id, name, currency_code')
+      .from('meme_tokens')
+      .select('id, token_name, currency_code')
+      .eq('status', 'active')
       .limit(50);
 
     return {
@@ -1724,7 +1733,7 @@ class AIAssistant {
               label: 'Token to Trade',
               type: 'select',
               required: true,
-              options: tokens?.map(t => ({ value: t.id, label: `${t.name} (${t.currency_code})` })) || [],
+              options: tokens?.map(t => ({ value: t.id, label: `${t.token_name} (${t.currency_code})` })) || [],
               hint: 'Which token should the bot trade'
             },
             {
