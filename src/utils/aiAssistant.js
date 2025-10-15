@@ -108,7 +108,7 @@ class AIAssistant {
     } else if (this.isTokenStatsQuery(lowerMessage)) {
       return await this.handleTokenStats();
     } else if (this.isMarketCapQuery(lowerMessage)) {
-      return await this.handleMarketCapQuery();
+      return await this.handleMarketCapQuery(message);
     } else if (this.isVolumeQuery(lowerMessage)) {
       return await this.handleVolumeQuery();
     } else if (this.isHoldersQuery(lowerMessage)) {
@@ -529,25 +529,52 @@ class AIAssistant {
 
   async handlePriceQuery(message) {
     try {
-      const { data: tokens, error } = await supabase
-        .from('tokens')
-        .select('*')
-        .order('volume_24h', { ascending: false, nullsFirst: false })
-        .limit(5);
+      const tokenMatch = message.match(/(?:price|cost|worth|market cap|marketcap|mcap|liquidity|volume).*?(?:for|of|on)\s+([A-Z]{2,10})/i);
 
-      if (error) throw error;
+      if (tokenMatch) {
+        const tokenCode = tokenMatch[1].toUpperCase();
+        return await this.getDetailedTokenInfo(tokenCode);
+      }
+
+      const symbolMatch = message.match(/\b([A-Z]{3,10})\b/);
+      if (symbolMatch) {
+        const tokenCode = symbolMatch[1];
+        return await this.getDetailedTokenInfo(tokenCode);
+      }
+
+      const topTokens = await AICachedData.getTopTokens(5);
+
+      if (!topTokens || topTokens.length === 0) {
+        return {
+          content: 'No token data available yet. Try asking about a specific token!',
+          data: {
+            actions: [
+              {
+                label: 'View All Tokens',
+                icon: '💰',
+                style: 'primary',
+                onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'memes' }))
+              }
+            ]
+          }
+        };
+      }
 
       return {
-        content: 'Here are the top tokens by trading volume:',
+        content: 'Here are the top tokens by volume (from cache):',
         data: {
           table: {
-            headers: ['Token', 'Symbol', '24h Volume', '24h Change'],
-            rows: tokens?.map(token => [
-              token.name || 'Unknown',
-              token.currency_code || 'N/A',
-              token.volume_24h ? `${token.volume_24h.toFixed(2)}` : 'N/A',
-              token.price_change_24h ? `${token.price_change_24h > 0 ? '+' : ''}${token.price_change_24h.toFixed(2)}%` : 'N/A'
-            ]) || []
+            headers: ['Token', 'Symbol', 'Price', 'Market Cap', '24h Volume'],
+            rows: topTokens.map(token => {
+              const formatted = AICachedData.formatTokenData(token);
+              return [
+                formatted.name,
+                formatted.symbol,
+                formatted.price,
+                formatted.marketCap,
+                formatted.volume24h
+              ];
+            })
           },
           actions: [
             {
@@ -1238,8 +1265,21 @@ class AIAssistant {
     }
   }
 
-  async handleMarketCapQuery() {
+  async handleMarketCapQuery(message) {
     try {
+      const tokenMatch = message.match(/(?:market cap|marketcap|mcap).*?(?:for|of|on)\s+([A-Z]{2,10})/i);
+
+      if (tokenMatch) {
+        const tokenCode = tokenMatch[1].toUpperCase();
+        return await this.getDetailedTokenInfo(tokenCode);
+      }
+
+      const symbolMatch = message.match(/\b([A-Z]{3,10})\b/);
+      if (symbolMatch) {
+        const tokenCode = symbolMatch[1];
+        return await this.getDetailedTokenInfo(tokenCode);
+      }
+
       const tokensWithMC = await AICachedData.getMarketCapRankings(10);
 
       if (!tokensWithMC || tokensWithMC.length === 0) {

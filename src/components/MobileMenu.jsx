@@ -1,18 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getAvailableServers, getCurrentServer, setManualServer } from '../utils/xrplClient';
 
-export function MobileMenu({ 
-  activeTab, 
-  setActiveTab, 
-  network, 
-  setNetwork, 
+export function MobileMenu({
+  activeTab,
+  setActiveTab,
+  network,
+  setNetwork,
   onActivityLog,
-  onScanQR 
+  onScanQR
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showNodeSelector, setShowNodeSelector] = useState(false);
+  const [currentNode, setCurrentNode] = useState(null);
+  const [availableNodes, setAvailableNodes] = useState([]);
+
+  useEffect(() => {
+    setAvailableNodes(getAvailableServers());
+    setCurrentNode(getCurrentServer());
+  }, []);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     setIsOpen(false);
+  };
+
+  const handleNodeChange = async (index) => {
+    try {
+      await setManualServer(index);
+      setCurrentNode(availableNodes[index]);
+      setShowNodeSelector(false);
+    } catch (error) {
+      console.error('Failed to change node:', error);
+    }
   };
 
   return (
@@ -83,6 +102,36 @@ export function MobileMenu({
                   Main
                 </button>
               </div>
+            </div>
+            <div className="px-3 py-2">
+              <button
+                onClick={() => setShowNodeSelector(!showNodeSelector)}
+                className="w-full px-3 py-2 text-left text-gray-300 hover:bg-gray-700/50 rounded-md transition-all duration-200 flex items-center justify-between"
+              >
+                <span className="text-sm">
+                  {currentNode ? currentNode.name : 'Select Node'}
+                </span>
+                <svg className={`w-4 h-4 transition-transform ${showNodeSelector ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showNodeSelector && (
+                <div className="mt-2 space-y-1">
+                  {availableNodes.map((node, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleNodeChange(index)}
+                      className={`w-full px-3 py-2 text-left rounded-md transition-all duration-200 text-xs ${
+                        currentNode?.url === node.url
+                          ? 'bg-gradient-to-r from-green-600 to-green-500 text-white'
+                          : 'text-gray-400 hover:bg-gray-700/50'
+                      }`}
+                    >
+                      {node.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <button
               onClick={() => {
