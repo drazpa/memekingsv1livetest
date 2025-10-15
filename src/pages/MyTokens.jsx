@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import TokenIcon from '../components/TokenIcon';
 import SendTokenModal from '../components/SendTokenModal';
 import ReceiveTokenModal from '../components/ReceiveTokenModal';
+import TokenDetailModal from '../components/TokenDetailModal';
 import { TokenTrustButton } from '../components/TokenTrustButton';
 import { onTokenUpdate } from '../utils/tokenEvents';
 import { CategoryBadge, calculateDaysOnMarket } from '../utils/categoryUtils';
@@ -18,6 +19,7 @@ export default function MyTokens() {
   const [showSendModal, setShowSendModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [selectedHolding, setSelectedHolding] = useState(null);
+  const [selectedToken, setSelectedToken] = useState(null);
   const [analytics, setAnalytics] = useState({
     totalValue: 0,
     totalTokens: 0,
@@ -866,10 +868,17 @@ export default function MyTokens() {
                       return sortOrder === 'asc' ? -compareValue : compareValue;
                     })
                     .map((holding, index) => (
-                  <tr key={index} className="hover:bg-purple-900/20 transition-colors">
+                  <tr
+                    key={index}
+                    onClick={() => setSelectedToken(holding.token)}
+                    className="hover:bg-purple-900/20 transition-colors cursor-pointer"
+                  >
                     <td className="p-4">
                       <button
-                        onClick={() => toggleFavorite(holding.token.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(holding.token.id);
+                        }}
                         className={`text-2xl ${favorites.includes(holding.token.id) ? 'text-yellow-400' : 'text-gray-600 hover:text-yellow-400'} transition-colors`}
                       >
                         {favorites.includes(holding.token.id) ? '⭐' : '☆'}
@@ -1035,9 +1044,12 @@ export default function MyTokens() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {userCreatedTokens.map(token => (
-              <div key={token.id} className="glass rounded-lg p-4 hover:bg-purple-900/30 transition-colors">
-                <div className="flex items-start gap-3 mb-3 cursor-pointer"
-                  onClick={() => window.dispatchEvent(new CustomEvent('navigateToToken', { detail: token.token_name }))}>
+              <div
+                key={token.id}
+                onClick={() => setSelectedToken(token)}
+                className="glass rounded-lg p-4 hover:bg-purple-900/30 transition-colors cursor-pointer"
+              >
+                <div className="flex items-start gap-3 mb-3">
                   <TokenIcon token={token} size="lg" />
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-purple-200 truncate">{token.token_name}</div>
@@ -1120,6 +1132,13 @@ export default function MyTokens() {
             setShowReceiveModal(false);
             setSelectedHolding(null);
           }}
+        />
+      )}
+
+      {selectedToken && (
+        <TokenDetailModal
+          token={selectedToken}
+          onClose={() => setSelectedToken(null)}
         />
       )}
     </div>

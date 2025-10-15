@@ -145,11 +145,47 @@ export default function Vault() {
   };
 
   const loadTokens = async () => {
-    const { data } = await supabase
-      .from('meme_tokens')
-      .select('*')
-      .order('created_at', { ascending: false });
-    setTokens(data || []);
+    try {
+      // Try to load from cache first
+      const cachedTokens = localStorage.getItem('vault_tokens_cache');
+      const cacheTimestamp = localStorage.getItem('vault_tokens_cache_time');
+      const cacheExpiry = 5 * 60 * 1000; // 5 minutes
+
+      if (cachedTokens && cacheTimestamp) {
+        const age = Date.now() - parseInt(cacheTimestamp);
+        if (age < cacheExpiry) {
+          console.log('✅ Using cached tokens list for Vault');
+          setTokens(JSON.parse(cachedTokens));
+          // Load fresh data in background
+          loadTokensFromDB();
+          return;
+        }
+      }
+
+      // Load fresh data
+      await loadTokensFromDB();
+    } catch (error) {
+      console.error('Error loading tokens:', error);
+    }
+  };
+
+  const loadTokensFromDB = async () => {
+    try {
+      const { data } = await supabase
+        .from('meme_tokens')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      const tokenList = data || [];
+      setTokens(tokenList);
+
+      // Cache the data
+      localStorage.setItem('vault_tokens_cache', JSON.stringify(tokenList));
+      localStorage.setItem('vault_tokens_cache_time', Date.now().toString());
+      console.log('💾 Cached tokens list for Vault');
+    } catch (error) {
+      console.error('Error loading tokens from DB:', error);
+    }
   };
 
   const loadTokenBalances = async () => {
