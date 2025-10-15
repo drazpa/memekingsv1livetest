@@ -247,7 +247,7 @@ export default function AdvancedChart({ token, chartData, timeframe, onTimeframe
         volumeChartRef.current = null;
       }
     }
-  }, [chartData, chartStyle, showVolume, showGrid, logScale]);
+  }, [chartData, chartStyle, showVolume, showGrid, logScale, token]);
 
   const timeframes = [
     { label: '1m', value: '1m' },

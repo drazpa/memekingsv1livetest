@@ -100,6 +100,7 @@ export default function Trade({ preselectedToken = null }) {
   const [depositMode, setDepositMode] = useState('both');
   const [showMiniAIChat, setShowMiniAIChat] = useState(false);
   const [chartViewMode, setChartViewMode] = useState('simple');
+  const [advancedChartData, setAdvancedChartData] = useState([]);
   const priceChartContainerRef = useRef(null);
   const volumeChartContainerRef = useRef(null);
   const priceChartInstanceRef = useRef(null);
@@ -194,6 +195,16 @@ export default function Trade({ preselectedToken = null }) {
   useEffect(() => {
     checkSlippageAdequacy();
   }, [amount, xrpAmount, slippage, tradeType, marketData]);
+
+  useEffect(() => {
+    if (chartViewMode === 'simple' && selectedToken && priceChartContainerRef.current && volumeChartContainerRef.current) {
+      setTimeout(() => {
+        renderChart();
+      }, 100);
+    } else if (chartViewMode === 'advanced' && selectedToken) {
+      generateChartData();
+    }
+  }, [chartViewMode]);
 
   useEffect(() => {
     if (!selectedToken) return;
@@ -399,6 +410,7 @@ export default function Trade({ preselectedToken = null }) {
       }
 
       chartDataRef.current = data;
+      setAdvancedChartData(data);
       return data;
     } catch (error) {
       console.error('Error generating chart data:', error);
@@ -2160,8 +2172,9 @@ export default function Trade({ preselectedToken = null }) {
               chartViewMode === 'advanced' ? (
                 <div className="w-full h-[600px] overflow-hidden rounded">
                   <AdvancedChart
+                    key={selectedToken?.id}
                     token={selectedToken}
-                    chartData={chartDataRef.current}
+                    chartData={advancedChartData}
                     timeframe={timeframe}
                     onTimeframeChange={setTimeframe}
                   />
