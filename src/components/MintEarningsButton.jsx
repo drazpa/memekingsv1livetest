@@ -101,17 +101,17 @@ const MintEarningsButton = ({ connectedWallet }) => {
     }
   };
 
-  if (!connectedWallet) {
+  if (!connectedWallet || unclaimedAmount === 0) {
     return null;
   }
 
   return (
     <button
       onClick={claimEarnings}
-      disabled={isClaiming || unclaimedAmount === 0}
+      disabled={isClaiming}
       className="relative px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white font-semibold rounded-lg shadow-lg hover:shadow-blue-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
       style={{
-        animation: unclaimedAmount > 0 ? 'pulse-blue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none',
+        animation: 'pulse-blue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
       }}
     >
       <style>

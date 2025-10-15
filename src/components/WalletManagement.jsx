@@ -588,7 +588,7 @@ export default function WalletManagement() {
                   </div>
                 </div>
 
-                <MintEarningsChart walletAddress={wallet.address} walletSeed={wallet.encrypted_seed} />
+                <MintEarningsChart walletAddress={wallet.address} />
 
                 {wallet.notes && (
                   <div>
