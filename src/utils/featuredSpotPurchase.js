@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import * as xrpl from 'xrpl';
+import { Buffer } from 'buffer';
 import { getClient } from './xrplClient';
 
 const FEATURED_SPOT_WALLET = 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6';
