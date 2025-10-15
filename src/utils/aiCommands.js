@@ -60,6 +60,7 @@ export const AI_COMMANDS = {
     { id: 'bot_analytics', label: 'Bot analytics', prompt: 'Show me detailed analytics for my bots' }
   ],
   MARKET: [
+    { id: 'xrp_price', label: 'XRP Price (USD)', prompt: 'What is the price of XRP?' },
     { id: 'market_overview', label: 'Market overview', prompt: 'Give me a market overview' },
     { id: 'top_gainers', label: 'Top gainers', prompt: 'Show me the top gaining tokens' },
     { id: 'top_losers', label: 'Top losers', prompt: 'Show me the biggest losing tokens' },

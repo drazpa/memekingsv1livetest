@@ -81,8 +81,15 @@ export class CommandExecutor {
       };
     }
 
+    const xrpPriceMatch = normalizedInput.match(/(?:price|cost|value)\s+(?:of\s+)?xrp(?:\s+(?:in\s+)?(?:usd|dollars?))?/);
+    if (xrpPriceMatch) {
+      return {
+        type: 'XRP_PRICE'
+      };
+    }
+
     const priceMatch = normalizedInput.match(/(?:price|cost)\s+(?:of\s+)?([a-z]+)/);
-    if (priceMatch) {
+    if (priceMatch && priceMatch[1].toLowerCase() !== 'xrp') {
       return {
         type: 'TOKEN_PRICE',
         token: priceMatch[1].toUpperCase()
@@ -133,6 +140,9 @@ export class CommandExecutor {
 
         case 'TOKEN_PRICE':
           return await this.executeTokenPrice(parsedCommand);
+
+        case 'XRP_PRICE':
+          return await this.executeXRPPrice();
 
         case 'SETUP_TRUSTLINE':
           return await this.executeSetupTrustline(parsedCommand);
@@ -556,51 +566,134 @@ export class CommandExecutor {
     }
   }
 
-  async executeTokenPrice({ token }) {
+  async executeXRPPrice() {
     try {
-      const { data: tokenData } = await supabase
-        .from('meme_tokens')
-        .select('*')
-        .ilike('currency_code', token)
-        .eq('amm_pool_created', true)
-        .single();
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true');
+      const data = await response.json();
 
-      if (!tokenData) {
+      if (!data.ripple) {
         return {
           success: false,
-          message: `Token "${token}" not found or doesn't have an active pool.`
+          message: 'Unable to fetch XRP price data at this time. Please try again.'
         };
       }
 
-      const price = tokenData.amm_xrp_amount / tokenData.amm_asset_amount;
+      const ripple = data.ripple;
+      const price = ripple.usd;
+      const change24h = ripple.usd_24h_change || 0;
+      const marketCap = ripple.usd_market_cap;
+      const volume24h = ripple.usd_24h_vol;
 
-      const { data: tradeData } = await supabase
-        .from('trade_history')
-        .select('created_at, price')
-        .eq('token_id', tokenData.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      const changeEmoji = change24h > 0 ? '📈' : change24h < 0 ? '📉' : '➡️';
+      const changeText = change24h >= 0 ? '+' : '';
 
-      let change24h = 0;
-      if (tokenData.initial_xrp_amount && tokenData.initial_asset_amount) {
-        const initialPrice = tokenData.initial_xrp_amount / tokenData.initial_asset_amount;
-        change24h = ((price - initialPrice) / initialPrice) * 100;
-      }
+      const message = `**XRP Price Information**\n\n` +
+        `💰 **Current Price:** $${price.toFixed(4)} USD\n` +
+        `${changeEmoji} **24h Change:** ${changeText}${change24h.toFixed(2)}%\n` +
+        `📊 **Market Cap:** $${(marketCap / 1e9).toFixed(2)}B USD\n` +
+        `💱 **24h Volume:** $${(volume24h / 1e9).toFixed(2)}B USD\n\n` +
+        `*Data updated in real-time from CoinGecko*`;
 
       return {
         success: true,
-        message: `${token} is currently trading at ${price.toFixed(8)} XRP${change24h !== 0 ? ` (${change24h >= 0 ? '+' : ''}${change24h.toFixed(2)}% 24h)` : ''}`,
+        message,
         data: {
-          token,
           price,
           change24h,
-          recentTrades: tradeData?.length || 0
+          marketCap,
+          volume24h,
+          source: 'CoinGecko',
+          timestamp: new Date().toISOString()
         }
       };
     } catch (error) {
       return {
         success: false,
-        message: `Failed to get price: ${error.message}`
+        message: 'I apologize, but I\'m unable to retrieve XRP price data at the moment. Please check your internet connection and try again.'
+      };
+    }
+  }
+
+  async executeTokenPrice({ token }) {
+    try {
+      const { data: cachedPrice } = await supabase
+        .from('token_price_cache')
+        .select('*')
+        .eq('currency_code', token)
+        .gte('last_updated', new Date(Date.now() - 60000).toISOString())
+        .maybeSingle();
+
+      const { data: tokenData } = await supabase
+        .from('meme_tokens')
+        .select('*')
+        .ilike('currency_code', token)
+        .eq('amm_pool_created', true)
+        .maybeSingle();
+
+      if (!tokenData) {
+        return {
+          success: false,
+          message: `I couldn't find a token with the symbol "${token}" that has an active trading pool. Please verify the token symbol and try again.`
+        };
+      }
+
+      let price, change24h = 0;
+
+      if (cachedPrice && cachedPrice.price) {
+        price = parseFloat(cachedPrice.price);
+        change24h = parseFloat(cachedPrice.change_24h || 0);
+      } else {
+        price = tokenData.amm_xrp_amount / tokenData.amm_asset_amount;
+        if (tokenData.initial_xrp_amount && tokenData.initial_asset_amount) {
+          const initialPrice = tokenData.initial_xrp_amount / tokenData.initial_asset_amount;
+          change24h = ((price - initialPrice) / initialPrice) * 100;
+        }
+      }
+
+      const xrpUsdResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd');
+      const xrpUsdData = await xrpUsdResponse.json();
+      const xrpUsdPrice = xrpUsdData.ripple?.usd || 2.50;
+      const priceUSD = price * xrpUsdPrice;
+
+      const marketCap = parseFloat(tokenData.supply) * price;
+      const marketCapUSD = marketCap * xrpUsdPrice;
+      const liquidity = parseFloat(tokenData.amm_xrp_amount || 0);
+      const liquidityUSD = liquidity * xrpUsdPrice;
+
+      const changeEmoji = change24h > 0 ? '📈' : change24h < 0 ? '📉' : '➡️';
+      const changeText = change24h >= 0 ? '+' : '';
+
+      const message = `**${tokenData.token_name} (${tokenData.currency_code}) Price**\n\n` +
+        `💰 **Current Price:**\n` +
+        `   • ${price.toFixed(8)} XRP\n` +
+        `   • $${priceUSD.toFixed(6)} USD\n\n` +
+        `${changeEmoji} **24h Change:** ${changeText}${change24h.toFixed(2)}%\n\n` +
+        `📊 **Market Stats:**\n` +
+        `   • Market Cap: ${marketCap.toFixed(2)} XRP ($${(marketCapUSD / 1e6).toFixed(2)}M)\n` +
+        `   • Liquidity: ${liquidity.toFixed(2)} XRP ($${liquidityUSD.toFixed(2)})\n` +
+        `   • Total Supply: ${parseFloat(tokenData.supply).toLocaleString()}\n\n` +
+        `*Real-time data from ${cachedPrice ? 'cache' : 'live'} pool*`;
+
+      return {
+        success: true,
+        message,
+        data: {
+          token: tokenData.currency_code,
+          tokenName: tokenData.token_name,
+          price,
+          priceUSD,
+          change24h,
+          marketCap,
+          marketCapUSD,
+          liquidity,
+          supply: tokenData.supply,
+          cached: !!cachedPrice
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `I apologize, but I encountered an error while fetching the price for ${token}. Please try again in a moment.`
       };
     }
   }
