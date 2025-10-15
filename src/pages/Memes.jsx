@@ -879,17 +879,19 @@ export default function Memes() {
       throw new Error('Connected wallet required to pay creation fee');
     }
 
-    if (connectedWallet.address === RECEIVER_ADDRESS) {
+    if (connectedWallet.address === RECEIVER_ADDRESS && walletConfigMode === 'admin') {
       return 'FEE_WAIVED_ADMIN';
     }
 
     const wallet = xrpl.Wallet.fromSeed(connectedWallet.seed);
 
+    const feeAmount = walletConfigMode === 'simple' ? '3' : '5';
+
     const payment = {
       TransactionType: 'Payment',
       Account: connectedWallet.address,
       Destination: RECEIVER_ADDRESS,
-      Amount: xrpl.xrpToDrops('5'),
+      Amount: xrpl.xrpToDrops(feeAmount),
       Memos: [{
         Memo: {
           MemoData: Buffer.from(`Token Creation Fee: ${newToken.name}`, 'utf8').toString('hex').toUpperCase()
@@ -959,6 +961,9 @@ export default function Memes() {
       if (walletConfigMode === 'admin') {
         issuerWallet = xrpl.Wallet.fromSeed(ISSUER_SEED);
         receiverWallet = xrpl.Wallet.fromSeed(RECEIVER_SEED);
+      } else if (walletConfigMode === 'simple') {
+        issuerWallet = xrpl.Wallet.fromSeed(ISSUER_SEED);
+        receiverWallet = xrpl.Wallet.fromSeed(connectedWallet.seed);
       } else {
         if (!selectedIssuerWallet || !selectedReceiverWallet) {
           throw new Error('Please select both issuer and receiver wallets');
@@ -2250,6 +2255,16 @@ export default function Memes() {
                     Admin Token
                   </button>
                   <button
+                    onClick={() => setWalletConfigMode('simple')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      walletConfigMode === 'simple'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-purple-900/20 text-purple-300 hover:bg-purple-900/40'
+                    }`}
+                  >
+                    No Issuer Access
+                  </button>
+                  <button
                     onClick={() => setWalletConfigMode('custom')}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       walletConfigMode === 'custom'
@@ -2294,8 +2309,37 @@ export default function Memes() {
                       </ul>
                     </div>
                   </div>
+                ) : walletConfigMode === 'simple' ? (
+                  <div className="space-y-3">
+                    <div className="space-y-2 text-sm text-purple-300">
+                      <p><span className="font-medium">Issuer:</span> {ISSUER_ADDRESS}</p>
+                      <p><span className="font-medium">Receiver:</span> {connectedWallet?.address || 'Connect your wallet'}</p>
+                      <p className="text-xs text-purple-400 mt-2">Tokens will be sent directly to your connected wallet</p>
+                    </div>
+                    {!connectedWallet && (
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                        <p className="text-yellow-300 text-xs font-medium">⚠️ Connected wallet required</p>
+                        <p className="text-yellow-300/80 text-xs mt-1">Connect your wallet to receive tokens and pay the 3 XRP creation fee.</p>
+                      </div>
+                    )}
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                      <p className="text-blue-300 text-xs font-medium">ℹ️ Simple Token Creation:</p>
+                      <ul className="text-blue-300/80 text-xs mt-2 space-y-1 list-disc list-inside">
+                        <li>3 XRP creation fee (lower cost for simple minting)</li>
+                        <li>Token issued by MEMEKINGS issuer (no issuer wallet access)</li>
+                        <li>Tokens sent directly to your connected wallet</li>
+                        <li>Cannot mint additional tokens later</li>
+                        <li>Perfect for one-time token launches</li>
+                        <li>Automatic trustline setup and liquidity pool creation</li>
+                      </ul>
+                    </div>
+                  </div>
                 ) : (
                   <div className="space-y-3">
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-3">
+                      <p className="text-yellow-300 text-xs font-medium">⚠️ Important Requirements</p>
+                      <p className="text-yellow-300/80 text-xs mt-1">You need TWO activated wallets (20 XRP reserve each) before proceeding. Ensure you have enough XRP for transaction fees and liquidity pool creation.</p>
+                    </div>
                     <div>
                       <label className="block text-purple-300 mb-2 text-sm">Issuer Wallet</label>
                       <select
@@ -2355,6 +2399,7 @@ export default function Memes() {
                         <li>5 XRP fee is paid from your connected wallet</li>
                         <li>Token is issued by your selected issuer wallet</li>
                         <li>Tokens are sent to your selected receiver wallet</li>
+                        <li>You retain full control and can mint more tokens later</li>
                         <li>Automatic trustline setup and liquidity pool creation</li>
                       </ul>
                     </div>
@@ -2370,6 +2415,7 @@ export default function Memes() {
                   isCreating ||
                   uploadingImage ||
                   (walletConfigMode === 'admin' && !connectedWallet) ||
+                  (walletConfigMode === 'simple' && !connectedWallet) ||
                   (walletConfigMode === 'custom' && (!selectedIssuerWallet || !selectedReceiverWallet))
                 }
                 className="btn-primary text-white px-6 py-2 rounded-lg font-medium flex-1 disabled:opacity-50"
@@ -2383,6 +2429,8 @@ export default function Memes() {
                     🚀 Create Token
                     {connectedWallet?.address === RECEIVER_ADDRESS && walletConfigMode === 'admin'
                       ? ' (Admin - Free)'
+                      : walletConfigMode === 'simple'
+                      ? ' (3 XRP)'
                       : ' (5 XRP)'}
                   </span>
                 )}
