@@ -276,25 +276,6 @@ export default function AdvancedChart({ token, chartData, timeframe, onTimeframe
     <div className="flex flex-col h-full">
       <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-purple-900/30 border-b border-purple-700/30">
         <div className="flex flex-col gap-2 w-full">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-purple-300">Timeframe:</span>
-            <div className="flex gap-1 flex-wrap">
-              {timeframes.map(tf => (
-                <button
-                  key={tf.value}
-                  onClick={() => onTimeframeChange?.(tf.value)}
-                  className={`px-2.5 py-1 text-xs rounded transition-colors ${
-                    timeframe === tf.value
-                      ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/50'
-                      : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50 border border-purple-700/30'
-                  }`}
-                >
-                  {tf.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-sm text-purple-300">Chart Type:</span>
