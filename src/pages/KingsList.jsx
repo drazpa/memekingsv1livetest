@@ -23,37 +23,20 @@ export default function KingsList() {
         .select('*')
         .order('created_at', { ascending: true });
 
-      if (tokensError) {
-        console.error('Error loading tokens:', tokensError);
-        throw tokensError;
-      }
-
-      if (!tokensData || tokensData.length === 0) {
-        console.log('No tokens found in database');
-        setKings([]);
-        setLoading(false);
-        return;
-      }
-
-      console.log(`Found ${tokensData.length} tokens, checking holders...`);
+      if (tokensError) throw tokensError;
 
       const kingsData = [];
-      for (const token of tokensData) {
-        const { data: holderData, error: holderError } = await supabase
+      for (const token of tokensData || []) {
+        const { data: holderData } = await supabase
           .from('token_holders')
           .select('*')
           .eq('token_id', token.id)
           .order('rank', { ascending: true })
           .limit(1);
 
-        if (holderError) {
-          console.error(`Error loading holder for token ${token.name}:`, holderError);
-          continue;
-        }
-
         if (holderData && holderData.length > 0) {
           const holder = holderData[0];
-          const balance = parseFloat(holder.balance) || 0;
+          const balance = parseFloat(holder.balance);
           const price = parseFloat(token.current_price) || 0;
           const xrpValue = balance * price;
 
@@ -65,11 +48,10 @@ export default function KingsList() {
         }
       }
 
-      console.log(`Found ${kingsData.length} kings with holder data`);
       setKings(kingsData);
     } catch (error) {
       console.error('Error loading kings:', error);
-      toast.error(`Failed to load kings list: ${error.message}`);
+      toast.error('Failed to load kings list');
     } finally {
       setLoading(false);
     }
@@ -133,7 +115,7 @@ export default function KingsList() {
         }
 
         await loadKings();
-        toast.success(`Updated holders for ${token.token_name || token.name}`);
+        toast.success(`Updated holders for ${token.name}`);
       } finally {
         await client.disconnect();
       }
@@ -146,39 +128,19 @@ export default function KingsList() {
   };
 
   const refreshAllHolders = async () => {
-    if (loading) {
-      console.log('Already loading, skipping refresh');
-      return;
-    }
-
     setLoading(true);
-
-    try {
-      if (kings.length === 0) {
-        console.log('No kings to refresh, loading kings first...');
-        await loadKings();
-        return;
-      }
-
-      for (const king of kings) {
-        await refreshTokenHolders(king.token.id);
-      }
-      toast.success('All token holders updated!');
-    } catch (error) {
-      console.error('Error in refreshAllHolders:', error);
-      toast.error('Failed to refresh all holders');
-    } finally {
-      setLoading(false);
+    for (const king of kings) {
+      await refreshTokenHolders(king.token.id);
     }
+    toast.success('All token holders updated!');
   };
 
   const filteredKings = kings.filter(king => {
     if (!searchQuery) return true;
     const token = king.token;
-    const tokenName = token.token_name || token.name || '';
-    const tokenSymbol = token.currency_code || token.symbol || '';
-    return tokenName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           tokenSymbol.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!token.name || !token.symbol) return false;
+    return token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           token.symbol.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const totalXrpValue = filteredKings.reduce((sum, king) => sum + king.xrpValue, 0);
@@ -295,8 +257,8 @@ export default function KingsList() {
                       <div className="flex items-center gap-3">
                         <TokenIcon token={king.token} size="md" />
                         <div>
-                          <div className="text-white font-bold">{king.token.token_name || king.token.name}</div>
-                          <div className="text-gray-400 text-sm">{king.token.currency_code || king.token.symbol}</div>
+                          <div className="text-white font-bold">{king.token.name}</div>
+                          <div className="text-gray-400 text-sm">{king.token.symbol}</div>
                         </div>
                       </div>
                     </td>
@@ -320,7 +282,7 @@ export default function KingsList() {
                           maximumFractionDigits: 2
                         })}
                       </div>
-                      <div className="text-gray-500 text-xs">{king.token.currency_code || king.token.symbol}</div>
+                      <div className="text-gray-500 text-xs">{king.token.symbol}</div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="text-green-400 font-bold">

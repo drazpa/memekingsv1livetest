@@ -11,7 +11,6 @@ import SlippageRetryModal from '../components/SlippageRetryModal';
 import PoolHistoryModal from '../components/PoolHistoryModal';
 import TradeHistory from '../components/TradeHistory';
 import MiniAIChat from '../components/MiniAIChat';
-import AdvancedChart from '../components/AdvancedChart';
 import { onTokenUpdate } from '../utils/tokenEvents';
 import { XRPScanLink } from '../components/XRPScanLink';
 import { getXRPBalance } from '../utils/xrplBalance';
@@ -58,7 +57,7 @@ export default function Trade({ preselectedToken = null }) {
   const [tokenBalance, setTokenBalance] = useState('0');
   const [xrpBalance, setXrpBalance] = useState(0);
   const [loadingBalance, setLoadingBalance] = useState(false);
-  const [chartType, setChartType] = useState('baseline');
+  const [chartType, setChartType] = useState('candlestick');
   const [timeframe, setTimeframe] = useState('15m');
   const [marketData, setMarketData] = useState(null);
   const [livePrice, setLivePrice] = useState(0);
@@ -99,8 +98,6 @@ export default function Trade({ preselectedToken = null }) {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [depositMode, setDepositMode] = useState('both');
   const [showMiniAIChat, setShowMiniAIChat] = useState(false);
-  const [chartViewMode, setChartViewMode] = useState('simple');
-  const [advancedChartData, setAdvancedChartData] = useState([]);
   const priceChartContainerRef = useRef(null);
   const volumeChartContainerRef = useRef(null);
   const priceChartInstanceRef = useRef(null);
@@ -195,16 +192,6 @@ export default function Trade({ preselectedToken = null }) {
   useEffect(() => {
     checkSlippageAdequacy();
   }, [amount, xrpAmount, slippage, tradeType, marketData]);
-
-  useEffect(() => {
-    if (chartViewMode === 'simple' && selectedToken && priceChartContainerRef.current && volumeChartContainerRef.current) {
-      setTimeout(() => {
-        renderChart();
-      }, 100);
-    } else if (chartViewMode === 'advanced' && selectedToken) {
-      generateChartData();
-    }
-  }, [chartViewMode]);
 
   useEffect(() => {
     if (!selectedToken) return;
@@ -410,7 +397,6 @@ export default function Trade({ preselectedToken = null }) {
       }
 
       chartDataRef.current = data;
-      setAdvancedChartData(data);
       return data;
     } catch (error) {
       console.error('Error generating chart data:', error);
@@ -2099,59 +2085,31 @@ export default function Trade({ preselectedToken = null }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-1 border border-purple-500/30 rounded-lg p-0.5">
-                    <button
-                      onClick={() => setChartViewMode('simple')}
-                      className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                        chartViewMode === 'simple'
-                          ? 'bg-purple-600 text-white'
-                          : 'text-purple-300 hover:text-purple-100'
-                      }`}
-                      title="Simple Chart View"
-                    >
-                      📊 Simple
-                    </button>
-                    <button
-                      onClick={() => setChartViewMode('advanced')}
-                      className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                        chartViewMode === 'advanced'
-                          ? 'bg-purple-600 text-white'
-                          : 'text-purple-300 hover:text-purple-100'
-                      }`}
-                      title="Advanced Chart View"
-                    >
-                      📈 Advanced
-                    </button>
-                  </div>
-                  {chartViewMode === 'simple' && (
-                    <>
-                      <select
-                        value={timeframe}
-                        onChange={(e) => setTimeframe(e.target.value)}
-                        className="input px-2 py-1 text-xs text-purple-200"
-                      >
-                        <option value="5m">5m</option>
-                        <option value="15m">15m</option>
-                        <option value="30m">30m</option>
-                        <option value="1h">1h</option>
-                        <option value="4h">4h</option>
-                        <option value="1d">1D</option>
-                      </select>
-                      <select
-                        value={chartType}
-                        onChange={(e) => setChartType(e.target.value)}
-                        className="input px-2 py-1 text-xs text-purple-200"
-                      >
-                        <option value="candlestick">🕯 Candles</option>
-                        <option value="bars">📊 Bars</option>
-                        <option value="hollow">⬜ Hollow</option>
-                        <option value="heikin">🎴 Heikin Ashi</option>
-                        <option value="line">📈 Line</option>
-                        <option value="area">📉 Area</option>
-                        <option value="baseline">📏 Baseline</option>
-                      </select>
-                    </>
-                  )}
+                  <select
+                    value={timeframe}
+                    onChange={(e) => setTimeframe(e.target.value)}
+                    className="input px-2 py-1 text-xs text-purple-200"
+                  >
+                    <option value="5m">5m</option>
+                    <option value="15m">15m</option>
+                    <option value="30m">30m</option>
+                    <option value="1h">1h</option>
+                    <option value="4h">4h</option>
+                    <option value="1d">1D</option>
+                  </select>
+                  <select
+                    value={chartType}
+                    onChange={(e) => setChartType(e.target.value)}
+                    className="input px-2 py-1 text-xs text-purple-200"
+                  >
+                    <option value="candlestick">🕯 Candles</option>
+                    <option value="bars">📊 Bars</option>
+                    <option value="hollow">⬜ Hollow</option>
+                    <option value="heikin">🎴 Heikin Ashi</option>
+                    <option value="line">📈 Line</option>
+                    <option value="area">📉 Area</option>
+                    <option value="baseline">📏 Baseline</option>
+                  </select>
                   <button
                     onClick={async () => {
                       await fetchMarketData(true);
@@ -2169,22 +2127,10 @@ export default function Trade({ preselectedToken = null }) {
               </div>
             )}
             {selectedToken ? (
-              chartViewMode === 'advanced' ? (
-                <div className="w-full h-[600px] overflow-hidden rounded">
-                  <AdvancedChart
-                    key={selectedToken?.id}
-                    token={selectedToken}
-                    chartData={advancedChartData}
-                    timeframe={timeframe}
-                    onTimeframeChange={setTimeframe}
-                  />
-                </div>
-              ) : (
-                <>
-                  <div ref={priceChartContainerRef} className="w-full h-[300px] sm:h-[400px] lg:h-[500px] overflow-hidden bg-purple-900/20 rounded" />
-                  <div ref={volumeChartContainerRef} className="w-full h-[80px] sm:h-[100px] lg:h-[120px] overflow-hidden bg-purple-900/20 rounded mt-1" />
-                </>
-              )
+              <>
+                <div ref={priceChartContainerRef} className="w-full h-[300px] sm:h-[400px] lg:h-[500px] overflow-hidden bg-purple-900/20 rounded" />
+                <div ref={volumeChartContainerRef} className="w-full h-[80px] sm:h-[100px] lg:h-[120px] overflow-hidden bg-purple-900/20 rounded mt-1" />
+              </>
             ) : (
               <div className="w-full h-[380px] sm:h-[500px] lg:h-[620px] flex items-center justify-center bg-purple-900/20 rounded">
                 <div className="text-center text-purple-400">
