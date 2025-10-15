@@ -323,7 +323,7 @@ export default function WalletManagement() {
       const { requestWithRetry } = await import('../utils/xrplClient');
 
       let balance = 0;
-      let network = 'testnet';
+      let network = 'mainnet';
 
       try {
         const accountInfo = await requestWithRetry({
@@ -379,7 +379,7 @@ export default function WalletManagement() {
         encrypted_seed: importedWalletData.seed,
         purpose: 'trading',
         notes: `Imported from seed`,
-        network: importedWalletData.network || 'testnet',
+        network: importedWalletData.network || 'mainnet',
         balance_xrp: importedWalletData.balance,
         is_favorite: false,
         created_at: new Date().toISOString(),
@@ -1091,8 +1091,8 @@ export default function WalletManagement() {
                     <div className="font-medium mb-2">ℹ️ About Importing</div>
                     <ul className="list-disc list-inside space-y-1">
                       <li>This will import an existing XRPL wallet using its seed phrase</li>
-                      <li>The wallet will be checked on the testnet network</li>
-                      <li>Your seed phrase is securely stored in the database</li>
+                      <li>The wallet will be checked on the mainnet network</li>
+                      <li>Your seed phrase is securely stored locally in your browser</li>
                       <li>You'll get full control over the imported wallet</li>
                     </ul>
                   </div>
