@@ -13,6 +13,8 @@ import { getRandomWord } from '../utils/dictionary';
 import { emitTokenUpdate } from '../utils/tokenEvents';
 import { setFeaturedPosition, promoteToFeatured } from '../utils/featuredTokens';
 import { CategoryBadge, calculateDaysOnMarket, CATEGORIES } from '../utils/categoryUtils';
+import FeaturedSpotModal from '../components/FeaturedSpotModal';
+import TokenSelectionModal from '../components/TokenSelectionModal';
 
 const ISSUER_SEED = 'sEd7bAfzqZWKxaatJpoWzTvENyaTg1Y';
 const ISSUER_ADDRESS = 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6';
@@ -98,6 +100,9 @@ export default function Dashboard() {
   const [trustDropdownOpen, setTrustDropdownOpen] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [volumeHistory, setVolumeHistory] = useState({});
+  const [showTokenSelectionModal, setShowTokenSelectionModal] = useState(false);
+  const [showFeaturedSpotModal, setShowFeaturedSpotModal] = useState(false);
+  const [selectedTokenForFeatured, setSelectedTokenForFeatured] = useState(null);
   const TOKENS_PER_PAGE = 100;
 
   useEffect(() => {
@@ -1785,7 +1790,21 @@ export default function Dashboard() {
       {topTokens.length > 0 && (
         <div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-            <h3 className="text-xl sm:text-2xl font-bold text-purple-200">🔥 Top 3 Featured</h3>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h3 className="text-xl sm:text-2xl font-bold text-purple-200">🔥 Top 3 Featured</h3>
+              <button
+                onClick={() => {
+                  if (!connectedWallet) {
+                    toast.error('Please connect your wallet first');
+                    return;
+                  }
+                  setShowTokenSelectionModal(true);
+                }}
+                className="bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
+              >
+                ⭐ Get Featured
+              </button>
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setTopViewMode('grid')}
@@ -2974,6 +2993,28 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      <TokenSelectionModal
+        isOpen={showTokenSelectionModal}
+        onClose={() => setShowTokenSelectionModal(false)}
+        tokens={tokens}
+        onSelectToken={(token) => {
+          setSelectedTokenForFeatured(token);
+          setShowTokenSelectionModal(false);
+          setShowFeaturedSpotModal(true);
+        }}
+      />
+
+      <FeaturedSpotModal
+        isOpen={showFeaturedSpotModal}
+        onClose={() => {
+          setShowFeaturedSpotModal(false);
+          setSelectedTokenForFeatured(null);
+        }}
+        token={selectedTokenForFeatured}
+        walletSeed={connectedWallet?.seed}
+        walletAddress={connectedWallet?.address}
+      />
     </div>
   );
 }
