@@ -482,45 +482,45 @@ export default function XRPRewards() {
         <div className="glass rounded-lg p-6">
           <h3 className="text-xl font-bold text-purple-200 mb-4">💡 How to Earn XRP Rewards</h3>
           <div className="space-y-4">
-            <div className="flex items-start gap-3 p-3 bg-purple-900/20 rounded-lg border border-purple-500/20 opacity-70">
+            <div className="flex items-start gap-3 p-3 bg-purple-900/20 rounded-lg border border-purple-500/20">
               <div className="text-2xl">🪙</div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <div className="text-purple-200 font-semibold">Create Tokens</div>
-                  <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30">Coming Soon</span>
-                </div>
+              <div>
+                <div className="text-purple-200 font-semibold">Create Tokens</div>
                 <div className="text-purple-400 text-sm">Earn 0.10 XRP reward when you create new tokens on the platform</div>
-                <div className="text-yellow-400 text-xs mt-1">⏳ This reward system will be activated soon</div>
+                <div className="text-green-400 text-xs mt-1">✓ Instant reward upon token creation</div>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-3 bg-blue-900/20 rounded-lg border border-blue-500/20 opacity-70">
+            <div className="flex items-start gap-3 p-3 bg-blue-900/20 rounded-lg border border-blue-500/20">
               <div className="text-2xl">🤖</div>
+              <div>
+                <div className="text-blue-200 font-semibold">Create Trading Bots</div>
+                <div className="text-blue-400 text-sm">Get 0.10 XRP reward for each trading bot you create</div>
+                <div className="text-green-400 text-xs mt-1">✓ Automated trading + rewards</div>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 bg-green-900/20 rounded-lg border border-green-500/20 opacity-70">
+              <div className="text-2xl">💱</div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <div className="text-blue-200 font-semibold">Create Trading Bots</div>
+                  <div className="text-green-200 font-semibold">Execute Trades</div>
                   <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30">Coming Soon</span>
                 </div>
-                <div className="text-blue-400 text-sm">Get 0.10 XRP reward for each trading bot you create</div>
+                <div className="text-green-400 text-sm">Earn rewards for trading activity on the platform</div>
                 <div className="text-yellow-400 text-xs mt-1">⏳ This reward system will be activated soon</div>
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-3 bg-green-900/20 rounded-lg border border-green-500/20">
-              <div className="text-2xl">💱</div>
-              <div>
-                <div className="text-green-200 font-semibold">Execute Trades</div>
-                <div className="text-green-400 text-sm">Earn rewards for trading activity on the platform</div>
-                <div className="text-green-400 text-xs mt-1">✓ Trade more, earn more</div>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-3 p-3 bg-yellow-900/20 rounded-lg border border-yellow-500/20">
+            <div className="flex items-start gap-3 p-3 bg-yellow-900/20 rounded-lg border border-yellow-500/20 opacity-70">
               <div className="text-2xl">🎯</div>
-              <div>
-                <div className="text-yellow-200 font-semibold">Milestones & Referrals</div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <div className="text-yellow-200 font-semibold">Milestones & Referrals</div>
+                  <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30">Coming Soon</span>
+                </div>
                 <div className="text-yellow-400 text-sm">Unlock bonus rewards by reaching platform milestones</div>
-                <div className="text-green-400 text-xs mt-1">✓ Extra earning opportunities</div>
+                <div className="text-yellow-400 text-xs mt-1">⏳ This reward system will be activated soon</div>
               </div>
             </div>
           </div>
@@ -529,16 +529,13 @@ export default function XRPRewards() {
         <div className="glass rounded-lg p-6">
           <h3 className="text-xl font-bold text-purple-200 mb-4">📈 Your Earning Activity</h3>
           <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-purple-900/20 rounded-lg border border-purple-500/20 opacity-70">
+            <div className="flex items-center justify-between p-4 bg-purple-900/20 rounded-lg border border-purple-500/20">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center text-2xl">
                   🪙
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-purple-200 font-semibold">Tokens Created</div>
-                    <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30">Coming Soon</span>
-                  </div>
+                  <div className="text-purple-200 font-semibold">Tokens Created</div>
                   <div className="text-purple-400 text-sm">{earningStats.tokensCreated} tokens (0.10 XRP each)</div>
                 </div>
               </div>
@@ -552,16 +549,13 @@ export default function XRPRewards() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-blue-900/20 rounded-lg border border-blue-500/20 opacity-70">
+            <div className="flex items-center justify-between p-4 bg-blue-900/20 rounded-lg border border-blue-500/20">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-blue-500/20 flex items-center justify-center text-2xl">
                   🤖
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-blue-200 font-semibold">Bots Created</div>
-                    <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30">Coming Soon</span>
-                  </div>
+                  <div className="text-blue-200 font-semibold">Bots Created</div>
                   <div className="text-blue-400 text-sm">{earningStats.botsCreated} bots (0.10 XRP each)</div>
                 </div>
               </div>
@@ -575,13 +569,16 @@ export default function XRPRewards() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-green-900/20 rounded-lg border border-green-500/20">
+            <div className="flex items-center justify-between p-4 bg-green-900/20 rounded-lg border border-green-500/20 opacity-70">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-green-500/20 flex items-center justify-center text-2xl">
                   💱
                 </div>
                 <div>
-                  <div className="text-green-200 font-semibold">Trades Executed</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-green-200 font-semibold">Trades Executed</div>
+                    <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30">Coming Soon</span>
+                  </div>
                   <div className="text-green-400 text-sm">{earningStats.tradesExecuted} trades</div>
                 </div>
               </div>
@@ -595,13 +592,16 @@ export default function XRPRewards() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-yellow-900/20 rounded-lg border border-yellow-500/20">
+            <div className="flex items-center justify-between p-4 bg-yellow-900/20 rounded-lg border border-yellow-500/20 opacity-70">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-lg bg-yellow-500/20 flex items-center justify-center text-2xl">
                   🎯
                 </div>
                 <div>
-                  <div className="text-yellow-200 font-semibold">Other Rewards</div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-yellow-200 font-semibold">Other Rewards</div>
+                    <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full border border-yellow-500/30">Coming Soon</span>
+                  </div>
                   <div className="text-yellow-400 text-sm">Milestones & bonuses</div>
                 </div>
               </div>
