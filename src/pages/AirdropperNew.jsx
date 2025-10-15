@@ -121,40 +121,48 @@ export default function Airdropper() {
     if (!connectedWallet) return;
 
     try {
-      console.log('Loading wallet tokens for:', connectedWallet.address);
+      console.log('Loading cached wallet tokens for:', connectedWallet.address);
 
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
+      const { data, error } = await supabase
+        .from('token_holdings_cache')
+        .select(`
+          *,
+          meme_tokens:token_id (
+            currency_code,
+            issuer_address,
+            token_name,
+            image_url
+          )
+        `)
+        .eq('wallet_address', connectedWallet.address)
+        .gt('balance', 0)
+        .order('balance', { ascending: false });
 
-      try {
-        const response = await client.request({
-          command: 'account_lines',
-          account: connectedWallet.address,
-          ledger_index: 'validated'
+      if (error) {
+        console.error('Error loading cached tokens:', error);
+        setAllTokens([]);
+        return;
+      }
+
+      console.log('Loaded cached token holdings:', data?.length || 0);
+
+      const formattedTokens = (data || [])
+        .filter(holding => holding.meme_tokens)
+        .map(holding => {
+          const token = holding.meme_tokens;
+          return {
+            value: `${token.currency_code}:${token.issuer_address}`,
+            label: `${token.currency_code} ${token.token_name ? '- ' + token.token_name : ''} (Balance: ${parseFloat(holding.balance).toFixed(2)})`,
+            currency_code: token.currency_code,
+            issuer_address: token.issuer_address,
+            balance: parseFloat(holding.balance),
+            token_name: token.token_name,
+            image_url: token.image_url
+          };
         });
 
-        await client.disconnect();
-
-        const lines = response.result.lines || [];
-        console.log('Loaded wallet token lines:', lines.length);
-
-        const formattedTokens = lines
-          .filter(line => parseFloat(line.balance) > 0)
-          .map(line => ({
-            value: `${line.currency}:${line.account}`,
-            label: `${line.currency} (Balance: ${parseFloat(line.balance).toFixed(2)})`,
-            currency_code: line.currency,
-            issuer_address: line.account,
-            balance: parseFloat(line.balance)
-          }))
-          .sort((a, b) => b.balance - a.balance);
-
-        console.log('Setting allTokens with', formattedTokens.length, 'tokens');
-        setAllTokens(formattedTokens);
-      } catch (err) {
-        await client.disconnect();
-        throw err;
-      }
+      console.log('Setting allTokens with', formattedTokens.length, 'tokens');
+      setAllTokens(formattedTokens);
     } catch (error) {
       console.error('Error loading wallet tokens:', error);
       setAllTokens([]);
