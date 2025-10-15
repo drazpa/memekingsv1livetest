@@ -874,7 +874,7 @@ export default function Memes() {
     setNewToken({ ...newToken, image: file });
   };
 
-  const payCreationFee = async () => {
+  const payCreationFee = async (client) => {
     if (!connectedWallet) {
       throw new Error('Connected wallet required to pay creation fee');
     }
@@ -883,8 +883,6 @@ export default function Memes() {
       return 'FEE_WAIVED_ADMIN';
     }
 
-    const { getClient } = await import('../utils/xrplClient');
-    const client = await getClient();
     const wallet = xrpl.Wallet.fromSeed(connectedWallet.seed);
 
     const payment = {
@@ -943,16 +941,19 @@ export default function Memes() {
     setProgressSteps(steps);
     setCurrentProgressStep(0);
 
+    let client;
     try {
       setCurrentProgressStep(0);
-      const feeHash = await payCreationFee();
+
+      const { getClient } = await import('../utils/xrplClient');
+      client = await getClient();
+
+      const feeHash = await payCreationFee(client);
       const updatedSteps0 = [...steps];
       updatedSteps0[0] = { ...updatedSteps0[0], txHash: feeHash };
       setProgressSteps(updatedSteps0);
 
       setCurrentProgressStep(1);
-      const client = new xrpl.Client('wss://xrplcluster.com');
-      await client.connect();
 
       let issuerWallet, receiverWallet;
       if (walletConfigMode === 'admin') {
@@ -983,7 +984,6 @@ export default function Memes() {
           };
           setProgressSteps(errorStep);
           setCanCloseProgress(true);
-          await client.disconnect();
           setIsCreating(false);
           return;
         }
@@ -1004,7 +1004,6 @@ export default function Memes() {
           };
           setProgressSteps(errorStep);
           setCanCloseProgress(true);
-          await client.disconnect();
           setIsCreating(false);
           return;
         }
@@ -1166,7 +1165,6 @@ export default function Memes() {
         currentStep++;
       }
 
-      await client.disconnect();
       setCurrentProgressStep(currentStep);
       setCanCloseProgress(true);
 
