@@ -9,7 +9,7 @@ import BotTrader from './pages/BotTrader';
 import Vault from './pages/Vault';
 import MyTokens from './pages/MyTokens';
 import XRPRewards from './pages/XRPRewards';
-import Airdropper from './pages/Airdropper';
+import Airdropper from './pages/AirdropperNew';
 import Analytics from './pages/Analytics';
 import Top10 from './pages/Top10';
 import KingsList from './pages/KingsList';
