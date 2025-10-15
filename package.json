@@ -1,6 +1,7 @@
 {
-  "name": "xrpl-simple-js-scripts",
+  "name": "memekings",
   "version": "1.0.0",
+  "description": "XRP Ledger token trading platform",
   "type": "module",
   "scripts": {
     "dev": "vite",
