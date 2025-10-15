@@ -319,39 +319,68 @@ export default function WalletManagement() {
     setImportedWalletData(null);
 
     try {
-      const wallet = xrpl.Wallet.fromSeed(importSeedInput.trim());
-      const { requestWithRetry } = await import('../utils/xrplClient');
+      console.log('Starting wallet import...');
+
+      let wallet;
+      try {
+        wallet = xrpl.Wallet.fromSeed(importSeedInput.trim());
+        console.log('Wallet created from seed:', wallet.address);
+      } catch (seedError) {
+        console.error('Invalid seed:', seedError);
+        throw new Error('Invalid seed phrase format');
+      }
 
       let balance = 0;
       let network = 'mainnet';
 
       try {
-        const accountInfo = await requestWithRetry({
-          command: 'account_info',
-          account: wallet.address,
-          ledger_index: 'validated'
-        });
+        console.log('Fetching account info from XRPL...');
+        const { requestWithRetry } = await import('../utils/xrplClient');
+
+        const accountInfo = await Promise.race([
+          requestWithRetry({
+            command: 'account_info',
+            account: wallet.address,
+            ledger_index: 'validated'
+          }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout fetching account info')), 15000)
+          )
+        ]);
+
         balance = parseFloat(accountInfo.result.account_data.Balance) / 1000000;
+        console.log('Account balance:', balance);
       } catch (error) {
-        if (error.data?.error !== 'actNotFound') {
+        console.log('Account fetch error:', error.message);
+        if (error.data?.error === 'actNotFound') {
+          console.log('Account not found on ledger, setting balance to 0');
+          balance = 0;
+        } else if (error.message === 'Timeout fetching account info') {
+          console.error('Timeout - proceeding with 0 balance');
+          balance = 0;
+        } else {
           console.error('Error fetching account info:', error);
+          balance = 0;
         }
       }
 
-      setImportedWalletData({
+      const walletData = {
         address: wallet.address,
         seed: wallet.seed,
         publicKey: wallet.publicKey,
         balance: balance,
         network: network
-      });
+      };
 
+      console.log('Setting wallet data:', walletData);
+      setImportedWalletData(walletData);
       toast.success('Wallet imported successfully!');
     } catch (error) {
-      console.error('Error importing wallet:', error);
-      toast.error('Failed to import wallet: Invalid seed phrase');
+      console.error('Import failed:', error);
+      toast.error(error.message || 'Failed to import wallet');
       setImportedWalletData(null);
     } finally {
+      console.log('Import process complete, clearing loading state');
       setImportingSeed(false);
     }
   };
