@@ -1122,16 +1122,6 @@ export default function Memes() {
         .single();
 
       if (insertError) throw insertError;
-
-      await supabase
-        .from('mint_earnings')
-        .insert([{
-          wallet_address: receiverWallet.address,
-          token_id: insertedToken.id,
-          amount: 0.10,
-          claimed: false
-        }]);
-
       currentStep++;
 
       if (parseFloat(newToken.xrpLocked) > 0) {
