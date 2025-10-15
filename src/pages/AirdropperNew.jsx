@@ -288,6 +288,93 @@ export default function Airdropper() {
     }
   };
 
+  const startCampaign = async (campaignId) => {
+    try {
+      const { error } = await supabase
+        .from('airdrop_campaigns')
+        .update({
+          status: 'running',
+          started_at: new Date().toISOString()
+        })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      await supabase.from('airdrop_logs').insert({
+        campaign_id: campaignId,
+        log_type: 'info',
+        message: 'Campaign started'
+      });
+
+      toast.success('Campaign started!');
+      loadCampaigns();
+      if (selectedCampaign?.id === campaignId) {
+        loadCampaignDetails(campaignId);
+      }
+    } catch (error) {
+      console.error('Error starting campaign:', error);
+      toast.error('Failed to start campaign');
+    }
+  };
+
+  const pauseCampaign = async (campaignId) => {
+    try {
+      const { error } = await supabase
+        .from('airdrop_campaigns')
+        .update({
+          status: 'paused',
+          paused_at: new Date().toISOString()
+        })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      await supabase.from('airdrop_logs').insert({
+        campaign_id: campaignId,
+        log_type: 'warning',
+        message: 'Campaign paused'
+      });
+
+      toast.success('Campaign paused');
+      loadCampaigns();
+      if (selectedCampaign?.id === campaignId) {
+        loadCampaignDetails(campaignId);
+      }
+    } catch (error) {
+      console.error('Error pausing campaign:', error);
+      toast.error('Failed to pause campaign');
+    }
+  };
+
+  const stopCampaign = async (campaignId) => {
+    try {
+      const { error } = await supabase
+        .from('airdrop_campaigns')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      await supabase.from('airdrop_logs').insert({
+        campaign_id: campaignId,
+        log_type: 'info',
+        message: 'Campaign stopped by user'
+      });
+
+      toast.success('Campaign stopped');
+      loadCampaigns();
+      if (selectedCampaign?.id === campaignId) {
+        loadCampaignDetails(campaignId);
+      }
+    } catch (error) {
+      console.error('Error stopping campaign:', error);
+      toast.error('Failed to stop campaign');
+    }
+  };
+
   const createCampaign = async () => {
     if (!newCampaign.name.trim()) {
       toast.error('Please enter a campaign name');
@@ -534,6 +621,63 @@ export default function Airdropper() {
           <div className="lg:col-span-2 space-y-6">
             {selectedCampaign ? (
               <>
+                <div className="bg-purple-900/20 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                    <div>
+                      <h2 className="text-2xl font-bold mb-1">{selectedCampaign.name}</h2>
+                      <p className="text-sm text-slate-400">Campaign Controls</p>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {selectedCampaign.status === 'pending' && (
+                        <button
+                          onClick={() => startCampaign(selectedCampaign.id)}
+                          className="px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl font-medium hover:shadow-lg hover:shadow-green-500/50 transition-all flex items-center gap-2"
+                        >
+                          <span>▶️</span>
+                          <span>Start</span>
+                        </button>
+                      )}
+
+                      {selectedCampaign.status === 'running' && (
+                        <button
+                          onClick={() => pauseCampaign(selectedCampaign.id)}
+                          className="px-5 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl font-medium hover:shadow-lg hover:shadow-yellow-500/50 transition-all flex items-center gap-2"
+                        >
+                          <span>⏸️</span>
+                          <span>Pause</span>
+                        </button>
+                      )}
+
+                      {selectedCampaign.status === 'paused' && (
+                        <button
+                          onClick={() => startCampaign(selectedCampaign.id)}
+                          className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/50 transition-all flex items-center gap-2"
+                        >
+                          <span>▶️</span>
+                          <span>Resume</span>
+                        </button>
+                      )}
+
+                      {(selectedCampaign.status === 'running' || selectedCampaign.status === 'paused') && (
+                        <button
+                          onClick={() => stopCampaign(selectedCampaign.id)}
+                          className="px-5 py-2.5 bg-gradient-to-r from-red-500 to-pink-500 rounded-xl font-medium hover:shadow-lg hover:shadow-red-500/50 transition-all flex items-center gap-2"
+                        >
+                          <span>⏹️</span>
+                          <span>Stop</span>
+                        </button>
+                      )}
+
+                      {selectedCampaign.status === 'completed' && (
+                        <div className="px-5 py-2.5 bg-gradient-to-r from-purple-500/20 to-blue-500/20 border border-purple-500/50 rounded-xl flex items-center gap-2">
+                          <span>✅</span>
+                          <span className="font-medium">Completed</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <AirdropAnalytics campaign={selectedCampaign} transactions={transactions} recipients={recipients} />
 
                 <div className="bg-purple-900/20 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-6">
