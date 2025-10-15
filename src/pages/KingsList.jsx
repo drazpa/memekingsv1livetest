@@ -25,27 +25,90 @@ export default function KingsList() {
 
       if (tokensError) throw tokensError;
 
+      const client = new Client('wss://xrplcluster.com');
+      await client.connect();
+
       const kingsData = [];
-      for (const token of tokensData || []) {
-        const { data: holderData } = await supabase
-          .from('token_holders')
-          .select('*')
-          .eq('token_id', token.id)
-          .order('rank', { ascending: true })
-          .limit(1);
+      try {
+        for (const token of tokensData || []) {
+          try {
+            // First try to get from cache
+            const { data: holderData } = await supabase
+              .from('token_holders')
+              .select('*')
+              .eq('token_id', token.id)
+              .order('rank', { ascending: true })
+              .limit(1);
 
-        if (holderData && holderData.length > 0) {
-          const holder = holderData[0];
-          const balance = parseFloat(holder.balance);
-          const price = parseFloat(token.current_price) || 0;
-          const xrpValue = balance * price;
+            let holder = holderData && holderData.length > 0 ? holderData[0] : null;
 
-          kingsData.push({
-            token,
-            holder,
-            xrpValue
-          });
+            // If no cached data, fetch from blockchain
+            if (!holder) {
+              const response = await client.request({
+                command: 'account_lines',
+                account: token.issuer_address,
+                peer: undefined,
+                ledger_index: 'validated'
+              });
+
+              const trustlines = response.result.lines || [];
+              if (trustlines.length > 0) {
+                // Sort by balance descending
+                trustlines.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
+
+                const topLine = trustlines[0];
+                const balance = parseFloat(topLine.balance);
+
+                if (balance > 0) {
+                  const totalSupply = parseFloat(token.supply) || parseFloat(token.initial_supply) || 0;
+                  const percentage = totalSupply > 0 ? (balance / totalSupply) * 100 : 0;
+                  const receiverWallet = token.receiver_address;
+
+                  // Create holder object
+                  holder = {
+                    holder_address: topLine.account,
+                    balance: balance,
+                    percentage: percentage,
+                    is_developer_wallet: topLine.account === receiverWallet,
+                    rank: 1
+                  };
+
+                  // Cache it for next time
+                  await supabase
+                    .from('token_holders')
+                    .upsert({
+                      token_id: token.id,
+                      holder_address: topLine.account,
+                      balance: balance,
+                      percentage: percentage,
+                      is_developer_wallet: topLine.account === receiverWallet,
+                      rank: 1,
+                      last_updated: new Date().toISOString()
+                    }, {
+                      onConflict: 'token_id,holder_address'
+                    });
+                }
+              }
+            }
+
+            if (holder) {
+              const balance = parseFloat(holder.balance);
+              const price = parseFloat(token.current_price) || 0;
+              const xrpValue = balance * price;
+
+              kingsData.push({
+                token,
+                holder,
+                xrpValue
+              });
+            }
+          } catch (tokenError) {
+            console.error(`Error loading holder for token ${token.token_name}:`, tokenError);
+            // Continue to next token
+          }
         }
+      } finally {
+        await client.disconnect();
       }
 
       setKings(kingsData);
@@ -65,7 +128,7 @@ export default function KingsList() {
       if (!king) return;
 
       const token = king.token;
-      const receiverWallet = localStorage.getItem('memekings_receiver');
+      const receiverWallet = token.receiver_address;
 
       const client = new Client('wss://xrplcluster.com');
       await client.connect();
@@ -79,7 +142,7 @@ export default function KingsList() {
         });
 
         const trustlines = response.result.lines || [];
-        const totalSupply = parseFloat(token.initial_supply) || 0;
+        const totalSupply = parseFloat(token.supply) || parseFloat(token.initial_supply) || 0;
         const holdersToInsert = [];
 
         trustlines.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
@@ -115,7 +178,7 @@ export default function KingsList() {
         }
 
         await loadKings();
-        toast.success(`Updated holders for ${token.name}`);
+        toast.success(`Updated holders for ${token.token_name || token.name}`);
       } finally {
         await client.disconnect();
       }
@@ -138,9 +201,10 @@ export default function KingsList() {
   const filteredKings = kings.filter(king => {
     if (!searchQuery) return true;
     const token = king.token;
-    if (!token.name || !token.symbol) return false;
-    return token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           token.symbol.toLowerCase().includes(searchQuery.toLowerCase());
+    const tokenName = token.token_name || token.name || '';
+    const tokenSymbol = token.currency_code || token.symbol || '';
+    return tokenName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           tokenSymbol.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const totalXrpValue = filteredKings.reduce((sum, king) => sum + king.xrpValue, 0);
@@ -257,8 +321,8 @@ export default function KingsList() {
                       <div className="flex items-center gap-3">
                         <TokenIcon token={king.token} size="md" />
                         <div>
-                          <div className="text-white font-bold">{king.token.name}</div>
-                          <div className="text-gray-400 text-sm">{king.token.symbol}</div>
+                          <div className="text-white font-bold">{king.token.token_name || king.token.name}</div>
+                          <div className="text-gray-400 text-sm">{king.token.currency_code || king.token.symbol}</div>
                         </div>
                       </div>
                     </td>
@@ -282,7 +346,7 @@ export default function KingsList() {
                           maximumFractionDigits: 2
                         })}
                       </div>
-                      <div className="text-gray-500 text-xs">{king.token.symbol}</div>
+                      <div className="text-gray-500 text-xs">{king.token.currency_code || king.token.symbol}</div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="text-green-400 font-bold">
