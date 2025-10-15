@@ -303,7 +303,7 @@ export default function Airdropper() {
         case 'xrp_balance_percent':
           return t.balance_percent && parseFloat(t.balance_percent) > 0;
         case 'token_balance_ratio':
-          return t.source_token_currency && t.source_token_issuer;
+          return true;
         case 'random_range':
           return t.min_amount && t.max_amount && parseFloat(t.min_amount) <= parseFloat(t.max_amount);
         default:
