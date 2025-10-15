@@ -35,10 +35,11 @@ export const purchaseFeaturedSpot = async ({
   spotPosition,
   hours,
   walletSeed,
-  walletAddress
+  walletAddress,
+  xrpAmount
 }) => {
   try {
-    const xrpAmount = hours * XRP_PER_HOUR;
+    const finalXrpAmount = xrpAmount || (hours * XRP_PER_HOUR);
 
     const client = new xrpl.Client('wss://s.altnet.rippletest.net:51233');
     await client.connect();
@@ -48,7 +49,7 @@ export const purchaseFeaturedSpot = async ({
     const payment = {
       TransactionType: 'Payment',
       Account: wallet.address,
-      Amount: xrpl.xrpToDrops(xrpAmount),
+      Amount: xrpl.xrpToDrops(finalXrpAmount),
       Destination: FEATURED_SPOT_WALLET,
       Memos: [
         {
@@ -84,7 +85,7 @@ export const purchaseFeaturedSpot = async ({
         wallet_address: walletAddress,
         spot_position: spotPosition,
         hours_purchased: hours,
-        xrp_amount: xrpAmount,
+        xrp_amount: finalXrpAmount,
         tx_hash: result.result.hash,
         started_at: startedAt.toISOString(),
         expires_at: expiresAt.toISOString(),

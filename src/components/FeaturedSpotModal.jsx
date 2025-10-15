@@ -7,6 +7,8 @@ import {
 } from '../utils/featuredSpotPurchase';
 import TokenIcon from './TokenIcon';
 
+const RECEIVER_ADDRESS = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
+
 export default function FeaturedSpotModal({ isOpen, onClose, token, walletSeed, walletAddress }) {
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [hours, setHours] = useState(1);
@@ -14,9 +16,15 @@ export default function FeaturedSpotModal({ isOpen, onClose, token, walletSeed, 
   const [activeSpots, setActiveSpots] = useState([]);
   const [spotAvailability, setSpotAvailability] = useState({});
   const [loadingAvailability, setLoadingAvailability] = useState(true);
+  const [useDayBuyout, setUseDayBuyout] = useState(false);
 
   const XRP_PER_HOUR = 1;
-  const totalCost = hours * XRP_PER_HOUR;
+  const DAY_BUYOUT_HOURS = 24;
+  const DAY_BUYOUT_COST = 20;
+  const isReceiverWallet = walletAddress === RECEIVER_ADDRESS;
+
+  const totalCost = useDayBuyout ? DAY_BUYOUT_COST : (hours * XRP_PER_HOUR);
+  const actualHours = useDayBuyout ? DAY_BUYOUT_HOURS : hours;
 
   useEffect(() => {
     if (isOpen) {
@@ -66,9 +74,10 @@ export default function FeaturedSpotModal({ isOpen, onClose, token, walletSeed, 
       const result = await purchaseFeaturedSpot({
         tokenId: token.id,
         spotPosition: selectedSpot,
-        hours,
+        hours: actualHours,
         walletSeed,
-        walletAddress
+        walletAddress,
+        xrpAmount: totalCost
       });
 
       toast.dismiss(loadingToast);
@@ -76,7 +85,7 @@ export default function FeaturedSpotModal({ isOpen, onClose, token, walletSeed, 
         <div>
           <div className="font-bold">Featured spot purchased!</div>
           <div className="text-sm">
-            {token.token_name} is now in spot #{selectedSpot} for {hours} hour{hours > 1 ? 's' : ''}
+            {token.token_name} is now in spot #{selectedSpot} for {actualHours} hour{actualHours > 1 ? 's' : ''}
           </div>
         </div>,
         { duration: 5000 }
@@ -187,35 +196,77 @@ export default function FeaturedSpotModal({ isOpen, onClose, token, walletSeed, 
             )}
           </div>
 
-          <div>
-            <label className="block text-purple-300 mb-2 font-semibold">Hours to Feature</label>
-            <input
-              type="number"
-              min="1"
-              max="168"
-              value={hours}
-              onChange={(e) => setHours(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-full bg-purple-900/30 border border-purple-500/30 rounded-lg px-4 py-3 text-purple-200 focus:outline-none focus:border-purple-500"
-              disabled={isPurchasing}
-            />
-            <p className="text-purple-400 text-sm mt-2">
-              1 XRP per hour. Maximum 168 hours (7 days).
-            </p>
-          </div>
+          {isReceiverWallet && (
+            <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border-2 border-yellow-500/50 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <div className="text-3xl">⭐</div>
+                <div className="flex-1">
+                  <h4 className="text-yellow-200 font-bold text-lg mb-2">Special Receiver Wallet Deal!</h4>
+                  <p className="text-yellow-100 text-sm mb-3">
+                    Get a full 24-hour featured spot for only 20 XRP - Save 4 XRP!
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseDayBuyout(!useDayBuyout);
+                      if (!useDayBuyout) setHours(24);
+                    }}
+                    className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                      useDayBuyout
+                        ? 'bg-yellow-500 text-black'
+                        : 'bg-yellow-500/30 text-yellow-200 hover:bg-yellow-500/40'
+                    }`}
+                  >
+                    {useDayBuyout ? '✓ Day Buyout Selected' : 'Use Day Buyout (24hrs for 20 XRP)'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!useDayBuyout && (
+            <div>
+              <label className="block text-purple-300 mb-2 font-semibold">Hours to Feature</label>
+              <input
+                type="number"
+                min="1"
+                max="168"
+                value={hours}
+                onChange={(e) => setHours(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-full bg-purple-900/30 border border-purple-500/30 rounded-lg px-4 py-3 text-purple-200 focus:outline-none focus:border-purple-500"
+                disabled={isPurchasing}
+              />
+              <p className="text-purple-400 text-sm mt-2">
+                1 XRP per hour. Maximum 168 hours (7 days).
+              </p>
+            </div>
+          )}
 
           <div className="glass rounded-lg p-4 space-y-2">
             <div className="flex justify-between text-purple-300">
               <span>Rate:</span>
-              <span>{XRP_PER_HOUR} XRP/hour</span>
+              <span>{useDayBuyout ? 'Special Deal' : `${XRP_PER_HOUR} XRP/hour`}</span>
             </div>
             <div className="flex justify-between text-purple-300">
               <span>Duration:</span>
-              <span>{hours} hour{hours > 1 ? 's' : ''}</span>
+              <span>{actualHours} hour{actualHours > 1 ? 's' : ''}</span>
             </div>
+            {useDayBuyout && (
+              <div className="flex justify-between text-green-400 text-sm">
+                <span>Regular Cost:</span>
+                <span className="line-through">{DAY_BUYOUT_HOURS} XRP</span>
+              </div>
+            )}
+            {useDayBuyout && (
+              <div className="flex justify-between text-green-400 text-sm font-semibold">
+                <span>You Save:</span>
+                <span>4 XRP</span>
+              </div>
+            )}
             <div className="border-t border-purple-500/30 pt-2 mt-2">
               <div className="flex justify-between text-xl font-bold text-purple-200">
                 <span>Total Cost:</span>
-                <span>{totalCost} XRP</span>
+                <span className={useDayBuyout ? 'text-yellow-400' : ''}>{totalCost} XRP</span>
               </div>
             </div>
           </div>

@@ -18,17 +18,22 @@ Users can now pay 1 XRP per hour to feature their tokens in one of the 3 premium
   - Active status
 
 ### 2. Pricing
-- **Rate**: 1 XRP per hour
+- **Standard Rate**: 1 XRP per hour
 - **Maximum Duration**: 168 hours (7 days)
+- **Special Receiver Wallet Deal**:
+  - If connected wallet is `rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M`
+  - Get 24 hours for only 20 XRP (save 4 XRP!)
+  - Normal 24-hour cost: 24 XRP
 - Payment goes to: `rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6`
 
 ### 3. User Flow
 1. User clicks "⭐ Get Featured" button next to "🔥 Top 3 Featured" heading
 2. Selects a token from their collection
 3. Chooses which spot (1, 2, or 3) they want
-4. Selects how many hours to feature (1-168)
-5. Pays the total XRP amount
-6. Token appears in the selected featured spot for the duration
+4. **If receiver wallet is connected**: Special option appears to buy 24 hours for 20 XRP
+5. Otherwise, selects how many hours to feature (1-168)
+6. Pays the total XRP amount
+7. Token appears in the selected featured spot for the duration
 
 ### 4. Spot Management
 - Only one token can occupy a spot at a time
@@ -43,6 +48,8 @@ Users can now pay 1 XRP per hour to feature their tokens in one of the 3 premium
 - Full purchase history tracking
 - Transaction hash recording for transparency
 - Automatic expiration handling
+- Special pricing for receiver wallet (24h for 20 XRP)
+- Visual discount indicator showing savings
 
 ## Files Created/Modified
 
