@@ -877,23 +877,6 @@ export default function Vault() {
            prevProps.isListView === nextProps.isListView;
   });
 
-  if (!connectedWallet) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold text-purple-200 mb-2">Passive Earnings Vault</h2>
-          <p className="text-purple-400">Earn 10% APY on your token holdings automatically</p>
-        </div>
-
-        <div className="glass rounded-lg p-12 text-center">
-          <div className="text-6xl mb-4">🔒</div>
-          <h3 className="text-2xl font-bold text-purple-200 mb-2">Connect Your Wallet</h3>
-          <p className="text-purple-400">Connect your wallet to start earning passive income on your tokens</p>
-        </div>
-      </div>
-    );
-  }
-
   const tokensWithBalance = useMemo(() =>
     tokens.filter(t => parseFloat(tokenBalances[t.id] || 0) > 0),
     [tokens, tokenBalances]
@@ -918,6 +901,23 @@ export default function Vault() {
     }),
     [filteredTokens, favorites]
   );
+
+  if (!connectedWallet) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold text-purple-200 mb-2">Passive Earnings Vault</h2>
+          <p className="text-purple-400">Earn 10% APY on your token holdings automatically</p>
+        </div>
+
+        <div className="glass rounded-lg p-12 text-center">
+          <div className="text-6xl mb-4">🔒</div>
+          <h3 className="text-2xl font-bold text-purple-200 mb-2">Connect Your Wallet</h3>
+          <p className="text-purple-400">Connect your wallet to start earning passive income on your tokens</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
