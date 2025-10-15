@@ -418,7 +418,10 @@ export default function WalletManagement() {
       allWallets.push(newWallet);
       localStorage.setItem('wallets', JSON.stringify(allWallets));
 
-      toast.success('Wallet saved successfully!');
+      // Auto-connect the wallet after import
+      connectWallet(newWallet);
+
+      toast.success('Wallet saved and connected successfully!');
       setShowImportSeedModal(false);
       setImportedWalletData(null);
       setImportSeedInput('');
