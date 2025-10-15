@@ -281,7 +281,8 @@ export default function Airdropper() {
       toast.success(`Added ${holders.size} token holders!`, { id: 'fetch-holders' });
     } catch (error) {
       console.error('Error fetching token holders:', error);
-      toast.error('Failed to fetch token holders', { id: 'fetch-holders' });
+      const errorMessage = error.message || 'Failed to fetch token holders';
+      toast.error(`Failed to fetch token holders: ${errorMessage}`, { id: 'fetch-holders' });
     } finally {
       setFetchingHolders(false);
     }
@@ -411,7 +412,8 @@ export default function Airdropper() {
       loadCampaigns();
     } catch (error) {
       console.error('Error creating campaign:', error);
-      toast.error('Failed to create campaign');
+      const errorMessage = error.message || error.hint || 'Failed to create campaign';
+      toast.error(`Failed to create campaign: ${errorMessage}`);
     }
   };
 
