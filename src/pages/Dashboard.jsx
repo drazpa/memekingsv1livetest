@@ -15,6 +15,7 @@ import { setFeaturedPosition, promoteToFeatured } from '../utils/featuredTokens'
 import { CategoryBadge, calculateDaysOnMarket, CATEGORIES } from '../utils/categoryUtils';
 import FeaturedSpotModal from '../components/FeaturedSpotModal';
 import TokenSelectionModal from '../components/TokenSelectionModal';
+import MintEarningsButton from '../components/MintEarningsButton';
 
 const ISSUER_SEED = 'sEd7bAfzqZWKxaatJpoWzTvENyaTg1Y';
 const ISSUER_ADDRESS = 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6';
@@ -1630,6 +1631,7 @@ export default function Dashboard() {
           <p className="text-purple-400 mt-1 text-sm sm:text-base">Meme token factory control center</p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <MintEarningsButton connectedWallet={connectedWallet} />
           <button
             onClick={async () => {
               setIsRefreshing(true);

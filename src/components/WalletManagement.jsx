@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import * as xrpl from 'xrpl';
 import { TrustlineDropdown } from './TrustlineDropdown';
 import { PinProtection } from './PinProtection';
+import MintEarningsChart from './MintEarningsChart';
 
 export default function WalletManagement() {
   const [wallets, setWallets] = useState([]);
@@ -586,6 +587,8 @@ export default function WalletManagement() {
                     {wallet.balance_xrp || 0} XRP
                   </div>
                 </div>
+
+                <MintEarningsChart walletAddress={wallet.address} />
 
                 {wallet.notes && (
                   <div>
