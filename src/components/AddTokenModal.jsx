@@ -31,9 +31,13 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
     hasAmmPool: false,
     ammAssetAmount: '',
     ammXrpAmount: '',
+    ammAccountId: '',
+    ammLpTokenBalance: '',
+    ammTradingFee: '',
     addFeatured: false,
     featuredDuration: 0
   });
+  const [fetchingAmmInfo, setFetchingAmmInfo] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -51,6 +55,9 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
         hasAmmPool: false,
         ammAssetAmount: '',
         ammXrpAmount: '',
+        ammAccountId: '',
+        ammLpTokenBalance: '',
+        ammTradingFee: '',
         addFeatured: false,
         featuredDuration: 0
       });
@@ -96,8 +103,68 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
         toast.error('AMM XRP amount is required when pool is enabled');
         return false;
       }
+      if (!formData.ammAccountId) {
+        toast.error('AMM account ID is required. Please fetch AMM info.');
+        return false;
+      }
     }
     return true;
+  };
+
+  const fetchAmmInfo = async () => {
+    if (!formData.currencyCode || !formData.issuerAddress) {
+      toast.error('Please enter currency code and issuer address first');
+      return;
+    }
+
+    setFetchingAmmInfo(true);
+    try {
+      const client = await getClient();
+
+      const currencyHex = formData.currencyCode.length > 3
+        ? Buffer.from(formData.currencyCode, 'utf8').toString('hex').toUpperCase().padEnd(40, '0')
+        : formData.currencyCode.toUpperCase();
+
+      const ammInfo = await client.request({
+        command: 'amm_info',
+        asset: { currency: 'XRP' },
+        asset2: { currency: currencyHex, issuer: formData.issuerAddress },
+        ledger_index: 'validated'
+      });
+
+      await client.disconnect();
+
+      if (ammInfo?.result?.amm) {
+        const amm = ammInfo.result.amm;
+        const xrpAmount = parseFloat(amm.amount) / 1000000;
+        const tokenAmount = parseFloat(amm.amount2.value);
+        const lpTokenBalance = parseFloat(amm.lp_token.value);
+        const tradingFee = amm.trading_fee || 0;
+
+        setFormData({
+          ...formData,
+          hasAmmPool: true,
+          ammAssetAmount: tokenAmount.toString(),
+          ammXrpAmount: xrpAmount.toString(),
+          ammAccountId: amm.account,
+          ammLpTokenBalance: lpTokenBalance.toString(),
+          ammTradingFee: tradingFee.toString()
+        });
+
+        toast.success('AMM pool found and data loaded!');
+      } else {
+        toast.error('No AMM pool found for this token pair');
+      }
+    } catch (error) {
+      console.error('Error fetching AMM info:', error);
+      if (error.data?.error === 'actNotFound') {
+        toast.error('No AMM pool exists for this token');
+      } else {
+        toast.error('Failed to fetch AMM info. Please check the token details.');
+      }
+    } finally {
+      setFetchingAmmInfo(false);
+    }
   };
 
   const handleNext = () => {
@@ -161,6 +228,9 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
           amm_pool_created: formData.hasAmmPool,
           amm_asset_amount: formData.hasAmmPool ? parseFloat(formData.ammAssetAmount) : null,
           amm_xrp_amount: formData.hasAmmPool ? parseFloat(formData.ammXrpAmount) : null,
+          amm_account_id: formData.hasAmmPool ? formData.ammAccountId : null,
+          amm_lp_token_balance: formData.hasAmmPool ? parseFloat(formData.ammLpTokenBalance) : null,
+          amm_trading_fee: formData.hasAmmPool ? parseInt(formData.ammTradingFee) : null,
           status: 'listed',
           tx_hash: result.result.hash
         })
@@ -409,6 +479,60 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
 
             {formData.hasAmmPool && (
               <>
+                <button
+                  type="button"
+                  onClick={fetchAmmInfo}
+                  disabled={fetchingAmmInfo}
+                  className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800/50 text-white rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                >
+                  {fetchingAmmInfo ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Fetching AMM Info...
+                    </>
+                  ) : (
+                    <>
+                      <span>🔍</span>
+                      Fetch AMM Pool Data from XRPL
+                    </>
+                  )}
+                </button>
+
+                {formData.ammAccountId && (
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                    <h4 className="text-green-300 font-semibold mb-2 flex items-center gap-2">
+                      <span>✅</span>
+                      AMM Pool Verified
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-green-200">AMM Account:</span>
+                        <span className="text-white font-mono text-xs">{formData.ammAccountId.slice(0, 10)}...{formData.ammAccountId.slice(-8)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-green-200">Token Amount:</span>
+                        <span className="text-white">{parseFloat(formData.ammAssetAmount).toLocaleString()} {formData.currencyCode}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-green-200">XRP Amount:</span>
+                        <span className="text-white">{parseFloat(formData.ammXrpAmount).toLocaleString()} XRP</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-green-200">LP Token Balance:</span>
+                        <span className="text-white">{parseFloat(formData.ammLpTokenBalance).toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-green-200">Trading Fee:</span>
+                        <span className="text-white">{formData.ammTradingFee} basis points</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-green-200">Current Price:</span>
+                        <span className="text-white">{(parseFloat(formData.ammXrpAmount) / parseFloat(formData.ammAssetAmount)).toFixed(8)} XRP</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-purple-300 text-sm mb-2">AMM Token Amount *</label>
                   <input
@@ -416,7 +540,8 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
                     value={formData.ammAssetAmount}
                     onChange={(e) => setFormData({ ...formData, ammAssetAmount: e.target.value })}
                     placeholder="900000"
-                    className="w-full px-4 py-3 bg-purple-900/20 border border-purple-500/30 rounded-lg text-white placeholder-purple-500"
+                    readOnly={!!formData.ammAccountId}
+                    className="w-full px-4 py-3 bg-purple-900/20 border border-purple-500/30 rounded-lg text-white placeholder-purple-500 read-only:opacity-50"
                   />
                 </div>
 
@@ -427,7 +552,8 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
                     value={formData.ammXrpAmount}
                     onChange={(e) => setFormData({ ...formData, ammXrpAmount: e.target.value })}
                     placeholder="100"
-                    className="w-full px-4 py-3 bg-purple-900/20 border border-purple-500/30 rounded-lg text-white placeholder-purple-500"
+                    readOnly={!!formData.ammAccountId}
+                    className="w-full px-4 py-3 bg-purple-900/20 border border-purple-500/30 rounded-lg text-white placeholder-purple-500 read-only:opacity-50"
                   />
                 </div>
               </>
