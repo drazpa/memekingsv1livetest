@@ -145,11 +145,11 @@ export function WalletManager({
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           <button
             onClick={generateWallet}
             disabled={loading}
-            className="bg-gradient-to-r from-green-600 to-green-500 text-white py-3 px-4 rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300"
+            className="bg-gradient-to-r from-green-600 to-green-500 text-white py-3 px-3 sm:px-4 rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300 text-sm sm:text-base whitespace-nowrap overflow-hidden text-ellipsis"
           >
             {loading ? 'Processing...' : 'Generate New Wallet'}
           </button>
@@ -158,7 +158,7 @@ export function WalletManager({
               setShowImport(!showImport);
               setShowXamanImport(false);
             }}
-            className="bg-gray-800/50 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-700/50 transition-all duration-300"
+            className="bg-gray-800/50 text-gray-300 py-3 px-3 sm:px-4 rounded-lg hover:bg-gray-700/50 transition-all duration-300 text-sm sm:text-base whitespace-nowrap"
           >
             Import Wallet
           </button>
@@ -167,7 +167,7 @@ export function WalletManager({
               setShowXamanImport(!showXamanImport);
               setShowImport(false);
             }}
-            className="bg-gray-800/50 text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-700/50 transition-all duration-300"
+            className="bg-gray-800/50 text-gray-300 py-3 px-3 sm:px-4 rounded-lg hover:bg-gray-700/50 transition-all duration-300 text-sm sm:text-base whitespace-nowrap"
           >
             Import Xaman
           </button>
@@ -345,12 +345,12 @@ export function WalletManager({
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <span className="text-white font-medium">
+                          <span className="text-white font-medium text-sm sm:text-base break-words">
                             {walletLabels[saved.address] || 'Unnamed Wallet'}
                           </span>
                           <button
                             onClick={() => setEditingLabel(saved.address)}
-                            className="text-gray-400 hover:text-gray-300"
+                            className="text-gray-400 hover:text-gray-300 flex-shrink-0"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -375,12 +375,12 @@ export function WalletManager({
                     <div>
                       <label className="block text-sm font-medium text-gray-400">Seed</label>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-white">
+                        <span className="font-mono text-white text-xs sm:text-sm break-all">
                           {visibleSeeds.has(saved.address) ? saved.seed : '••••••••••••'}
                         </span>
                         <button
                           onClick={() => toggleSeedVisibility(saved.address)}
-                          className="text-gray-400 hover:text-gray-300"
+                          className="text-gray-400 hover:text-gray-300 flex-shrink-0"
                         >
                           {visibleSeeds.has(saved.address) ? (
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -397,21 +397,21 @@ export function WalletManager({
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-400">Created</label>
-                      <span className="text-gray-300">
+                      <span className="text-gray-300 text-xs sm:text-sm">
                         {new Date(saved.timestamp).toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex gap-3 mt-4">
+                    <div className="flex gap-2 sm:gap-3 mt-4">
                       <button
                         onClick={() => loadWallet(saved)}
                         disabled={loading}
-                        className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300"
+                        className="flex-1 px-3 sm:px-4 py-2 bg-gradient-to-r from-green-600 to-green-500 text-white rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300 text-sm sm:text-base"
                       >
                         Load
                       </button>
                       <button
                         onClick={() => deleteWallet(saved.address)}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-300"
+                        className="flex-1 px-3 sm:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-300 text-sm sm:text-base"
                       >
                         Delete
                       </button>
