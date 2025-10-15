@@ -7,6 +7,7 @@ import { uploadImageToPinata } from '../utils/pinata';
 import TokenIcon from '../components/TokenIcon';
 import TokenDetailModal from '../components/TokenDetailModal';
 import TokenCreationProgressModal from '../components/TokenCreationProgressModal';
+import AddTokenModal from '../components/AddTokenModal';
 import { getXRPBalance, checkWalletFunded } from '../utils/xrplBalance';
 import { logActivity, ACTION_TYPES } from '../utils/activityLogger';
 import { onTokenUpdate } from '../utils/tokenEvents';
@@ -2095,59 +2096,11 @@ export default function Memes() {
         </div>
       )}
 
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="glass rounded-lg p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold text-purple-200 mb-6">Add Token</h3>
-
-            <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Token Name"
-                value={newToken.name}
-                onChange={(e) => setNewToken({ ...newToken, name: e.target.value })}
-                className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
-              />
-              <input
-                type="text"
-                placeholder="Issuer Address"
-                value={newToken.issuer}
-                onChange={(e) => setNewToken({ ...newToken, issuer: e.target.value })}
-                className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
-              />
-              <input
-                type="number"
-                placeholder="Supply"
-                value={newToken.supply}
-                onChange={(e) => setNewToken({ ...newToken, supply: e.target.value })}
-                className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
-              />
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={addToken}
-                disabled={isCreating || uploadingImage}
-                className="btn-primary text-white px-6 py-2 rounded-lg font-medium flex-1 disabled:opacity-50"
-              >
-                {isCreating ? '🔄 Adding...' : '+ Add Token'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowAddModal(false);
-                  setNewToken({ name: '', issuer: '', supply: '1000000', xrpLocked: '1', image: null, imageUrl: '', tfTransferable: false, requireDestTag: false, description: '', twitterHandle: '', websiteUrl: '' });
-                  setImagePreview(null);
-                  setAddMode('manual');
-                }}
-                disabled={isCreating}
-                className="btn text-purple-300 px-6 py-2 rounded-lg font-medium disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddTokenModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        wallet={connectedWallet}
+      />
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
