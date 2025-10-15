@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '../utils/supabase';
 import { Wallet as XrplWallet } from 'xrpl';
-import { getClient } from '../utils/xrplClient';
+import { getClient, submitWithRetry } from '../utils/xrplClient';
 import { encodeCurrencyCode } from '../utils/currencyUtils';
+
+const AMM_CREATION_FEE = 0.10;
 
 export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
   const [step, setStep] = useState(1);
@@ -35,6 +37,7 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
         .from('meme_tokens')
         .select('*')
         .eq('amm_pool_created', false)
+        .neq('status', 'active')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -93,6 +96,29 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
       const token = formData.selectedToken;
       const currencyHex = token.currency_hex || encodeCurrencyCode(token.currency_code);
 
+      if (token.receiver_address && token.receiver_address !== wallet.address) {
+        const feePayment = {
+          TransactionType: 'Payment',
+          Account: xrplWallet.address,
+          Amount: String(AMM_CREATION_FEE * 1000000),
+          Destination: token.receiver_address,
+          Memos: [{
+            Memo: {
+              MemoData: Buffer.from(`AMM Pool Creation Fee: ${token.currency_code}`).toString('hex').toUpperCase(),
+              MemoType: Buffer.from('amm-creation-fee').toString('hex').toUpperCase()
+            }
+          }]
+        };
+
+        const feeResult = await submitWithRetry(feePayment, xrplWallet);
+
+        if (feeResult.result.meta.TransactionResult !== 'tesSUCCESS') {
+          throw new Error('Fee payment failed');
+        }
+
+        toast.success(`${AMM_CREATION_FEE} XRP fee paid to token receiver`);
+      }
+
       const amount = {
         currency: currencyHex,
         issuer: token.issuer_address,
@@ -122,7 +148,9 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
         .update({
           amm_pool_created: true,
           amm_asset_amount: parseFloat(formData.tokenAmount),
-          amm_xrp_amount: parseFloat(formData.xrpAmount)
+          amm_xrp_amount: parseFloat(formData.xrpAmount),
+          amm_tx_hash: result.result.hash,
+          status: 'active'
         })
         .eq('id', token.id);
 
@@ -197,6 +225,7 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
                 <li>• Provide initial liquidity (Token + XRP)</li>
                 <li>• The pool will be created on the XRPL blockchain</li>
                 <li>• You'll receive LP tokens representing your share</li>
+                <li>• Fee: {AMM_CREATION_FEE} XRP (FREE if you're the token receiver)</li>
               </ul>
             </div>
 
@@ -335,6 +364,26 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
                 <div className="text-purple-400 text-sm mb-1">Trading Fee</div>
                 <div className="text-white">{formData.tradingFee / 100}%</div>
               </div>
+
+              {formData.selectedToken?.receiver_address && formData.selectedToken.receiver_address !== wallet?.address && (
+                <div className="glass rounded-lg p-4 bg-blue-500/10 border-blue-500/30">
+                  <div className="text-blue-400 text-sm mb-1">AMM Creation Fee</div>
+                  <div className="text-white font-semibold">{AMM_CREATION_FEE} XRP</div>
+                  <div className="text-blue-300 text-xs mt-1">
+                    Paid to token receiver: {formData.selectedToken.receiver_address.slice(0, 8)}...{formData.selectedToken.receiver_address.slice(-6)}
+                  </div>
+                </div>
+              )}
+
+              {(!formData.selectedToken?.receiver_address || formData.selectedToken.receiver_address === wallet?.address) && (
+                <div className="glass rounded-lg p-4 bg-green-500/10 border-green-500/30">
+                  <div className="text-green-400 text-sm mb-1">AMM Creation Fee</div>
+                  <div className="text-green-200 font-semibold">FREE</div>
+                  <div className="text-green-300 text-xs mt-1">
+                    No fee for token receiver wallet
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
