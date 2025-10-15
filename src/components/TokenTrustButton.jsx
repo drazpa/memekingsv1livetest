@@ -3,6 +3,7 @@ import { Wallet as XrplWallet, Client } from 'xrpl';
 import { Buffer } from 'buffer';
 import toast from 'react-hot-toast';
 import { logActivity, ACTION_TYPES } from '../utils/activityLogger';
+import { supabase } from '../utils/supabase';
 
 export function TokenTrustButton({
   token,
@@ -39,12 +40,53 @@ export function TokenTrustButton({
 
   useEffect(() => {
     if (connectedWallet && token) {
-      checkTrustlineStatus();
+      checkTrustlineStatusCached();
     } else {
       setCheckingTrustline(false);
       setHasTrustline(false);
     }
   }, [token?.id, connectedWallet?.address]);
+
+  const checkTrustlineStatusCached = async () => {
+    if (!connectedWallet || !token) {
+      setCheckingTrustline(false);
+      return;
+    }
+
+    const currencyHex = getCurrencyHex(token);
+    const issuerAddress = getIssuerAddress(token);
+
+    if (!currencyHex || !issuerAddress) {
+      console.error('Token missing required fields:', token);
+      setCheckingTrustline(false);
+      return;
+    }
+
+    setCheckingTrustline(true);
+
+    try {
+      const cacheKey = `${connectedWallet.address}_${currencyHex}_${issuerAddress}`;
+      const cacheTime = 60000;
+
+      const { data: cached } = await supabase
+        .from('wallet_trustlines')
+        .select('*')
+        .eq('wallet_address', connectedWallet.address)
+        .eq('token_id', token.id)
+        .maybeSingle();
+
+      if (cached && (Date.now() - new Date(cached.last_checked).getTime()) < cacheTime) {
+        setHasTrustline(cached.has_trustline);
+        setCheckingTrustline(false);
+        return;
+      }
+
+      await checkTrustlineStatus();
+    } catch (error) {
+      console.error('Error checking cached trustline:', error);
+      await checkTrustlineStatus();
+    }
+  };
 
 
   const checkTrustlineStatus = async () => {
@@ -97,6 +139,19 @@ export function TokenTrustButton({
       );
 
       setHasTrustline(exists);
+
+      await supabase
+        .from('wallet_trustlines')
+        .upsert({
+          wallet_address: connectedWallet.address,
+          token_id: token.id,
+          currency: currencyHex,
+          issuer: issuerAddress,
+          has_trustline: exists,
+          last_checked: new Date().toISOString()
+        }, {
+          onConflict: 'wallet_address,token_id'
+        });
     } catch (error) {
       console.error('Error checking trustline:', error);
       if (error.data?.error === 'actNotFound') {
@@ -211,6 +266,19 @@ export function TokenTrustButton({
       if (result.result.meta.TransactionResult === 'tesSUCCESS') {
         toast.success(`Trustline set for ${token.name || token.symbol}!`);
         setHasTrustline(true);
+
+        await supabase
+          .from('wallet_trustlines')
+          .upsert({
+            wallet_address: connectedWallet.address,
+            token_id: token.id,
+            currency: currencyHex,
+            issuer: issuerAddress,
+            has_trustline: true,
+            last_checked: new Date().toISOString()
+          }, {
+            onConflict: 'wallet_address,token_id'
+          });
 
         await logActivity({
           type: ACTION_TYPES.TRUSTLINE_CREATED,
@@ -369,6 +437,19 @@ export function TokenTrustButton({
       if (result.result.meta.TransactionResult === 'tesSUCCESS') {
         toast.success(`Trustline removed for ${token.name || token.symbol}!`);
         setHasTrustline(false);
+
+        await supabase
+          .from('wallet_trustlines')
+          .upsert({
+            wallet_address: connectedWallet.address,
+            token_id: token.id,
+            currency: currencyHex,
+            issuer: issuerAddress,
+            has_trustline: false,
+            last_checked: new Date().toISOString()
+          }, {
+            onConflict: 'wallet_address,token_id'
+          });
 
         await logActivity({
           type: ACTION_TYPES.TRUSTLINE_REMOVED,
