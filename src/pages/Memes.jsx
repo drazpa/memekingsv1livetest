@@ -38,12 +38,10 @@ export default function Memes() {
   const [lpHistory, setLpHistory] = useState({});
   const [marketCapHistory, setMarketCapHistory] = useState({});
   const [liquidityHistory, setLiquidityHistory] = useState({});
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [passwordAction, setPasswordAction] = useState('add');
-  const [password, setPassword] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [addMode, setAddMode] = useState('manual');
+  const [walletConfigMode, setWalletConfigMode] = useState('admin');
   const [userWallets, setUserWallets] = useState([]);
   const [selectedIssuerWallet, setSelectedIssuerWallet] = useState(null);
   const [selectedReceiverWallet, setSelectedReceiverWallet] = useState(null);
@@ -54,6 +52,7 @@ export default function Memes() {
     supply: '1000000',
     xrpLocked: '1',
     image: null,
+    imageUrl: '',
     tfTransferable: false,
     requireDestTag: false,
     description: '',
@@ -546,7 +545,7 @@ export default function Memes() {
 
       toast.success(`Token ${newToken.name} added successfully!`);
       setShowAddModal(false);
-      setNewToken({ name: '', issuer: '', supply: '1000000', xrpLocked: '1', image: null, tfTransferable: false, requireDestTag: false, description: '', twitterHandle: '', websiteUrl: '' });
+      setNewToken({ name: '', issuer: '', supply: '1000000', xrpLocked: '1', image: null, imageUrl: '', tfTransferable: false, requireDestTag: false, description: '', twitterHandle: '', websiteUrl: '' });
       setImagePreview(null);
       loadTokens();
     } catch (error) {
@@ -823,7 +822,7 @@ export default function Memes() {
         metadata: { tokenName: newToken.name, issuer: issuerWallet.address, receiver: receiverWallet.address }
       });
 
-      setNewToken({ name: '', issuer: '', supply: '1000000', xrpLocked: '1', image: null, tfTransferable: false, requireDestTag: false, description: '', twitterHandle: '', websiteUrl: '' });
+      setNewToken({ name: '', issuer: '', supply: '1000000', xrpLocked: '1', image: null, imageUrl: '', tfTransferable: false, requireDestTag: false, description: '', twitterHandle: '', websiteUrl: '' });
       setImagePreview(null);
       setShowCreateModal(false);
       loadTokens();
@@ -1151,7 +1150,7 @@ export default function Memes() {
         tokenId: insertedToken?.id
       });
 
-      setNewToken({ name: '', issuer: '', supply: '1000000', xrpLocked: '1', image: null, tfTransferable: false, requireDestTag: false });
+      setNewToken({ name: '', issuer: '', supply: '1000000', xrpLocked: '1', image: null, imageUrl: '', tfTransferable: false, requireDestTag: false, description: '', twitterHandle: '', websiteUrl: '' });
       setImagePreview(null);
       setAddMode('manual');
       setShowCreateModal(false);
@@ -2146,7 +2145,7 @@ export default function Memes() {
               <button
                 onClick={() => {
                   setShowAddModal(false);
-                  setNewToken({ name: '', issuer: '', supply: '1000000', xrpLocked: '1', image: null });
+                  setNewToken({ name: '', issuer: '', supply: '1000000', xrpLocked: '1', image: null, imageUrl: '', tfTransferable: false, requireDestTag: false, description: '', twitterHandle: '', websiteUrl: '' });
                   setImagePreview(null);
                   setAddMode('manual');
                 }}
@@ -2361,6 +2360,7 @@ export default function Memes() {
                     supply: '1000000',
                     xrpLocked: '1',
                     image: null,
+                    imageUrl: '',
                     tfTransferable: false,
                     requireDestTag: false,
                     description: '',
