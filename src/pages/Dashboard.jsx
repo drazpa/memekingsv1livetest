@@ -350,7 +350,6 @@ export default function Dashboard() {
       if (cachedTokens) {
         console.log('✅ Using cached token list');
         setTokens(cachedTokens);
-        setFilteredTokens(cachedTokens);
         return;
       }
 
