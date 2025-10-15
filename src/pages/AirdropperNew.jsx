@@ -63,6 +63,7 @@ export default function Airdropper() {
 
   useEffect(() => {
     loadConnectedWallet();
+    loadAllTokens();
   }, []);
 
   useEffect(() => {
@@ -70,7 +71,6 @@ export default function Airdropper() {
       loadCampaigns();
       loadAnalytics();
       loadAvailableTokens();
-      loadAllTokens();
     }
   }, [connectedWallet]);
 
@@ -121,19 +121,25 @@ export default function Airdropper() {
     try {
       const { data, error } = await supabase
         .from('tokens')
-        .select('*')
+        .select('currency_code, issuer_address, name, image_url')
         .order('created_at', { ascending: false })
         .limit(500);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error loading tokens:', error);
+        return;
+      }
+
+      console.log('Loaded tokens from database:', data?.length || 0);
 
       const formattedTokens = (data || []).map(token => ({
         value: `${token.currency_code}:${token.issuer_address}`,
-        label: `${token.currency_code} (${token.issuer_address.slice(0, 8)}...)`,
+        label: `${token.currency_code} ${token.name ? '- ' + token.name : ''} (${token.issuer_address.slice(0, 8)}...)`,
         currency_code: token.currency_code,
         issuer_address: token.issuer_address
       }));
 
+      console.log('Setting allTokens with', formattedTokens.length, 'tokens');
       setAllTokens(formattedTokens);
     } catch (error) {
       console.error('Error loading all tokens:', error);
@@ -1461,25 +1467,23 @@ export default function Airdropper() {
                           )}
                         </div>
 
-                        {allTokens.length > 0 && (
-                          <div>
-                            <label className="block text-xs text-slate-400 mb-1">Select from all tokens</label>
-                            <select
-                              onChange={(e) => {
-                                const selected = allTokens.find(t => t.value === e.target.value);
-                                if (selected) selectTokenFromDropdown(index, selected);
-                              }}
-                              className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm"
-                            >
-                              <option value="">Choose a token...</option>
-                              {allTokens.map(token => (
-                                <option key={token.value} value={token.value}>
-                                  {token.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
+                        <div>
+                          <label className="block text-xs text-slate-400 mb-1">Select from all tokens</label>
+                          <select
+                            onChange={(e) => {
+                              const selected = allTokens.find(t => t.value === e.target.value);
+                              if (selected) selectTokenFromDropdown(index, selected);
+                            }}
+                            className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm"
+                          >
+                            <option value="">Choose a token...</option>
+                            {allTokens.map(token => (
+                              <option key={token.value} value={token.value}>
+                                {token.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
                         <div className="grid grid-cols-2 gap-2">
                           <input
@@ -1743,30 +1747,28 @@ export default function Airdropper() {
                           )}
                         </div>
 
-                        {allTokens.length > 0 && (
-                          <div>
-                            <label className="block text-xs text-slate-400 mb-1">Select from all tokens</label>
-                            <select
-                              onChange={(e) => {
-                                const selected = allTokens.find(t => t.value === e.target.value);
-                                if (selected) {
-                                  const newTokens = [...editingCampaign.tokens];
-                                  newTokens[index].currency_code = selected.currency_code;
-                                  newTokens[index].issuer_address = selected.issuer_address;
-                                  setEditingCampaign({ ...editingCampaign, tokens: newTokens });
-                                }
-                              }}
-                              className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm"
-                            >
-                              <option value="">Choose a token...</option>
-                              {allTokens.map(token => (
-                                <option key={token.value} value={token.value}>
-                                  {token.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
+                        <div>
+                          <label className="block text-xs text-slate-400 mb-1">Select from all tokens</label>
+                          <select
+                            onChange={(e) => {
+                              const selected = allTokens.find(t => t.value === e.target.value);
+                              if (selected) {
+                                const newTokens = [...editingCampaign.tokens];
+                                newTokens[index].currency_code = selected.currency_code;
+                                newTokens[index].issuer_address = selected.issuer_address;
+                                setEditingCampaign({ ...editingCampaign, tokens: newTokens });
+                              }
+                            }}
+                            className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm"
+                          >
+                            <option value="">Choose a token...</option>
+                            {allTokens.map(token => (
+                              <option key={token.value} value={token.value}>
+                                {token.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
                         <div className="grid grid-cols-2 gap-2">
                           <input
