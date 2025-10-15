@@ -2305,7 +2305,15 @@ export default function Memes() {
                         ))}
                       </select>
                     </div>
-                    <p className="text-xs text-purple-400">Token will be issued from your selected wallets</p>
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                      <p className="text-blue-300 text-xs font-medium">ℹ️ What happens during creation:</p>
+                      <ul className="text-blue-300/80 text-xs mt-2 space-y-1 list-disc list-inside">
+                        <li>5 XRP fee is paid from your connected wallet</li>
+                        <li>Token is issued by your selected issuer wallet</li>
+                        <li>Tokens are sent to your selected receiver wallet</li>
+                        <li>Automatic trustline setup and liquidity pool creation</li>
+                      </ul>
+                    </div>
                   </div>
                 )}
               </div>
