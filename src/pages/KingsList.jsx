@@ -133,7 +133,7 @@ export default function KingsList() {
         }
 
         await loadKings();
-        toast.success(`Updated holders for ${token.name}`);
+        toast.success(`Updated holders for ${token.token_name || token.name}`);
       } finally {
         await client.disconnect();
       }
@@ -146,19 +146,39 @@ export default function KingsList() {
   };
 
   const refreshAllHolders = async () => {
-    setLoading(true);
-    for (const king of kings) {
-      await refreshTokenHolders(king.token.id);
+    if (loading) {
+      console.log('Already loading, skipping refresh');
+      return;
     }
-    toast.success('All token holders updated!');
+
+    setLoading(true);
+
+    try {
+      if (kings.length === 0) {
+        console.log('No kings to refresh, loading kings first...');
+        await loadKings();
+        return;
+      }
+
+      for (const king of kings) {
+        await refreshTokenHolders(king.token.id);
+      }
+      toast.success('All token holders updated!');
+    } catch (error) {
+      console.error('Error in refreshAllHolders:', error);
+      toast.error('Failed to refresh all holders');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredKings = kings.filter(king => {
     if (!searchQuery) return true;
     const token = king.token;
-    if (!token.name || !token.symbol) return false;
-    return token.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           token.symbol.toLowerCase().includes(searchQuery.toLowerCase());
+    const tokenName = token.token_name || token.name || '';
+    const tokenSymbol = token.currency_code || token.symbol || '';
+    return tokenName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           tokenSymbol.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const totalXrpValue = filteredKings.reduce((sum, king) => sum + king.xrpValue, 0);
@@ -275,8 +295,8 @@ export default function KingsList() {
                       <div className="flex items-center gap-3">
                         <TokenIcon token={king.token} size="md" />
                         <div>
-                          <div className="text-white font-bold">{king.token.name}</div>
-                          <div className="text-gray-400 text-sm">{king.token.symbol}</div>
+                          <div className="text-white font-bold">{king.token.token_name || king.token.name}</div>
+                          <div className="text-gray-400 text-sm">{king.token.currency_code || king.token.symbol}</div>
                         </div>
                       </div>
                     </td>
@@ -300,7 +320,7 @@ export default function KingsList() {
                           maximumFractionDigits: 2
                         })}
                       </div>
-                      <div className="text-gray-500 text-xs">{king.token.symbol}</div>
+                      <div className="text-gray-500 text-xs">{king.token.currency_code || king.token.symbol}</div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="text-green-400 font-bold">
