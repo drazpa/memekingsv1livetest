@@ -21,6 +21,7 @@ export default function KingsList() {
       const { data: tokensData, error: tokensError } = await supabase
         .from('meme_tokens')
         .select('*')
+        .eq('amm_pool_created', true)
         .order('created_at', { ascending: true });
 
       if (tokensError) throw tokensError;
@@ -32,76 +33,126 @@ export default function KingsList() {
       try {
         for (const token of tokensData || []) {
           try {
-            // First try to get from cache
-            const { data: holderData } = await supabase
-              .from('token_holders')
-              .select('*')
-              .eq('token_id', token.id)
-              .order('rank', { ascending: true })
-              .limit(1);
+            // Always fetch fresh data from blockchain
+            const response = await client.request({
+              command: 'account_lines',
+              account: token.issuer_address,
+              peer: undefined,
+              ledger_index: 'validated'
+            });
 
-            let holder = holderData && holderData.length > 0 ? holderData[0] : null;
+            const trustlines = response.result.lines || [];
 
-            // If no cached data, fetch from blockchain
-            if (!holder) {
-              const response = await client.request({
-                command: 'account_lines',
-                account: token.issuer_address,
-                peer: undefined,
-                ledger_index: 'validated'
-              });
+            if (trustlines.length === 0) continue;
 
-              const trustlines = response.result.lines || [];
-              if (trustlines.length > 0) {
-                // Sort by balance descending
-                trustlines.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
+            // Sort by balance descending to get top holder
+            trustlines.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
 
-                const topLine = trustlines[0];
-                const balance = parseFloat(topLine.balance);
+            const topLine = trustlines[0];
+            const balance = parseFloat(topLine.balance);
 
-                if (balance > 0) {
-                  const totalSupply = parseFloat(token.supply) || parseFloat(token.initial_supply) || 0;
-                  const percentage = totalSupply > 0 ? (balance / totalSupply) * 100 : 0;
-                  const receiverWallet = token.receiver_address;
+            if (balance <= 0) continue;
 
-                  // Create holder object
-                  holder = {
-                    holder_address: topLine.account,
-                    balance: balance,
-                    percentage: percentage,
-                    is_developer_wallet: topLine.account === receiverWallet,
-                    rank: 1
-                  };
+            // Calculate total supply from all trustlines
+            const totalSupply = trustlines.reduce((sum, line) => {
+              const bal = parseFloat(line.balance);
+              return sum + (bal > 0 ? bal : 0);
+            }, 0);
 
-                  // Cache it for next time
-                  await supabase
-                    .from('token_holders')
-                    .upsert({
-                      token_id: token.id,
-                      holder_address: topLine.account,
-                      balance: balance,
-                      percentage: percentage,
-                      is_developer_wallet: topLine.account === receiverWallet,
-                      rank: 1,
-                      last_updated: new Date().toISOString()
-                    }, {
-                      onConflict: 'token_id,holder_address'
-                    });
+            const percentage = totalSupply > 0 ? (balance / totalSupply) * 100 : 0;
+            const receiverWallet = token.receiver_address;
+
+            // Fetch real-time price from AMM pool if available
+            let price = 0;
+            if (token.amm_account_id) {
+              try {
+                const ammInfoResponse = await client.request({
+                  command: 'amm_info',
+                  asset: {
+                    currency: token.currency_code,
+                    issuer: token.issuer_address
+                  },
+                  asset2: {
+                    currency: 'XRP'
+                  },
+                  ledger_index: 'validated'
+                });
+
+                if (ammInfoResponse?.result?.amm) {
+                  const amm = ammInfoResponse.result.amm;
+                  const amount = amm.amount;
+                  const amount2 = amm.amount2;
+
+                  let xrpPool, tokenPool;
+                  if (typeof amount === 'string') {
+                    xrpPool = parseFloat(amount) / 1000000;
+                    tokenPool = parseFloat(amount2.value);
+                  } else {
+                    xrpPool = parseFloat(amount2) / 1000000;
+                    tokenPool = parseFloat(amount.value);
+                  }
+
+                  if (tokenPool > 0) {
+                    price = xrpPool / tokenPool;
+                  }
                 }
+              } catch (ammError) {
+                console.error(`Error fetching AMM price for ${token.token_name}:`, ammError);
+                // Use cached price as fallback
+                price = parseFloat(token.current_price) || 0;
               }
+            } else {
+              // No AMM pool, use cached price
+              price = parseFloat(token.current_price) || 0;
             }
 
-            if (holder) {
-              const balance = parseFloat(holder.balance);
-              const price = parseFloat(token.current_price) || 0;
-              const xrpValue = balance * price;
+            const xrpValue = balance * price;
 
-              kingsData.push({
-                token,
-                holder,
-                xrpValue
+            // Create holder object
+            const holder = {
+              holder_address: topLine.account,
+              balance: balance,
+              percentage: percentage,
+              is_developer_wallet: topLine.account === receiverWallet,
+              rank: 1
+            };
+
+            // Cache holder data for reference
+            await supabase
+              .from('token_holders')
+              .upsert({
+                token_id: token.id,
+                holder_address: topLine.account,
+                balance: balance,
+                percentage: percentage,
+                is_developer_wallet: topLine.account === receiverWallet,
+                rank: 1,
+                last_updated: new Date().toISOString()
+              }, {
+                onConflict: 'token_id,holder_address'
               });
+
+            // Update token price cache
+            if (price > 0) {
+              await supabase
+                .from('meme_tokens')
+                .update({
+                  current_price: price,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', token.id);
             }
+
+            kingsData.push({
+              token: {
+                ...token,
+                current_price: price,
+                total_supply: totalSupply
+              },
+              holder,
+              xrpValue
+            });
+
           } catch (tokenError) {
             console.error(`Error loading holder for token ${token.token_name}:`, tokenError);
             // Continue to next token
@@ -142,7 +193,13 @@ export default function KingsList() {
         });
 
         const trustlines = response.result.lines || [];
-        const totalSupply = parseFloat(token.supply) || parseFloat(token.initial_supply) || 0;
+
+        // Calculate real total supply from trustlines
+        const totalSupply = trustlines.reduce((sum, line) => {
+          const bal = parseFloat(line.balance);
+          return sum + (bal > 0 ? bal : 0);
+        }, 0);
+
         const holdersToInsert = [];
 
         trustlines.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
