@@ -235,7 +235,7 @@ export async function executeBuyToken(data) {
   }
 
   const { data: token, error } = await supabase
-    .from('tokens')
+    .from('meme_tokens')
     .select('*')
     .eq('id', tokenId)
     .single();
@@ -249,6 +249,34 @@ export async function executeBuyToken(data) {
 
   try {
     const wallet = Wallet.fromSeed(walletData.seed);
+
+    // Check if trustline exists
+    const accountLines = await client.request({
+      command: 'account_lines',
+      account: wallet.address,
+      ledger_index: 'validated'
+    });
+
+    const hasTrustline = accountLines.result.lines.some(
+      line => line.currency === token.currency_code && line.account === token.issuer_address
+    );
+
+    // Set up trustline if it doesn't exist
+    if (!hasTrustline) {
+      const trustSet = {
+        TransactionType: 'TrustSet',
+        Account: wallet.address,
+        LimitAmount: {
+          currency: token.currency_code,
+          issuer: token.issuer_address,
+          value: '999999999'
+        }
+      };
+
+      const preparedTrust = await client.autofill(trustSet);
+      const signedTrust = wallet.sign(preparedTrust);
+      await client.submitAndWait(signedTrust.tx_blob);
+    }
 
     const offer = {
       TransactionType: 'OfferCreate',
@@ -269,7 +297,7 @@ export async function executeBuyToken(data) {
       wallet_address: wallet.address,
       action_type: 'buy_token',
       details: {
-        token: token.name,
+        token: token.token_name,
         amountXRP: amountXRP,
         txHash: result.result.hash
       }
@@ -278,10 +306,10 @@ export async function executeBuyToken(data) {
     return {
       status: 'success',
       title: 'Buy Order Placed',
-      message: `Successfully placed buy order for ${token.name}`,
+      message: `Successfully placed buy order for ${token.token_name}`,
       transactionHash: result.result.hash,
       data: {
-        token: token.name,
+        token: token.token_name,
         spent: `${amountXRP} XRP`,
         slippage: `${slippage}%`
       },
@@ -310,7 +338,7 @@ export async function executeSellToken(data) {
   }
 
   const { data: token, error } = await supabase
-    .from('tokens')
+    .from('meme_tokens')
     .select('*')
     .eq('id', tokenId)
     .single();
@@ -324,6 +352,34 @@ export async function executeSellToken(data) {
 
   try {
     const wallet = Wallet.fromSeed(walletData.seed);
+
+    // Check if trustline exists
+    const accountLines = await client.request({
+      command: 'account_lines',
+      account: wallet.address,
+      ledger_index: 'validated'
+    });
+
+    const hasTrustline = accountLines.result.lines.some(
+      line => line.currency === token.currency_code && line.account === token.issuer_address
+    );
+
+    // Set up trustline if it doesn't exist (needed to receive tokens)
+    if (!hasTrustline) {
+      const trustSet = {
+        TransactionType: 'TrustSet',
+        Account: wallet.address,
+        LimitAmount: {
+          currency: token.currency_code,
+          issuer: token.issuer_address,
+          value: '999999999'
+        }
+      };
+
+      const preparedTrust = await client.autofill(trustSet);
+      const signedTrust = wallet.sign(preparedTrust);
+      await client.submitAndWait(signedTrust.tx_blob);
+    }
 
     const offer = {
       TransactionType: 'OfferCreate',
@@ -344,7 +400,7 @@ export async function executeSellToken(data) {
       wallet_address: wallet.address,
       action_type: 'sell_token',
       details: {
-        token: token.name,
+        token: token.token_name,
         amount: amountToken,
         minXRP: minXRP,
         txHash: result.result.hash
@@ -354,10 +410,10 @@ export async function executeSellToken(data) {
     return {
       status: 'success',
       title: 'Sell Order Placed',
-      message: `Successfully placed sell order for ${amountToken} ${token.name}`,
+      message: `Successfully placed sell order for ${amountToken} ${token.token_name}`,
       transactionHash: result.result.hash,
       data: {
-        token: token.name,
+        token: token.token_name,
         amount: `${amountToken} ${token.currency_code}`,
         minReceive: `${minXRP} XRP`
       },
