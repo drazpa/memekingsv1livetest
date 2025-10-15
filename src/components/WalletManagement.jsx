@@ -323,6 +323,8 @@ export default function WalletManagement() {
       const { requestWithRetry } = await import('../utils/xrplClient');
 
       let balance = 0;
+      let network = 'testnet';
+
       try {
         const accountInfo = await requestWithRetry({
           command: 'account_info',
@@ -332,7 +334,7 @@ export default function WalletManagement() {
         balance = parseFloat(accountInfo.result.account_data.Balance) / 1000000;
       } catch (error) {
         if (error.data?.error !== 'actNotFound') {
-          throw error;
+          console.error('Error fetching account info:', error);
         }
       }
 
@@ -340,13 +342,15 @@ export default function WalletManagement() {
         address: wallet.address,
         seed: wallet.seed,
         publicKey: wallet.publicKey,
-        balance: balance
+        balance: balance,
+        network: network
       });
 
       toast.success('Wallet imported successfully!');
     } catch (error) {
       console.error('Error importing wallet:', error);
-      toast.error('Failed to import wallet: Invalid seed phrase or network error');
+      toast.error('Failed to import wallet: Invalid seed phrase');
+      setImportedWalletData(null);
     } finally {
       setImportingSeed(false);
     }
@@ -375,7 +379,7 @@ export default function WalletManagement() {
         encrypted_seed: importedWalletData.seed,
         purpose: 'trading',
         notes: `Imported from seed`,
-        network: 'testnet',
+        network: importedWalletData.network || 'testnet',
         balance_xrp: importedWalletData.balance,
         is_favorite: false,
         created_at: new Date().toISOString(),
