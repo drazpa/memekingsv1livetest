@@ -276,17 +276,17 @@ export default function MyTokens() {
     setLoading(true);
 
     try {
-      const cacheAge = 300;
-      const { data: cachedData, error: cacheError } = await supabase
+      // First, try to load ANY cached data immediately (even if expired)
+      const { data: anyCachedData } = await supabase
         .from('token_holdings_cache')
         .select('*, token:meme_tokens(*)')
         .eq('wallet_address', connectedWallet.address)
-        .gte('last_updated', new Date(Date.now() - cacheAge * 1000).toISOString());
+        .order('last_updated', { ascending: false });
 
-      if (!forceRefresh && cachedData && cachedData.length > 0 && !cacheError) {
-        console.log(`✅ Using cached holdings (${cachedData.length} items)`);
+      if (anyCachedData && anyCachedData.length > 0) {
+        console.log(`⚡ Showing cached data immediately (${anyCachedData.length} items)`);
 
-        const tokenHoldings = cachedData.map(cache => {
+        const tokenHoldings = anyCachedData.map(cache => {
           const balance = parseFloat(cache.balance);
           const supplyPercent = cache.token?.supply && parseFloat(cache.token.supply) > 0
             ? (balance / parseFloat(cache.token.supply)) * 100
@@ -306,11 +306,18 @@ export default function MyTokens() {
 
         setHoldings(tokenHoldings);
         calculateAnalytics(tokenHoldings);
-        setLoading(false);
-        return;
+
+        // If cache is recent and not forcing refresh, stop here
+        const cacheAge = new Date() - new Date(anyCachedData[0].last_updated);
+        if (!forceRefresh && cacheAge < 300000) {
+          console.log('✅ Cache is fresh (<5min), skipping XRPL fetch');
+          setLoading(false);
+          return;
+        }
+
+        console.log('🔄 Cache shown, fetching fresh data in background...');
       }
 
-      console.log('🔄 Fetching fresh data from XRPL...');
       const { requestWithRetry } = await import('../utils/xrplClient');
 
       const response = await requestWithRetry({
