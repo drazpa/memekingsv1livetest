@@ -890,9 +890,9 @@ class AIAssistant {
     const { data: tokens } = await supabase
       .from('meme_tokens')
       .select('*')
-      .eq('status', 'active')
+      .not('status', 'is', null)
       .order('token_name', { ascending: true })
-      .limit(100);
+      .limit(200);
 
     if (!tokens || tokens.length === 0) {
       return {
@@ -1562,9 +1562,10 @@ class AIAssistant {
 
     const { data: tokens } = await supabase
       .from('meme_tokens')
-      .select('id, token_name, currency_code')
-      .eq('status', 'active')
-      .limit(50);
+      .select('id, token_name, currency_code, issuer_address')
+      .eq('amm_pool_created', true)
+      .order('token_name', { ascending: true })
+      .limit(200);
 
     return {
       content: 'Let\'s buy some tokens! I\'ll guide you through the process step by step.',
@@ -1634,9 +1635,10 @@ class AIAssistant {
 
     const { data: tokens } = await supabase
       .from('meme_tokens')
-      .select('id, token_name, currency_code')
-      .eq('status', 'active')
-      .limit(50);
+      .select('id, token_name, currency_code, issuer_address')
+      .eq('amm_pool_created', true)
+      .order('token_name', { ascending: true })
+      .limit(200);
 
     return {
       content: 'Ready to sell tokens! I\'ll help you create a sell order.',
