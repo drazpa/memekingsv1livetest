@@ -920,7 +920,7 @@ export default function Memes() {
     setCanCloseProgress(false);
 
     const steps = [
-      { title: 'Processing Creation Fee', description: connectedWallet?.address === RECEIVER_ADDRESS ? 'Creation fee waived (admin)' : 'Processing 5 XRP creation fee payment' },
+      { title: 'Connecting to XRPL', description: 'Establishing connection to XRP Ledger testnet' },
       { title: 'Validating Wallets', description: 'Checking issuer and receiver wallet balances' },
       { title: 'Creating Trust Line', description: 'Setting up trust line for the new token' },
       { title: 'Issuing Tokens', description: 'Minting tokens to receiver wallet' }
@@ -945,12 +945,8 @@ export default function Memes() {
     try {
       setCurrentProgressStep(0);
 
-      try {
-        const { getClient } = await import('../utils/xrplClient');
-        client = await getClient();
-      } catch (connectionError) {
-        throw new Error(`Failed to connect to XRP Ledger: ${connectionError.message}`);
-      }
+      const { getClient } = await import('../utils/xrplClient');
+      client = await getClient();
 
       const feeHash = await payCreationFee(client);
       const updatedSteps0 = [...steps];
