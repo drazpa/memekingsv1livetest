@@ -4,6 +4,7 @@ import * as xrpl from 'xrpl';
 import { Buffer } from 'buffer';
 import toast from 'react-hot-toast';
 import TokenIcon from '../components/TokenIcon';
+import TokenGridCard from '../components/TokenGridCard';
 import SendTokenModal from '../components/SendTokenModal';
 import ReceiveTokenModal from '../components/ReceiveTokenModal';
 import TokenDetailModal from '../components/TokenDetailModal';
@@ -38,6 +39,9 @@ export default function MyTokens() {
   const [tokenFilterTab, setTokenFilterTab] = useState('all');
   const [userCreatedTokens, setUserCreatedTokens] = useState([]);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [viewMode, setViewMode] = useState(() => {
+    return window.innerWidth < 768 ? 'grid' : 'list';
+  });
 
   useEffect(() => {
     loadConnectedWallet();
@@ -720,9 +724,34 @@ export default function MyTokens() {
             >
               {sortOrder === 'asc' ? '↑' : '↓'}
             </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-purple-900/30 border border-purple-500/30 text-purple-200 hover:bg-purple-900/50'
+                }`}
+                title="List View"
+              >
+                ☰
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-purple-900/30 border border-purple-500/30 text-purple-200 hover:bg-purple-900/50'
+                }`}
+                title="Grid View"
+              >
+                ▦
+              </button>
+            </div>
             </div>
           </div>
 
+          {viewMode === 'list' ? (
           <div className="glass rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -1037,6 +1066,61 @@ export default function MyTokens() {
             </table>
           </div>
         </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {holdings
+                .filter(holding => {
+                  const isUserToken = connectedWallet && holding.token.issuer_address === connectedWallet.address;
+                  const isLPToken = holding.isLPToken;
+                  const isRegularToken = !isLPToken && !isUserToken;
+
+                  if (tokenFilterTab === 'all') {
+                    if (isLPToken && !showLPTokens) return false;
+                    if (isRegularToken && !showRegularTokens) return false;
+                    if (isUserToken && !showUserTokens) return false;
+                  } else if (tokenFilterTab === 'user') {
+                    if (!isUserToken) return false;
+                  }
+
+                  if (!searchQuery) return true;
+                  const search = searchQuery.toLowerCase();
+                  return holding.token.token_name.toLowerCase().includes(search) ||
+                         holding.token.currency_code.toLowerCase().includes(search);
+                })
+                .sort((a, b) => {
+                  const favA = favorites.includes(a.token.id);
+                  const favB = favorites.includes(b.token.id);
+                  if (favA !== favB) return favB ? 1 : -1;
+
+                  let compareValue = 0;
+                  if (sortBy === 'value') compareValue = b.value - a.value;
+                  else if (sortBy === 'balance') compareValue = b.balance - a.balance;
+                  else if (sortBy === 'supplyPercent') compareValue = (b.supplyPercentage || 0) - (a.supplyPercentage || 0);
+                  else if (sortBy === 'price') compareValue = b.price - a.price;
+                  else if (sortBy === 'name') compareValue = a.token.token_name.localeCompare(b.token.token_name);
+
+                  return sortOrder === 'asc' ? -compareValue : compareValue;
+                })
+                .map((holding, index) => (
+                  <TokenGridCard
+                    key={index}
+                    token={holding.token}
+                    poolData={{
+                      price: holding.price,
+                      marketCap: holding.value,
+                      xrpAmount: poolsData[holding.token.id]?.xrpAmount || 0,
+                      tokenAmount: poolsData[holding.token.id]?.tokenAmount || 0
+                    }}
+                    isFavorited={favorites.includes(holding.token.id)}
+                    onToggleFavorite={(id, e) => {
+                      e?.stopPropagation();
+                      toggleFavorite(id);
+                    }}
+                    onClick={() => setSelectedToken(holding.token)}
+                  />
+                ))}
+            </div>
+          )}
         </>
       ) : (
         <div className="glass rounded-lg p-12 text-center">

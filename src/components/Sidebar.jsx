@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { getXRPBalance } from '../utils/xrplBalance';
 import { getAvailableServers, getCurrentServer, setManualServer, loadSavedServer } from '../utils/xrplClient';
+import { NetworkSelector } from './NetworkSelector';
 
 export default function Sidebar({ currentPage, onNavigate }) {
   const [xrpPrice, setXrpPrice] = useState(null);
@@ -327,6 +328,19 @@ export default function Sidebar({ currentPage, onNavigate }) {
               ) : (
                 <div className="text-purple-400 text-[10px]">Unable to load</div>
               )}
+            </div>
+
+            {/* Mobile Network Selector */}
+            <div className="glass rounded-lg p-2 mt-1">
+              <div className="text-purple-300 text-[10px] font-medium mb-2">Network</div>
+              <NetworkSelector
+                network={selectedNetwork || getCurrentServer()}
+                setNetwork={(network) => {
+                  setManualServer(network);
+                  setSelectedNetwork(network);
+                  window.location.reload();
+                }}
+              />
             </div>
           </div>
         </div>
