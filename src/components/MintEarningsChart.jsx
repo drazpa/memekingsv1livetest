@@ -46,17 +46,25 @@ const MintEarningsChart = ({ walletAddress, walletSeed }) => {
         dailyEarnings[date] = (dailyEarnings[date] || 0) + parseFloat(record.amount);
       });
 
-      const history = Object.entries(dailyEarnings)
-        .map(([date, amount]) => ({ date, amount }))
-        .slice(0, 7)
-        .reverse();
+      const sortedEntries = Object.entries(dailyEarnings).sort((a, b) => {
+        return new Date(a[0]) - new Date(b[0]);
+      });
+
+      const history = sortedEntries.map(([date, amount]) => ({ date, amount }));
+
+      const cumulativeHistory = [];
+      let runningTotal = 0;
+      history.forEach(item => {
+        runningTotal += item.amount;
+        cumulativeHistory.push({ date: item.date, amount: runningTotal });
+      });
 
       setEarnings({
         total,
         claimed,
         unclaimed,
         totalMints: data.length,
-        history
+        history: cumulativeHistory.slice(-30)
       });
     } catch (error) {
       console.error('Error loading earnings:', error);
@@ -133,8 +141,6 @@ const MintEarningsChart = ({ walletAddress, walletSeed }) => {
     }
   };
 
-  const maxEarning = Math.max(...earnings.history.map(h => h.amount), 1);
-
   return (
     <div className="bg-gray-800/50 rounded-lg p-6 border border-gray-700">
       <div className="flex items-center justify-between mb-4">
@@ -191,27 +197,65 @@ const MintEarningsChart = ({ walletAddress, walletSeed }) => {
 
       {earnings.history.length > 0 ? (
         <div>
-          <div className="text-gray-400 text-sm mb-3">Last 7 Days</div>
-          <div className="flex items-end justify-between gap-2 h-40">
-            {earnings.history.map((day, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-full bg-gray-700 rounded-t relative group">
-                  <div
-                    className="bg-gradient-to-t from-blue-600 to-blue-400 rounded-t transition-all duration-300 hover:from-blue-500 hover:to-blue-300"
-                    style={{
-                      height: `${(day.amount / maxEarning) * 140}px`,
-                      minHeight: day.amount > 0 ? '8px' : '0px'
-                    }}
-                  />
-                  <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    {day.amount.toFixed(4)} XRP
-                  </div>
-                </div>
-                <div className="text-xs text-gray-500 transform -rotate-45 origin-top-left w-16 mt-2">
-                  {day.date.split('/').slice(0, 2).join('/')}
-                </div>
-              </div>
-            ))}
+          <div className="text-gray-400 text-sm mb-3">Earnings History (Last 30 Days)</div>
+          <div className="relative h-48 bg-gray-900/50 rounded-lg p-4">
+            <svg className="w-full h-full" viewBox="0 0 400 150" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="earningsGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="rgb(34, 211, 238)" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="rgb(34, 211, 238)" stopOpacity="0.05" />
+                </linearGradient>
+              </defs>
+
+              {earnings.history.length > 1 && (() => {
+                const maxAmount = Math.max(...earnings.history.map(h => h.amount), 0.1);
+                const points = earnings.history.map((point, index) => {
+                  const x = (index / (earnings.history.length - 1)) * 400;
+                  const y = 150 - ((point.amount / maxAmount) * 130);
+                  return `${x},${y}`;
+                }).join(' ');
+
+                const areaPoints = `0,150 ${points} 400,150`;
+
+                return (
+                  <>
+                    <polyline
+                      points={points}
+                      fill="none"
+                      stroke="rgb(34, 211, 238)"
+                      strokeWidth="2"
+                      className="drop-shadow-lg"
+                    />
+                    <polygon
+                      points={areaPoints}
+                      fill="url(#earningsGradient)"
+                    />
+                    {earnings.history.map((point, index) => {
+                      const x = (index / (earnings.history.length - 1)) * 400;
+                      const y = 150 - ((point.amount / maxAmount) * 130);
+                      return (
+                        <g key={index}>
+                          <circle
+                            cx={x}
+                            cy={y}
+                            r="3"
+                            fill="rgb(34, 211, 238)"
+                            className="drop-shadow-lg"
+                          />
+                          <title>{`${point.date}: ${point.amount.toFixed(6)} XRP`}</title>
+                        </g>
+                      );
+                    })}
+                  </>
+                );
+              })()}
+            </svg>
+            <div className="absolute bottom-2 left-4 text-xs text-gray-500">
+              {earnings.history.length > 0 && new Date(earnings.history[0].date).toLocaleDateString()}
+            </div>
+            <div className="absolute bottom-2 right-4 text-xs text-gray-500">
+              {earnings.history.length > 0 && new Date(earnings.history[earnings.history.length - 1].date).toLocaleDateString()}
+            </div>
           </div>
         </div>
       ) : (
