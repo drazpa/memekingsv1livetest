@@ -874,6 +874,38 @@ export default function Memes() {
     setNewToken({ ...newToken, image: file });
   };
 
+  const payCreationFee = async () => {
+    if (!connectedWallet) {
+      throw new Error('Connected wallet required to pay creation fee');
+    }
+
+    const { getClient } = await import('../utils/xrplClient');
+    const client = await getClient();
+    const wallet = xrpl.Wallet.fromSeed(connectedWallet.seed);
+
+    const payment = {
+      TransactionType: 'Payment',
+      Account: connectedWallet.address,
+      Destination: RECEIVER_ADDRESS,
+      Amount: xrpl.xrpToDrops('5'),
+      Memos: [{
+        Memo: {
+          MemoData: Buffer.from(`Token Creation Fee: ${newToken.name}`, 'utf8').toString('hex').toUpperCase()
+        }
+      }]
+    };
+
+    const prepared = await client.autofill(payment);
+    const signed = wallet.sign(prepared);
+    const result = await client.submitAndWait(signed.tx_blob);
+
+    if (result.result.meta.TransactionResult !== 'tesSUCCESS') {
+      throw new Error(`Payment failed: ${result.result.meta.TransactionResult}`);
+    }
+
+    return result.result.hash;
+  };
+
   const createCustomToken = async () => {
     if (!newToken.name) {
       toast.error('Token name is required');
