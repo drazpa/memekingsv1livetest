@@ -2096,50 +2096,73 @@ export default function Memes() {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <div className="glass rounded-lg p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold text-purple-200 mb-6">Create Token</h3>
+            <h3 className="text-2xl font-bold text-purple-200 mb-2">Create Token</h3>
+            <p className="text-purple-400 text-sm mb-6">
+              Create a new token on the XRP Ledger. The token will be minted and automatically added to a liquidity pool with the XRP you lock.
+            </p>
 
             <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Token Name"
-                value={newToken.name}
-                onChange={(e) => setNewToken({ ...newToken, name: e.target.value })}
-                className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
-              />
-              <input
-                type="number"
-                placeholder="Supply (default: 1,000,000)"
-                value={newToken.supply}
-                onChange={(e) => setNewToken({ ...newToken, supply: e.target.value })}
-                className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
-              />
-              <input
-                type="number"
-                placeholder="XRP to Lock in Pool (default: 1)"
-                value={newToken.xrpLocked}
-                onChange={(e) => setNewToken({ ...newToken, xrpLocked: e.target.value })}
-                className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
-              />
-              <textarea
-                placeholder="Description (optional)"
-                value={newToken.description}
-                onChange={(e) => setNewToken({ ...newToken, description: e.target.value })}
-                className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400 min-h-[80px]"
-              />
-              <input
-                type="text"
-                placeholder="Twitter Handle (optional, e.g., @mytoken)"
-                value={newToken.twitterHandle}
-                onChange={(e) => setNewToken({ ...newToken, twitterHandle: e.target.value })}
-                className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
-              />
-              <input
-                type="url"
-                placeholder="Website URL (optional)"
-                value={newToken.websiteUrl}
-                onChange={(e) => setNewToken({ ...newToken, websiteUrl: e.target.value })}
-                className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
-              />
+              <div>
+                <label className="block text-purple-300 mb-2 text-sm font-medium">Token Name *</label>
+                <input
+                  type="text"
+                  placeholder="e.g., MemeKing"
+                  value={newToken.name}
+                  onChange={(e) => setNewToken({ ...newToken, name: e.target.value })}
+                  className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
+                />
+              </div>
+              <div>
+                <label className="block text-purple-300 mb-2 text-sm font-medium">Total Supply *</label>
+                <input
+                  type="number"
+                  placeholder="1000000"
+                  value={newToken.supply}
+                  onChange={(e) => setNewToken({ ...newToken, supply: e.target.value })}
+                  className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
+                />
+                <p className="text-xs text-purple-400 mt-1">Maximum number of tokens that will exist</p>
+              </div>
+              <div>
+                <label className="block text-purple-300 mb-2 text-sm font-medium">XRP to Lock in Initial Pool *</label>
+                <input
+                  type="number"
+                  placeholder="1"
+                  value={newToken.xrpLocked}
+                  onChange={(e) => setNewToken({ ...newToken, xrpLocked: e.target.value })}
+                  className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
+                />
+                <p className="text-xs text-purple-400 mt-1">Amount of XRP to add as initial liquidity (determines starting price)</p>
+              </div>
+              <div>
+                <label className="block text-purple-300 mb-2 text-sm font-medium">Description</label>
+                <textarea
+                  placeholder="Tell the community about your token..."
+                  value={newToken.description}
+                  onChange={(e) => setNewToken({ ...newToken, description: e.target.value })}
+                  className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400 min-h-[80px]"
+                />
+              </div>
+              <div>
+                <label className="block text-purple-300 mb-2 text-sm font-medium">Twitter Handle</label>
+                <input
+                  type="text"
+                  placeholder="e.g., @mytoken"
+                  value={newToken.twitterHandle}
+                  onChange={(e) => setNewToken({ ...newToken, twitterHandle: e.target.value })}
+                  className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
+                />
+              </div>
+              <div>
+                <label className="block text-purple-300 mb-2 text-sm font-medium">Website URL</label>
+                <input
+                  type="url"
+                  placeholder="https://yourtoken.com"
+                  value={newToken.websiteUrl}
+                  onChange={(e) => setNewToken({ ...newToken, websiteUrl: e.target.value })}
+                  className="w-full px-4 py-2 bg-purple-900/20 border border-purple-500/30 rounded-lg text-purple-200 placeholder-purple-400"
+                />
+              </div>
               <div>
                 <label className="block text-purple-300 mb-2 text-sm">Token Image</label>
                 <input
@@ -2205,10 +2228,27 @@ export default function Memes() {
                 </div>
 
                 {walletConfigMode === 'admin' ? (
-                  <div className="space-y-2 text-sm text-purple-300">
-                    <p><span className="font-medium">Issuer:</span> {ISSUER_ADDRESS}</p>
-                    <p><span className="font-medium">Receiver:</span> {RECEIVER_ADDRESS}</p>
-                    <p className="text-xs text-purple-400 mt-2">Using MEMEKINGS managed wallets for token creation</p>
+                  <div className="space-y-3">
+                    <div className="space-y-2 text-sm text-purple-300">
+                      <p><span className="font-medium">Issuer:</span> {ISSUER_ADDRESS}</p>
+                      <p><span className="font-medium">Receiver:</span> {RECEIVER_ADDRESS}</p>
+                      <p className="text-xs text-purple-400 mt-2">Using MEMEKINGS managed wallets for token creation</p>
+                    </div>
+                    {!connectedWallet && (
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                        <p className="text-yellow-300 text-xs font-medium">⚠️ Connected wallet required</p>
+                        <p className="text-yellow-300/80 text-xs mt-1">You must connect your wallet to pay the 5 XRP creation fee when using Admin Token mode.</p>
+                      </div>
+                    )}
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                      <p className="text-blue-300 text-xs font-medium">ℹ️ What happens during creation:</p>
+                      <ul className="text-blue-300/80 text-xs mt-2 space-y-1 list-disc list-inside">
+                        <li>5 XRP fee is paid from your connected wallet</li>
+                        <li>Token is issued by MEMEKINGS managed issuer</li>
+                        <li>Tokens are sent to platform receiver wallet</li>
+                        <li>Automatic trustline setup and liquidity pool creation</li>
+                      </ul>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -2274,7 +2314,12 @@ export default function Memes() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={createCustomToken}
-                disabled={isCreating || uploadingImage || (walletConfigMode === 'custom' && (!selectedIssuerWallet || !selectedReceiverWallet))}
+                disabled={
+                  isCreating ||
+                  uploadingImage ||
+                  (walletConfigMode === 'admin' && !connectedWallet) ||
+                  (walletConfigMode === 'custom' && (!selectedIssuerWallet || !selectedReceiverWallet))
+                }
                 className="btn-primary text-white px-6 py-2 rounded-lg font-medium flex-1 disabled:opacity-50"
               >
                 {uploadingImage ? (
