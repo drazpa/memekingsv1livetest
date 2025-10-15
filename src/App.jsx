@@ -8,6 +8,7 @@ import Trade from './pages/Trade';
 import BotTrader from './pages/BotTrader';
 import Vault from './pages/Vault';
 import MyTokens from './pages/MyTokens';
+import XRPRewards from './pages/XRPRewards';
 import Analytics from './pages/Analytics';
 import Top10 from './pages/Top10';
 import KingsList from './pages/KingsList';
@@ -203,6 +204,8 @@ export default function App() {
         return <Vault key={pageKey} />;
       case 'mytokens':
         return <MyTokens key={pageKey} />;
+      case 'xrprewards':
+        return <XRPRewards key={pageKey} />;
       case 'analytics':
         return <Analytics key={pageKey} />;
       case 'top10':

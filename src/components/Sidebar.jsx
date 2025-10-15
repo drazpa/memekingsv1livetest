@@ -122,6 +122,7 @@ export default function Sidebar({ currentPage, onNavigate }) {
     { id: 'bottrader', label: 'Bot Trader', icon: '🤖' },
     { id: 'vault', label: 'Vault', icon: '🏦' },
     { id: 'mytokens', label: 'My Tokens', icon: '💎' },
+    { id: 'xrprewards', label: 'XRP Rewards', icon: '💰' },
     { id: 'analytics', label: 'Analytics', icon: '📈' },
     { id: 'aichat', label: 'AI Chat', icon: '💬' },
     { id: 'about', label: 'About', icon: 'ℹ️' },

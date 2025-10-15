@@ -19,11 +19,35 @@ const BOT_FEE_RECEIVER = 'rphatRpwXcPAo7CVm46dC78JAQ6kLMqb2M';
 const MIN_XRP_AMOUNT = 0.1;
 const MAX_XRP_AMOUNT = 100;
 
-const BOT_STRATEGIES = {
-  ACCUMULATE: 'accumulate',
-  DISTRIBUTE: 'distribute',
-  BALANCED: 'balanced'
-};
+const BOT_STRATEGIES = [
+  { id: 'balanced', name: '⚖️ Balanced (50% Buy / 50% Sell)', buyProb: 50 },
+  { id: 'accumulate', name: '📈 Accumulate (80% Buy / 20% Sell)', buyProb: 80 },
+  { id: 'distribute', name: '📉 Distribute (20% Buy / 80% Sell)', buyProb: 20 },
+  { id: 'aggressive_buy', name: '🔥 Aggressive Buy (90% Buy / 10% Sell)', buyProb: 90 },
+  { id: 'aggressive_sell', name: '❄️ Aggressive Sell (10% Buy / 90% Sell)', buyProb: 10 },
+  { id: 'moderate_buy', name: '📊 Moderate Buy (70% Buy / 30% Sell)', buyProb: 70 },
+  { id: 'moderate_sell', name: '📊 Moderate Sell (30% Buy / 70% Sell)', buyProb: 30 },
+  { id: 'slight_buy', name: '➕ Slight Buy Bias (60% Buy / 40% Sell)', buyProb: 60 },
+  { id: 'slight_sell', name: '➖ Slight Sell Bias (40% Buy / 60% Sell)', buyProb: 40 },
+  { id: 'extreme_buy', name: '🚀 Extreme Buy (95% Buy / 5% Sell)', buyProb: 95 },
+  { id: 'extreme_sell', name: '🎯 Extreme Sell (5% Buy / 95% Sell)', buyProb: 5 },
+  { id: 'conservative', name: '🛡️ Conservative (55% Buy / 45% Sell)', buyProb: 55 },
+  { id: 'conservative_sell', name: '🛡️ Conservative Sell (45% Buy / 55% Sell)', buyProb: 45 },
+  { id: 'bullish', name: '🐂 Bullish (85% Buy / 15% Sell)', buyProb: 85 },
+  { id: 'bearish', name: '🐻 Bearish (15% Buy / 85% Sell)', buyProb: 15 },
+  { id: 'neutral', name: '⚪ Neutral (50% Buy / 50% Sell)', buyProb: 50 },
+  { id: 'scalper', name: '⚡ Scalper (65% Buy / 35% Sell)', buyProb: 65 },
+  { id: 'swing', name: '🌊 Swing Trader (55% Buy / 45% Sell)', buyProb: 55 },
+  { id: 'hodl', name: '💎 HODL (75% Buy / 25% Sell)', buyProb: 75 },
+  { id: 'profit_taker', name: '💰 Profit Taker (25% Buy / 75% Sell)', buyProb: 25 },
+  { id: 'dca', name: '📅 DCA (Dollar Cost Average) (70% Buy / 30% Sell)', buyProb: 70 },
+  { id: 'momentum', name: '⚡ Momentum (80% Buy / 20% Sell)', buyProb: 80 },
+  { id: 'contrarian', name: '🔄 Contrarian (35% Buy / 65% Sell)', buyProb: 35 },
+  { id: 'volatility', name: '📈📉 Volatility (50% Buy / 50% Sell)', buyProb: 50 },
+  { id: 'adaptive', name: '🤖 Adaptive (60% Buy / 40% Sell)', buyProb: 60 }
+];
+
+const BOT_CREATION_REWARD = 0.10;
 
 export default function BotTrader() {
   const [tokens, setTokens] = useState([]);
@@ -48,7 +72,7 @@ export default function BotTrader() {
   const [newBot, setNewBot] = useState({
     name: '',
     tokenId: '',
-    strategy: BOT_STRATEGIES.BALANCED,
+    strategy: 'balanced',
     interval: 15,
     minAmount: 0.5,
     maxAmount: 2,
@@ -689,7 +713,20 @@ export default function BotTrader() {
 
       if (error) throw error;
 
-      toast.success('Trading bot created successfully!');
+      // Award XRP rewards for bot creation
+      try {
+        await supabase.from('xrp_rewards').insert([{
+          wallet_address: connectedWallet.address,
+          amount: BOT_CREATION_REWARD,
+          reward_type: 'bot_creation',
+          description: `Created trading bot: ${newBot.name}`,
+          status: 'pending'
+        }]);
+      } catch (rewardError) {
+        console.error('Error recording bot creation reward:', rewardError);
+      }
+
+      toast.success(`Trading bot created! You earned ${BOT_CREATION_REWARD} XRP reward!`);
       setBots([data, ...bots]);
 
       const createdToken = tokens.find(t => t.id === newBot.tokenId);
@@ -710,7 +747,7 @@ export default function BotTrader() {
       setNewBot({
         name: '',
         tokenId: '',
-        strategy: BOT_STRATEGIES.BALANCED,
+        strategy: 'balanced',
         interval: 15,
         minAmount: 0.5,
         maxAmount: 2,
@@ -737,20 +774,10 @@ export default function BotTrader() {
   };
 
   const determineNextAction = (bot, poolData) => {
-    const strategy = bot.strategy || BOT_STRATEGIES.BALANCED;
+    const strategy = bot.strategy || 'balanced';
     const buyProb = (bot.trade_mode || 50) / 100;
 
-    let willBuy = false;
-    switch (strategy) {
-      case BOT_STRATEGIES.ACCUMULATE:
-        willBuy = Math.random() < 0.8;
-        break;
-      case BOT_STRATEGIES.DISTRIBUTE:
-        willBuy = Math.random() < 0.2;
-        break;
-      default:
-        willBuy = Math.random() < buyProb;
-    }
+    const willBuy = Math.random() < buyProb;
 
     const xrpAmount = getRandomAmount(bot.min_amount, bot.max_amount);
     const currentPrice = poolData.price;
@@ -2587,12 +2614,19 @@ export default function BotTrader() {
                 <label className="block text-blue-300 mb-2">Strategy</label>
                 <select
                   value={newBot.strategy}
-                  onChange={(e) => setNewBot({ ...newBot, strategy: e.target.value })}
+                  onChange={(e) => {
+                    const selectedStrategy = BOT_STRATEGIES.find(s => s.id === e.target.value);
+                    setNewBot({
+                      ...newBot,
+                      strategy: e.target.value,
+                      buyProbability: selectedStrategy ? selectedStrategy.buyProb : 50
+                    });
+                  }}
                   className="input w-full"
                 >
-                  <option value={BOT_STRATEGIES.BALANCED}>⚖️ Balanced (50/50 Buy/Sell)</option>
-                  <option value={BOT_STRATEGIES.ACCUMULATE}>📈 Accumulate (80% Buy / 20% Sell)</option>
-                  <option value={BOT_STRATEGIES.DISTRIBUTE}>📉 Distribute (20% Buy / 80% Sell)</option>
+                  {BOT_STRATEGIES.map(strategy => (
+                    <option key={strategy.id} value={strategy.id}>{strategy.name}</option>
+                  ))}
                 </select>
               </div>
 
@@ -2720,12 +2754,19 @@ export default function BotTrader() {
                 <label className="block text-blue-300 mb-2">Strategy</label>
                 <select
                   value={editingBot.strategy}
-                  onChange={(e) => setEditingBot({ ...editingBot, strategy: e.target.value })}
+                  onChange={(e) => {
+                    const selectedStrategy = BOT_STRATEGIES.find(s => s.id === e.target.value);
+                    setEditingBot({
+                      ...editingBot,
+                      strategy: e.target.value,
+                      trade_mode: selectedStrategy ? selectedStrategy.buyProb : editingBot.trade_mode
+                    });
+                  }}
                   className="input w-full"
                 >
-                  <option value={BOT_STRATEGIES.BALANCED}>⚖️ Balanced (50/50)</option>
-                  <option value={BOT_STRATEGIES.ACCUMULATE}>📈 Accumulate (80/20)</option>
-                  <option value={BOT_STRATEGIES.DISTRIBUTE}>📉 Distribute (20/80)</option>
+                  {BOT_STRATEGIES.map(strategy => (
+                    <option key={strategy.id} value={strategy.id}>{strategy.name}</option>
+                  ))}
                 </select>
               </div>
 
