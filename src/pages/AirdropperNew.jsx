@@ -48,6 +48,8 @@ export default function Airdropper() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [fetchingHolders, setFetchingHolders] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [currentProgress, setCurrentProgress] = useState({ recipient: 0, token: 0, total: 0 });
   const [fetchHoldersForToken, setFetchHoldersForToken] = useState(null);
   const [analytics, setAnalytics] = useState({
     totalCampaigns: 0,
@@ -311,6 +313,8 @@ export default function Airdropper() {
       if (selectedCampaign?.id === campaignId) {
         loadCampaignDetails(campaignId);
       }
+
+      executeAirdrop(campaignId);
     } catch (error) {
       console.error('Error starting campaign:', error);
       toast.error('Failed to start campaign');
@@ -348,6 +352,8 @@ export default function Airdropper() {
 
   const stopCampaign = async (campaignId) => {
     try {
+      processingRef.current = false;
+
       const { error } = await supabase
         .from('airdrop_campaigns')
         .update({
@@ -372,6 +378,364 @@ export default function Airdropper() {
     } catch (error) {
       console.error('Error stopping campaign:', error);
       toast.error('Failed to stop campaign');
+    }
+  };
+
+  const calculateAmountForRecipient = async (token, recipientAddress, client) => {
+    try {
+      switch (token.distribution_method) {
+        case 'fixed':
+          return parseFloat(token.amount);
+
+        case 'wallet_balance_percent':
+          const tokenBalance = await client.request({
+            command: 'account_lines',
+            account: recipientAddress,
+            peer: token.issuer_address
+          });
+          const line = tokenBalance.result.lines.find(l =>
+            l.currency === token.currency_code
+          );
+          const balance = line ? parseFloat(line.balance) : 0;
+          return balance * (parseFloat(token.balance_percent) / 100);
+
+        case 'xrp_balance_percent':
+          const accountInfo = await client.request({
+            command: 'account_info',
+            account: recipientAddress
+          });
+          const xrpBalance = parseFloat(accountInfo.result.account_data.Balance) / 1000000;
+          return xrpBalance * (parseFloat(token.balance_percent) / 100);
+
+        case 'random_range':
+          const min = parseFloat(token.min_amount);
+          const max = parseFloat(token.max_amount);
+          return Math.random() * (max - min) + min;
+
+        case 'token_balance_ratio':
+          const sourceBalance = await client.request({
+            command: 'account_lines',
+            account: recipientAddress,
+            peer: token.source_token_issuer
+          });
+          const sourceLine = sourceBalance.result.lines.find(l =>
+            l.currency === token.source_token_currency
+          );
+          return sourceLine ? parseFloat(sourceLine.balance) : 0;
+
+        default:
+          return 0;
+      }
+    } catch (error) {
+      console.error('Error calculating amount:', error);
+      return 0;
+    }
+  };
+
+  const executeAirdrop = async (campaignId) => {
+    if (processingRef.current) {
+      toast.error('Airdrop already in progress');
+      return;
+    }
+
+    processingRef.current = true;
+    setIsProcessing(true);
+
+    try {
+      const { data: campaign } = await supabase
+        .from('airdrop_campaigns')
+        .select('*')
+        .eq('id', campaignId)
+        .single();
+
+      if (!campaign) throw new Error('Campaign not found');
+
+      const { data: tokens } = await supabase
+        .from('airdrop_tokens')
+        .select('*')
+        .eq('campaign_id', campaignId);
+
+      const { data: recipients } = await supabase
+        .from('airdrop_recipients')
+        .select('*')
+        .eq('campaign_id', campaignId)
+        .eq('status', 'pending');
+
+      if (!tokens || tokens.length === 0) {
+        throw new Error('No tokens configured');
+      }
+
+      if (!recipients || recipients.length === 0) {
+        await supabase.from('airdrop_logs').insert({
+          campaign_id: campaignId,
+          log_type: 'info',
+          message: 'All recipients completed'
+        });
+        await stopCampaign(campaignId);
+        return;
+      }
+
+      const wallet = xrpl.Wallet.fromSeed(connectedWallet.seed);
+      const client = new xrpl.Client('wss://xrplcluster.com');
+      await client.connect();
+
+      await supabase.from('airdrop_logs').insert({
+        campaign_id: campaignId,
+        log_type: 'info',
+        message: `Starting airdrop execution: ${recipients.length} recipients, ${tokens.length} tokens`
+      });
+
+      let totalProcessed = 0;
+      let totalFailed = 0;
+      let totalCompleted = 0;
+      let totalFeesAccumulated = 0;
+
+      for (let recipientIndex = 0; recipientIndex < recipients.length; recipientIndex++) {
+        if (!processingRef.current) {
+          await supabase.from('airdrop_logs').insert({
+            campaign_id: campaignId,
+            log_type: 'warning',
+            message: 'Airdrop execution stopped'
+          });
+          break;
+        }
+
+        const recipient = recipients[recipientIndex];
+        setCurrentProgress({
+          recipient: recipientIndex + 1,
+          token: 0,
+          total: recipients.length * tokens.length
+        });
+
+        await supabase.from('airdrop_recipients').update({
+          status: 'processing'
+        }).eq('id', recipient.id);
+
+        let recipientFailed = false;
+        let recipientSuccessCount = 0;
+
+        for (let tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
+          if (!processingRef.current) break;
+
+          const token = tokens[tokenIndex];
+          totalProcessed++;
+
+          setCurrentProgress({
+            recipient: recipientIndex + 1,
+            token: tokenIndex + 1,
+            total: recipients.length * tokens.length
+          });
+
+          const { data: existingTx } = await supabase
+            .from('airdrop_transactions')
+            .select('*')
+            .eq('campaign_id', campaignId)
+            .eq('recipient_id', recipient.id)
+            .eq('token_id', token.id)
+            .maybeSingle();
+
+          if (existingTx && existingTx.status === 'completed') {
+            continue;
+          }
+
+          let transactionId = existingTx?.id;
+          if (!transactionId) {
+            const { data: newTx } = await supabase
+              .from('airdrop_transactions')
+              .insert({
+                campaign_id: campaignId,
+                recipient_id: recipient.id,
+                token_id: token.id,
+                amount: 0,
+                fee_xrp: 0.01,
+                status: 'pending'
+              })
+              .select()
+              .single();
+            transactionId = newTx.id;
+          }
+
+          try {
+            await supabase.from('airdrop_transactions').update({
+              status: 'processing'
+            }).eq('id', transactionId);
+
+            const amount = await calculateAmountForRecipient(token, recipient.wallet_address, client);
+
+            if (amount <= 0) {
+              await supabase.from('airdrop_transactions').update({
+                status: 'failed',
+                error_message: 'Calculated amount is zero or negative',
+                amount: amount,
+                processed_at: new Date().toISOString()
+              }).eq('id', transactionId);
+
+              await supabase.from('airdrop_logs').insert({
+                campaign_id: campaignId,
+                log_type: 'warning',
+                message: `Skipped ${recipient.wallet_address} - ${token.currency_code}: amount is ${amount}`
+              });
+
+              totalFailed++;
+              continue;
+            }
+
+            const payment = {
+              TransactionType: 'Payment',
+              Account: wallet.address,
+              Destination: recipient.wallet_address,
+              Amount: {
+                currency: token.currency_code,
+                value: amount.toString(),
+                issuer: token.issuer_address
+              }
+            };
+
+            const prepared = await client.autofill(payment);
+            const signed = wallet.sign(prepared);
+            const result = await client.submitAndWait(signed.tx_blob);
+
+            if (result.result.meta.TransactionResult === 'tesSUCCESS') {
+              const feeInXRP = parseFloat(result.result.Fee) / 1000000;
+              totalFeesAccumulated += feeInXRP;
+
+              await supabase.from('airdrop_transactions').update({
+                status: 'completed',
+                amount: amount,
+                fee_xrp: feeInXRP,
+                tx_hash: result.result.hash,
+                processed_at: new Date().toISOString()
+              }).eq('id', transactionId);
+
+              await supabase.from('airdrop_tokens').update({
+                total_sent: (parseFloat(token.total_sent || 0) + amount).toString()
+              }).eq('id', token.id);
+
+              recipientSuccessCount++;
+              totalCompleted++;
+
+              await supabase.from('airdrop_logs').insert({
+                campaign_id: campaignId,
+                log_type: 'success',
+                message: `Sent ${amount.toFixed(6)} ${token.currency_code} to ${recipient.wallet_address}`,
+                details: { tx_hash: result.result.hash, fee: feeInXRP }
+              });
+            } else {
+              throw new Error(result.result.meta.TransactionResult);
+            }
+
+          } catch (error) {
+            console.error('Transaction error:', error);
+            const errorMessage = error.message || 'Transaction failed';
+
+            await supabase.from('airdrop_transactions').update({
+              status: 'failed',
+              error_message: errorMessage,
+              processed_at: new Date().toISOString()
+            }).eq('id', transactionId);
+
+            await supabase.from('airdrop_logs').insert({
+              campaign_id: campaignId,
+              log_type: 'error',
+              message: `Failed to send ${token.currency_code} to ${recipient.wallet_address}: ${errorMessage}`
+            });
+
+            totalFailed++;
+            recipientFailed = true;
+          }
+
+          if (tokenIndex < tokens.length - 1 || recipientIndex < recipients.length - 1) {
+            const intervalSeconds = Math.max(5, campaign.interval_seconds);
+            for (let i = intervalSeconds; i > 0; i--) {
+              if (!processingRef.current) break;
+              setCountdown(i);
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            setCountdown(0);
+          }
+        }
+
+        if (recipientSuccessCount === tokens.length) {
+          await supabase.from('airdrop_recipients').update({
+            status: 'completed',
+            processed_at: new Date().toISOString()
+          }).eq('id', recipient.id);
+        } else if (recipientSuccessCount > 0) {
+          await supabase.from('airdrop_recipients').update({
+            status: 'completed',
+            error_message: 'Some tokens failed',
+            processed_at: new Date().toISOString()
+          }).eq('id', recipient.id);
+        } else {
+          await supabase.from('airdrop_recipients').update({
+            status: 'failed',
+            error_message: 'All tokens failed',
+            processed_at: new Date().toISOString()
+          }).eq('id', recipient.id);
+        }
+      }
+
+      await client.disconnect();
+
+      const completedRecipients = await supabase
+        .from('airdrop_recipients')
+        .select('*', { count: 'exact' })
+        .eq('campaign_id', campaignId)
+        .eq('status', 'completed');
+
+      const failedRecipients = await supabase
+        .from('airdrop_recipients')
+        .select('*', { count: 'exact' })
+        .eq('campaign_id', campaignId)
+        .eq('status', 'failed');
+
+      await supabase.from('airdrop_campaigns').update({
+        completed_recipients: completedRecipients.count || 0,
+        failed_recipients: failedRecipients.count || 0,
+        completed_transactions: totalCompleted,
+        failed_transactions: totalFailed,
+        total_fees_paid: totalFeesAccumulated
+      }).eq('id', campaignId);
+
+      const allDone = (completedRecipients.count + failedRecipients.count) >= campaign.total_recipients;
+
+      if (allDone) {
+        await supabase.from('airdrop_campaigns').update({
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        }).eq('id', campaignId);
+
+        await supabase.from('airdrop_logs').insert({
+          campaign_id: campaignId,
+          log_type: 'success',
+          message: `Campaign completed! Processed: ${totalCompleted}, Failed: ${totalFailed}, Total Fees: ${totalFeesAccumulated.toFixed(6)} XRP`
+        });
+
+        toast.success('Airdrop completed!');
+      } else {
+        await supabase.from('airdrop_logs').insert({
+          campaign_id: campaignId,
+          log_type: 'info',
+          message: `Batch completed. Processed: ${totalCompleted}, Failed: ${totalFailed}`
+        });
+      }
+
+      loadCampaigns();
+      loadCampaignDetails(campaignId);
+
+    } catch (error) {
+      console.error('Airdrop execution error:', error);
+      await supabase.from('airdrop_logs').insert({
+        campaign_id: campaignId,
+        log_type: 'error',
+        message: `Execution error: ${error.message}`
+      });
+      toast.error(`Airdrop failed: ${error.message}`);
+    } finally {
+      processingRef.current = false;
+      setIsProcessing(false);
+      setCountdown(0);
+      setCurrentProgress({ recipient: 0, token: 0, total: 0 });
     }
   };
 
@@ -631,7 +995,8 @@ export default function Airdropper() {
                       {selectedCampaign.status === 'pending' && (
                         <button
                           onClick={() => startCampaign(selectedCampaign.id)}
-                          className="px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl font-medium hover:shadow-lg hover:shadow-green-500/50 transition-all flex items-center gap-2"
+                          disabled={isProcessing}
+                          className="px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl font-medium hover:shadow-lg hover:shadow-green-500/50 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <span>▶️</span>
                           <span>Start</span>
@@ -651,7 +1016,8 @@ export default function Airdropper() {
                       {selectedCampaign.status === 'paused' && (
                         <button
                           onClick={() => startCampaign(selectedCampaign.id)}
-                          className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/50 transition-all flex items-center gap-2"
+                          disabled={isProcessing}
+                          className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium hover:shadow-lg hover:shadow-blue-500/50 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <span>▶️</span>
                           <span>Resume</span>
@@ -676,6 +1042,40 @@ export default function Airdropper() {
                       )}
                     </div>
                   </div>
+
+                  {isProcessing && (
+                    <div className="mt-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="animate-spin text-2xl">⚡</div>
+                          <div>
+                            <div className="font-bold text-white">Processing Airdrop</div>
+                            <div className="text-sm text-slate-400">
+                              Recipient {currentProgress.recipient} of {selectedCampaign.total_recipients} |
+                              Token {currentProgress.token} of {tokens.length}
+                            </div>
+                          </div>
+                        </div>
+                        {countdown > 0 && (
+                          <div className="flex items-center gap-2 bg-orange-500/20 border border-orange-500/30 px-4 py-2 rounded-lg">
+                            <span className="text-lg">⏱️</span>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-orange-300">{countdown}</div>
+                              <div className="text-xs text-orange-400">seconds</div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div className="bg-purple-950/50 rounded-full h-3 overflow-hidden">
+                        <div
+                          className="bg-gradient-to-r from-blue-500 to-purple-500 h-full transition-all duration-300"
+                          style={{
+                            width: `${currentProgress.total > 0 ? ((currentProgress.recipient - 1) * tokens.length + currentProgress.token) / currentProgress.total * 100 : 0}%`
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <AirdropAnalytics campaign={selectedCampaign} transactions={transactions} recipients={recipients} />
@@ -754,6 +1154,37 @@ export default function Airdropper() {
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+
+                <div className="bg-purple-900/20 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-6">
+                  <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                    <span>📋</span>
+                    <span>Activity Logs ({logs.length})</span>
+                  </h3>
+                  <div className="max-h-64 overflow-y-auto space-y-2">
+                    {logs.map(log => (
+                      <div key={log.id} className={`rounded-xl p-3 border ${
+                        log.log_type === 'success' ? 'bg-green-500/10 border-green-500/30' :
+                        log.log_type === 'error' ? 'bg-red-500/10 border-red-500/30' :
+                        log.log_type === 'warning' ? 'bg-yellow-500/10 border-yellow-500/30' :
+                        'bg-blue-500/10 border-blue-500/30'
+                      }`}>
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">
+                            {log.log_type === 'success' ? '✅' :
+                             log.log_type === 'error' ? '❌' :
+                             log.log_type === 'warning' ? '⚠️' : 'ℹ️'}
+                          </span>
+                          <div className="flex-1">
+                            <div className="text-sm text-white">{log.message}</div>
+                            <div className="text-xs text-slate-400 mt-1">
+                              {new Date(log.created_at).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </>
