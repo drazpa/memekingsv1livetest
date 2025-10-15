@@ -2,6 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as xrpl from 'xrpl';
 import { supabase } from '../utils/supabase';
 import toast from 'react-hot-toast';
+import { XRPScanLink } from '../components/XRPScanLink';
+
+const DISTRIBUTION_METHODS = [
+  { id: 'fixed', name: 'Fixed Amount', description: 'Same amount to all recipients' },
+  { id: 'wallet_balance_percent', name: 'Wallet Balance %', description: '% of recipient\'s token balance' },
+  { id: 'xrp_balance_percent', name: 'XRP Balance %', description: '% of recipient\'s XRP balance' },
+  { id: 'token_balance_ratio', name: 'Token Balance 1:1', description: '1:1 ratio based on another token' },
+  { id: 'random_range', name: 'Random Range', description: 'Random amount between min and max' }
+];
 
 export default function Airdropper() {
   const [connectedWallet, setConnectedWallet] = useState(null);
@@ -12,17 +21,27 @@ export default function Airdropper() {
   const [logs, setLogs] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   const processingRef = useRef(false);
   const pausedRef = useRef(false);
 
   const [newCampaign, setNewCampaign] = useState({
     name: '',
     intervalSeconds: 5,
-    tokens: [{ currency_code: '', issuer_address: '', amount: '' }],
+    tokens: [{
+      currency_code: '',
+      issuer_address: '',
+      distribution_method: 'fixed',
+      amount: '',
+      min_amount: '',
+      max_amount: '',
+      balance_percent: '',
+      source_token_currency: '',
+      source_token_issuer: ''
+    }],
     recipientsList: ''
   });
 
-  const [csvFile, setCsvFile] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [analytics, setAnalytics] = useState({
     totalCampaigns: 0,
@@ -153,7 +172,17 @@ export default function Airdropper() {
   const addToken = () => {
     setNewCampaign({
       ...newCampaign,
-      tokens: [...newCampaign.tokens, { currency_code: '', issuer_address: '', amount: '' }]
+      tokens: [...newCampaign.tokens, {
+        currency_code: '',
+        issuer_address: '',
+        distribution_method: 'fixed',
+        amount: '',
+        min_amount: '',
+        max_amount: '',
+        balance_percent: '',
+        source_token_currency: '',
+        source_token_issuer: ''
+      }]
     });
   };
 
@@ -168,15 +197,89 @@ export default function Airdropper() {
     setNewCampaign({ ...newCampaign, tokens: newTokens });
   };
 
+  const calculateAmount = async (client, recipientAddress, token) => {
+    try {
+      switch (token.distribution_method) {
+        case 'fixed':
+          return parseFloat(token.amount);
+
+        case 'wallet_balance_percent': {
+          const accountLines = await client.request({
+            command: 'account_lines',
+            account: recipientAddress,
+            ledger_index: 'validated'
+          });
+          const line = accountLines.result.lines.find(
+            l => l.currency === token.currency_code && l.account === token.issuer_address
+          );
+          const balance = line ? parseFloat(line.balance) : 0;
+          return balance * (parseFloat(token.balance_percent) / 100);
+        }
+
+        case 'xrp_balance_percent': {
+          const accountInfo = await client.request({
+            command: 'account_info',
+            account: recipientAddress,
+            ledger_index: 'validated'
+          });
+          const xrpBalance = parseFloat(xrpl.dropsToXrp(accountInfo.result.account_data.Balance));
+          return xrpBalance * (parseFloat(token.balance_percent) / 100);
+        }
+
+        case 'token_balance_ratio': {
+          const accountLines = await client.request({
+            command: 'account_lines',
+            account: recipientAddress,
+            ledger_index: 'validated'
+          });
+          const line = accountLines.result.lines.find(
+            l => l.currency === token.source_token_currency && l.account === token.source_token_issuer
+          );
+          const sourceBalance = line ? parseFloat(line.balance) : 0;
+          return sourceBalance;
+        }
+
+        case 'random_range': {
+          const min = parseFloat(token.min_amount);
+          const max = parseFloat(token.max_amount);
+          return min + Math.random() * (max - min);
+        }
+
+        default:
+          return parseFloat(token.amount);
+      }
+    } catch (error) {
+      console.error('Error calculating amount:', error);
+      return 0;
+    }
+  };
+
   const createCampaign = async () => {
     if (!newCampaign.name.trim()) {
       toast.error('Please enter a campaign name');
       return;
     }
 
-    const validTokens = newCampaign.tokens.filter(t => t.currency_code && t.issuer_address && t.amount);
+    const validTokens = newCampaign.tokens.filter(t => {
+      if (!t.currency_code || !t.issuer_address) return false;
+
+      switch (t.distribution_method) {
+        case 'fixed':
+          return t.amount && parseFloat(t.amount) > 0;
+        case 'wallet_balance_percent':
+        case 'xrp_balance_percent':
+          return t.balance_percent && parseFloat(t.balance_percent) > 0;
+        case 'token_balance_ratio':
+          return t.source_token_currency && t.source_token_issuer;
+        case 'random_range':
+          return t.min_amount && t.max_amount && parseFloat(t.min_amount) <= parseFloat(t.max_amount);
+        default:
+          return false;
+      }
+    });
+
     if (validTokens.length === 0) {
-      toast.error('Please add at least one valid token');
+      toast.error('Please add at least one valid token with proper distribution settings');
       return;
     }
 
@@ -204,7 +307,14 @@ export default function Airdropper() {
         campaign_id: campaign.id,
         currency_code: token.currency_code,
         issuer_address: token.issuer_address,
-        amount: parseFloat(token.amount)
+        distribution_method: token.distribution_method,
+        amount: token.distribution_method === 'fixed' ? parseFloat(token.amount) : null,
+        min_amount: token.distribution_method === 'random_range' ? parseFloat(token.min_amount) : null,
+        max_amount: token.distribution_method === 'random_range' ? parseFloat(token.max_amount) : null,
+        balance_percent: ['wallet_balance_percent', 'xrp_balance_percent'].includes(token.distribution_method)
+          ? parseFloat(token.balance_percent) : null,
+        source_token_currency: token.distribution_method === 'token_balance_ratio' ? token.source_token_currency : null,
+        source_token_issuer: token.distribution_method === 'token_balance_ratio' ? token.source_token_issuer : null
       }));
 
       await supabase.from('airdrop_tokens').insert(tokenInserts);
@@ -227,7 +337,17 @@ export default function Airdropper() {
       setNewCampaign({
         name: '',
         intervalSeconds: 5,
-        tokens: [{ currency_code: '', issuer_address: '', amount: '' }],
+        tokens: [{
+          currency_code: '',
+          issuer_address: '',
+          distribution_method: 'fixed',
+          amount: '',
+          min_amount: '',
+          max_amount: '',
+          balance_percent: '',
+          source_token_currency: '',
+          source_token_issuer: ''
+        }],
         recipientsList: ''
       });
       loadCampaigns();
@@ -306,13 +426,21 @@ export default function Airdropper() {
 
         try {
           for (const token of campaignTokens) {
+            const calculatedAmount = await calculateAmount(client, recipient.wallet_address, token);
+
+            if (calculatedAmount <= 0) {
+              await logMessage(campaign.id, 'warning',
+                `Skipping ${recipient.wallet_address} for ${token.currency_code}: calculated amount is 0`);
+              continue;
+            }
+
             const payment = {
               TransactionType: 'Payment',
               Account: wallet.address,
               Destination: recipient.wallet_address,
               Amount: {
                 currency: token.currency_code,
-                value: token.amount.toString(),
+                value: calculatedAmount.toFixed(6),
                 issuer: token.issuer_address
               }
             };
@@ -324,10 +452,21 @@ export default function Airdropper() {
             if (result.result.meta.TransactionResult === 'tesSUCCESS') {
               await supabase
                 .from('airdrop_tokens')
-                .update({ total_sent: parseFloat(token.total_sent) + parseFloat(token.amount) })
+                .update({ total_sent: parseFloat(token.total_sent || 0) + calculatedAmount })
                 .eq('id', token.id);
 
-              await logMessage(campaign.id, 'success', `Sent ${token.amount} ${token.currency_code} to ${recipient.wallet_address}`, { tx_hash: result.result.hash });
+              await supabase
+                .from('airdrop_recipients')
+                .update({
+                  amount_sent: calculatedAmount,
+                  calculated_amount: calculatedAmount,
+                  tx_hash: result.result.hash
+                })
+                .eq('id', recipient.id);
+
+              await logMessage(campaign.id, 'success',
+                `Sent ${calculatedAmount.toFixed(6)} ${token.currency_code} to ${recipient.wallet_address}`,
+                { tx_hash: result.result.hash, amount: calculatedAmount });
             } else {
               throw new Error(`Transaction failed: ${result.result.meta.TransactionResult}`);
             }
@@ -449,10 +588,11 @@ export default function Airdropper() {
     }
 
     const csv = [
-      ['Wallet Address', 'Status', 'TX Hash', 'Processed At', 'Error'],
+      ['Wallet Address', 'Status', 'Amount Sent', 'TX Hash', 'Processed At', 'Error'],
       ...recipients.map(r => [
         r.wallet_address,
         r.status,
+        r.amount_sent || '',
         r.tx_hash || '',
         r.processed_at ? new Date(r.processed_at).toLocaleString() : '',
         r.error_message || ''
@@ -485,11 +625,19 @@ export default function Airdropper() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-pink-400 text-transparent bg-clip-text">
-            Multi-Token Airdropper
-          </h1>
-          <p className="text-gray-300">Batch send multiple tokens to multiple recipients with intelligent processing</p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-pink-400 text-transparent bg-clip-text">
+              Multi-Token Airdropper
+            </h1>
+            <p className="text-gray-300">Batch send multiple tokens to multiple recipients with intelligent processing</p>
+          </div>
+          <button
+            onClick={() => setShowInfoModal(true)}
+            className="px-4 py-2 bg-blue-500/20 border border-blue-500/30 rounded-lg hover:bg-blue-500/30 transition-all"
+          >
+            ℹ️ How It Works
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -598,13 +746,26 @@ export default function Airdropper() {
                       {tokens.map(token => (
                         <div key={token.id} className="bg-white/5 rounded-lg p-3">
                           <div className="flex justify-between items-start">
-                            <div>
+                            <div className="flex-1">
                               <div className="font-medium">{token.currency_code}</div>
                               <div className="text-sm text-gray-400 truncate">{token.issuer_address}</div>
+                              <div className="text-xs text-purple-300 mt-1">
+                                Method: {DISTRIBUTION_METHODS.find(m => m.id === token.distribution_method)?.name || token.distribution_method}
+                              </div>
                             </div>
                             <div className="text-right">
-                              <div className="text-lg font-bold">{token.amount}</div>
-                              <div className="text-xs text-gray-400">Sent: {token.total_sent}</div>
+                              {token.distribution_method === 'fixed' && (
+                                <div className="text-lg font-bold">{token.amount}</div>
+                              )}
+                              {token.distribution_method === 'random_range' && (
+                                <div className="text-sm">
+                                  <div>{token.min_amount} - {token.max_amount}</div>
+                                </div>
+                              )}
+                              {['wallet_balance_percent', 'xrp_balance_percent'].includes(token.distribution_method) && (
+                                <div className="text-lg font-bold">{token.balance_percent}%</div>
+                              )}
+                              <div className="text-xs text-gray-400">Sent: {parseFloat(token.total_sent || 0).toFixed(2)}</div>
                             </div>
                           </div>
                         </div>
@@ -625,21 +786,31 @@ export default function Airdropper() {
                   </div>
                   <div className="max-h-96 overflow-y-auto space-y-2">
                     {recipients.map(recipient => (
-                      <div key={recipient.id} className="bg-white/5 rounded-lg p-3 flex justify-between items-center">
-                        <div className="truncate flex-1">
-                          <div className="font-mono text-sm truncate">{recipient.wallet_address}</div>
-                          {recipient.error_message && (
-                            <div className="text-xs text-red-400 mt-1">{recipient.error_message}</div>
-                          )}
+                      <div key={recipient.id} className="bg-white/5 rounded-lg p-3">
+                        <div className="flex justify-between items-start gap-3">
+                          <div className="truncate flex-1">
+                            <div className="font-mono text-sm truncate">{recipient.wallet_address}</div>
+                            {recipient.amount_sent && (
+                              <div className="text-xs text-green-400 mt-1">Sent: {parseFloat(recipient.amount_sent).toFixed(6)}</div>
+                            )}
+                            {recipient.tx_hash && (
+                              <div className="mt-1">
+                                <XRPScanLink type="tx" value={recipient.tx_hash} network="mainnet" />
+                              </div>
+                            )}
+                            {recipient.error_message && (
+                              <div className="text-xs text-red-400 mt-1">{recipient.error_message}</div>
+                            )}
+                          </div>
+                          <span className={`px-2 py-1 rounded text-xs ml-2 whitespace-nowrap ${
+                            recipient.status === 'completed' ? 'bg-green-500/20 text-green-300' :
+                            recipient.status === 'processing' ? 'bg-blue-500/20 text-blue-300' :
+                            recipient.status === 'failed' ? 'bg-red-500/20 text-red-300' :
+                            'bg-gray-500/20 text-gray-300'
+                          }`}>
+                            {recipient.status}
+                          </span>
                         </div>
-                        <span className={`px-2 py-1 rounded text-xs ml-2 ${
-                          recipient.status === 'completed' ? 'bg-green-500/20 text-green-300' :
-                          recipient.status === 'processing' ? 'bg-blue-500/20 text-blue-300' :
-                          recipient.status === 'failed' ? 'bg-red-500/20 text-red-300' :
-                          'bg-gray-500/20 text-gray-300'
-                        }`}>
-                          {recipient.status}
-                        </span>
                       </div>
                     ))}
                   </div>
@@ -659,7 +830,7 @@ export default function Airdropper() {
                     {logs.map(log => (
                       <div key={log.id} className="bg-white/5 rounded-lg p-3">
                         <div className="flex items-start gap-2">
-                          <span className={`px-2 py-1 rounded text-xs ${
+                          <span className={`px-2 py-1 rounded text-xs whitespace-nowrap ${
                             log.log_type === 'success' ? 'bg-green-500/20 text-green-300' :
                             log.log_type === 'error' ? 'bg-red-500/20 text-red-300' :
                             log.log_type === 'warning' ? 'bg-yellow-500/20 text-yellow-300' :
@@ -669,6 +840,11 @@ export default function Airdropper() {
                           </span>
                           <div className="flex-1">
                             <div className="text-sm">{log.message}</div>
+                            {log.details?.tx_hash && (
+                              <div className="mt-1">
+                                <XRPScanLink type="tx" value={log.details.tx_hash} network="mainnet" />
+                              </div>
+                            )}
                             <div className="text-xs text-gray-400 mt-1">
                               {new Date(log.created_at).toLocaleString()}
                             </div>
@@ -688,9 +864,79 @@ export default function Airdropper() {
         </div>
       </div>
 
-      {showCreateModal && (
+      {showInfoModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl border border-white/20 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-800 rounded-xl border border-white/20 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold">How Airdropper Works</h2>
+                <button
+                  onClick={() => setShowInfoModal(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-6 text-sm">
+                <div>
+                  <h3 className="text-lg font-bold mb-2 text-purple-400">Distribution Methods</h3>
+                  <div className="space-y-3">
+                    {DISTRIBUTION_METHODS.map(method => (
+                      <div key={method.id} className="bg-white/5 rounded-lg p-3">
+                        <div className="font-medium text-white">{method.name}</div>
+                        <div className="text-gray-400 text-xs mt-1">{method.description}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold mb-2 text-purple-400">Fees</h3>
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <p className="text-gray-300">Each recipient incurs a 0.01 XRP transaction fee. This is a standard XRPL network fee required for each payment transaction.</p>
+                    <p className="text-gray-400 text-xs mt-2">Example: Sending to 100 recipients = 1 XRP in total fees</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold mb-2 text-purple-400">Processing</h3>
+                  <div className="bg-white/5 rounded-lg p-3 space-y-2 text-gray-300">
+                    <p>1. All tokens are sent to one recipient before moving to the next</p>
+                    <p>2. Custom interval delay between each recipient (minimum 5 seconds)</p>
+                    <p>3. Runs in background with pause/resume controls</p>
+                    <p>4. Failed sends are logged and campaign continues</p>
+                    <p>5. All transactions are recorded with XRPScan links</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold mb-2 text-purple-400">CSV Import</h3>
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <p className="text-gray-300 mb-2">Import recipient addresses from a CSV file. Format:</p>
+                    <div className="bg-black/30 rounded p-2 font-mono text-xs text-green-400">
+                      rAddress1<br/>
+                      rAddress2<br/>
+                      rAddress3
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-bold mb-2 text-purple-400">Export Options</h3>
+                  <div className="bg-white/5 rounded-lg p-3 text-gray-300">
+                    <p>Export campaign logs and recipient data to CSV for record keeping and analysis.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-slate-800 rounded-xl border border-white/20 max-w-3xl w-full my-8">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold">Create Airdrop Campaign</h2>
@@ -702,7 +948,7 @@ export default function Airdropper() {
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
                 <div>
                   <label className="block text-sm font-medium mb-2">Campaign Name</label>
                   <input
@@ -737,8 +983,8 @@ export default function Airdropper() {
                   </div>
                   <div className="space-y-3">
                     {newCampaign.tokens.map((token, index) => (
-                      <div key={index} className="bg-white/5 rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-3">
+                      <div key={index} className="bg-white/5 rounded-lg p-4 space-y-3">
+                        <div className="flex justify-between items-center">
                           <span className="text-sm font-medium">Token {index + 1}</span>
                           {newCampaign.tokens.length > 1 && (
                             <button
@@ -749,29 +995,103 @@ export default function Airdropper() {
                             </button>
                           )}
                         </div>
-                        <div className="space-y-2">
+
+                        <div className="grid grid-cols-2 gap-2">
                           <input
                             type="text"
                             value={token.currency_code}
                             onChange={(e) => updateToken(index, 'currency_code', e.target.value)}
-                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
+                            className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
                             placeholder="Currency Code"
                           />
                           <input
                             type="text"
                             value={token.issuer_address}
                             onChange={(e) => updateToken(index, 'issuer_address', e.target.value)}
-                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
+                            className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
                             placeholder="Issuer Address"
                           />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1">Distribution Method</label>
+                          <select
+                            value={token.distribution_method}
+                            onChange={(e) => updateToken(index, 'distribution_method', e.target.value)}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
+                          >
+                            {DISTRIBUTION_METHODS.map(method => (
+                              <option key={method.id} value={method.id}>{method.name}</option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {DISTRIBUTION_METHODS.find(m => m.id === token.distribution_method)?.description}
+                          </p>
+                        </div>
+
+                        {token.distribution_method === 'fixed' && (
                           <input
                             type="number"
                             value={token.amount}
                             onChange={(e) => updateToken(index, 'amount', e.target.value)}
                             className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
                             placeholder="Amount per recipient"
+                            step="0.000001"
                           />
-                        </div>
+                        )}
+
+                        {token.distribution_method === 'random_range' && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="number"
+                              value={token.min_amount}
+                              onChange={(e) => updateToken(index, 'min_amount', e.target.value)}
+                              className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
+                              placeholder="Min amount"
+                              step="0.000001"
+                            />
+                            <input
+                              type="number"
+                              value={token.max_amount}
+                              onChange={(e) => updateToken(index, 'max_amount', e.target.value)}
+                              className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
+                              placeholder="Max amount"
+                              step="0.000001"
+                            />
+                          </div>
+                        )}
+
+                        {['wallet_balance_percent', 'xrp_balance_percent'].includes(token.distribution_method) && (
+                          <input
+                            type="number"
+                            value={token.balance_percent}
+                            onChange={(e) => updateToken(index, 'balance_percent', e.target.value)}
+                            className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
+                            placeholder="Percentage (e.g., 10 for 10%)"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                          />
+                        )}
+
+                        {token.distribution_method === 'token_balance_ratio' && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={token.source_token_currency}
+                              onChange={(e) => updateToken(index, 'source_token_currency', e.target.value)}
+                              className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
+                              placeholder="Source Currency"
+                            />
+                            <input
+                              type="text"
+                              value={token.source_token_issuer}
+                              onChange={(e) => updateToken(index, 'source_token_issuer', e.target.value)}
+                              className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
+                              placeholder="Source Issuer"
+                            />
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -793,7 +1113,7 @@ export default function Airdropper() {
                   <textarea
                     value={newCampaign.recipientsList}
                     onChange={(e) => setNewCampaign({ ...newCampaign, recipientsList: e.target.value })}
-                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 h-32"
+                    className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:border-purple-500 h-32 font-mono text-sm"
                     placeholder="rAddress1&#10;rAddress2&#10;rAddress3"
                   />
                   <div className="text-sm text-gray-400 mt-1">
