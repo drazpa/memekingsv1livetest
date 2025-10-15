@@ -144,13 +144,13 @@ const MintEarningsChart = ({ walletAddress, walletSeed }) => {
           </svg>
           Mint Earnings
         </h3>
-        {earnings.unclaimed > 0 && walletSeed && (
+        {walletSeed && (
           <button
             onClick={claimEarnings}
-            disabled={isClaiming}
+            disabled={isClaiming || earnings.unclaimed === 0}
             className="relative px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-semibold rounded-lg shadow-lg hover:shadow-blue-500/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
-              animation: 'pulse-blue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              animation: earnings.unclaimed > 0 ? 'pulse-blue 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none',
             }}
           >
             <style>
@@ -189,7 +189,7 @@ const MintEarningsChart = ({ walletAddress, walletSeed }) => {
         </div>
       </div>
 
-      {earnings.history.length > 0 && (
+      {earnings.history.length > 0 ? (
         <div>
           <div className="text-gray-400 text-sm mb-3">Last 7 Days</div>
           <div className="flex items-end justify-between gap-2 h-40">
@@ -214,14 +214,12 @@ const MintEarningsChart = ({ walletAddress, walletSeed }) => {
             ))}
           </div>
         </div>
-      )}
-
-      {earnings.totalMints === 0 && (
+      ) : (
         <div className="text-center text-gray-500 py-8">
           <svg className="w-16 h-16 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
           </svg>
-          <p>No mint earnings yet</p>
+          <p>No earnings history yet</p>
           <p className="text-sm mt-1">Earn 0.10 XRP for each token minted</p>
         </div>
       )}
