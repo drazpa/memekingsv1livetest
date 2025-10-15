@@ -235,7 +235,7 @@ class AIAssistant {
     }
 
     try {
-      const balance = await getXRPBalance(this.context.connectedWallet.address);
+      const balance = await getXRPBalance(this.context.connectedWallet.address, false);
 
       return {
         content: 'Here is your current wallet balance:',
@@ -257,9 +257,26 @@ class AIAssistant {
         }
       };
     } catch (error) {
+      console.error('Balance query error:', error);
+      const errorMsg = error.message || 'Unknown error';
       return {
-        content: 'I encountered an error fetching your balance. Please make sure your wallet is properly connected.',
-        data: null
+        content: `I encountered an error connecting to the XRPL network: ${errorMsg}\n\nThis could be due to:\n• Network connectivity issues\n• XRPL node temporarily unavailable\n• Wallet address not activated on the ledger\n\nPlease try again in a moment or check your wallet on XRPScan.`,
+        data: {
+          actions: [
+            {
+              label: 'Try Again',
+              icon: '🔄',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'check my wallet balance' }))
+            },
+            {
+              label: 'View on XRPScan',
+              icon: '🔍',
+              style: 'secondary',
+              onClick: () => window.open(`https://xrpscan.com/account/${this.context.connectedWallet.address}`, '_blank')
+            }
+          ]
+        }
       };
     }
   }
@@ -1106,7 +1123,7 @@ class AIAssistant {
     }
 
     try {
-      const balance = await getXRPBalance(this.context.connectedWallet.address);
+      const balance = await getXRPBalance(this.context.connectedWallet.address, false);
 
       return {
         content: 'Here are your wallet assets:',
@@ -1139,9 +1156,25 @@ class AIAssistant {
         }
       };
     } catch (error) {
+      console.error('Wallet assets query error:', error);
       return {
-        content: 'I had trouble fetching your wallet assets. Please try again.',
-        data: null
+        content: `I had trouble connecting to the XRPL network to fetch your wallet assets. ${error.message || 'Unknown error'}\n\nPlease try again in a moment or visit the Wallets page directly.`,
+        data: {
+          actions: [
+            {
+              label: 'Go to Wallets',
+              icon: '💼',
+              style: 'primary',
+              onClick: () => window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }))
+            },
+            {
+              label: 'Try Again',
+              icon: '🔄',
+              style: 'secondary',
+              onClick: () => window.dispatchEvent(new CustomEvent('sendAIMessage', { detail: 'show my wallet assets' }))
+            }
+          ]
+        }
       };
     }
   }

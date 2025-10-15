@@ -30,10 +30,24 @@ export async function getXRPBalance(address, useCache = true) {
     return balance;
   } catch (error) {
     if (error.data?.error === 'actNotFound') {
+      balanceCache.set(address, {
+        balance: 0,
+        timestamp: Date.now()
+      });
       return 0;
     }
+
     console.error('Error fetching XRP balance:', error);
-    throw error;
+
+    const errorMessage = error.message?.includes('timeout')
+      ? 'Connection to XRPL network timed out'
+      : error.message?.includes('disconnect')
+      ? 'Lost connection to XRPL network'
+      : error.message || 'Failed to fetch balance from XRPL';
+
+    const enhancedError = new Error(errorMessage);
+    enhancedError.originalError = error;
+    throw enhancedError;
   }
 }
 

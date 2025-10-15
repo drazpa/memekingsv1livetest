@@ -51,12 +51,15 @@ class XRPLClientManager {
         return this.connect(retryCount);
       }
 
-      this.client = new xrpl.Client(server.url);
+      this.client = new xrpl.Client(server.url, {
+        timeout: 8000,
+        connectionTimeout: 8000
+      });
 
       await Promise.race([
         this.client.connect(),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Connection timeout')), 5000)
+          setTimeout(() => reject(new Error('Connection timeout after 8 seconds')), 8000)
         )
       ]);
 
