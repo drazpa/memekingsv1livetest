@@ -47,6 +47,8 @@ export default function Airdropper() {
   });
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState(null);
   const [fetchingHolders, setFetchingHolders] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [currentProgress, setCurrentProgress] = useState({ recipient: 0, token: 0, total: 0 });
@@ -739,6 +741,169 @@ export default function Airdropper() {
     }
   };
 
+  const openEditModal = async (campaign) => {
+    const { data: tokens } = await supabase
+      .from('airdrop_tokens')
+      .select('*')
+      .eq('campaign_id', campaign.id);
+
+    const { data: recipients } = await supabase
+      .from('airdrop_recipients')
+      .select('*')
+      .eq('campaign_id', campaign.id)
+      .eq('status', 'pending');
+
+    const tokensList = tokens.map(t => ({
+      currency_code: t.currency_code,
+      issuer_address: t.issuer_address,
+      distribution_method: t.distribution_method,
+      amount: t.amount || '',
+      min_amount: t.min_amount || '',
+      max_amount: t.max_amount || '',
+      balance_percent: t.balance_percent || '',
+      source_token_currency: t.source_token_currency || '',
+      source_token_issuer: t.source_token_issuer || ''
+    }));
+
+    const recipientsList = recipients.map(r => r.wallet_address).join('\n');
+
+    setEditingCampaign({
+      id: campaign.id,
+      name: campaign.name,
+      intervalSeconds: campaign.interval_seconds,
+      tokens: tokensList,
+      recipientsList: recipientsList
+    });
+
+    setShowEditModal(true);
+  };
+
+  const updateCampaign = async () => {
+    if (!editingCampaign.name.trim()) {
+      toast.error('Please enter a campaign name');
+      return;
+    }
+
+    const validTokens = editingCampaign.tokens.filter(t => {
+      if (!t.currency_code || !t.issuer_address) return false;
+
+      switch (t.distribution_method) {
+        case 'fixed':
+          return t.amount && parseFloat(t.amount) > 0;
+        case 'wallet_balance_percent':
+        case 'xrp_balance_percent':
+          return t.balance_percent && parseFloat(t.balance_percent) > 0;
+        case 'token_balance_ratio':
+          return true;
+        case 'random_range':
+          return t.min_amount && t.max_amount && parseFloat(t.min_amount) <= parseFloat(t.max_amount);
+        default:
+          return false;
+      }
+    });
+
+    if (validTokens.length === 0) {
+      toast.error('Please add at least one valid token');
+      return;
+    }
+
+    const recipientAddresses = editingCampaign.recipientsList.split('\n').filter(addr => addr.trim());
+    if (recipientAddresses.length === 0) {
+      toast.error('Please add at least one recipient');
+      return;
+    }
+
+    try {
+      const totalTransactions = recipientAddresses.length * validTokens.length;
+
+      await supabase
+        .from('airdrop_campaigns')
+        .update({
+          name: editingCampaign.name,
+          total_recipients: recipientAddresses.length,
+          total_transactions: totalTransactions,
+          interval_seconds: Math.max(5, parseInt(editingCampaign.intervalSeconds))
+        })
+        .eq('id', editingCampaign.id);
+
+      await supabase
+        .from('airdrop_tokens')
+        .delete()
+        .eq('campaign_id', editingCampaign.id);
+
+      await supabase
+        .from('airdrop_recipients')
+        .delete()
+        .eq('campaign_id', editingCampaign.id);
+
+      await supabase
+        .from('airdrop_transactions')
+        .delete()
+        .eq('campaign_id', editingCampaign.id);
+
+      const tokenInserts = validTokens.map(token => ({
+        campaign_id: editingCampaign.id,
+        currency_code: token.currency_code,
+        issuer_address: token.issuer_address,
+        distribution_method: token.distribution_method,
+        amount: token.distribution_method === 'fixed' ? parseFloat(token.amount) : null,
+        min_amount: token.distribution_method === 'random_range' ? parseFloat(token.min_amount) : null,
+        max_amount: token.distribution_method === 'random_range' ? parseFloat(token.max_amount) : null,
+        balance_percent: ['wallet_balance_percent', 'xrp_balance_percent'].includes(token.distribution_method)
+          ? parseFloat(token.balance_percent) : null,
+        source_token_currency: token.distribution_method === 'token_balance_ratio' ? token.source_token_currency : null,
+        source_token_issuer: token.distribution_method === 'token_balance_ratio' ? token.source_token_issuer : null
+      }));
+
+      const { data: insertedTokens } = await supabase
+        .from('airdrop_tokens')
+        .insert(tokenInserts)
+        .select();
+
+      const recipientInserts = recipientAddresses.map(addr => ({
+        campaign_id: editingCampaign.id,
+        wallet_address: addr.trim()
+      }));
+
+      const { data: insertedRecipients } = await supabase
+        .from('airdrop_recipients')
+        .insert(recipientInserts)
+        .select();
+
+      const transactionInserts = [];
+      for (const recipient of insertedRecipients) {
+        for (const token of insertedTokens) {
+          transactionInserts.push({
+            campaign_id: editingCampaign.id,
+            recipient_id: recipient.id,
+            token_id: token.id,
+            amount: 0,
+            fee_xrp: 0.01,
+            status: 'pending'
+          });
+        }
+      }
+
+      await supabase.from('airdrop_transactions').insert(transactionInserts);
+
+      await supabase.from('airdrop_logs').insert({
+        campaign_id: editingCampaign.id,
+        log_type: 'info',
+        message: `Campaign updated with ${validTokens.length} tokens, ${recipientAddresses.length} recipients, ${totalTransactions} transactions`
+      });
+
+      toast.success('Campaign updated!');
+      setShowEditModal(false);
+      setEditingCampaign(null);
+      loadCampaigns();
+      loadCampaignDetails(editingCampaign.id);
+    } catch (error) {
+      console.error('Error updating campaign:', error);
+      const errorMessage = error.message || error.hint || 'Failed to update campaign';
+      toast.error(`Failed to update campaign: ${errorMessage}`);
+    }
+  };
+
   const createCampaign = async () => {
     if (!newCampaign.name.trim()) {
       toast.error('Please enter a campaign name');
@@ -992,6 +1157,16 @@ export default function Airdropper() {
                       <p className="text-sm text-slate-400">Campaign Controls</p>
                     </div>
                     <div className="flex gap-2 flex-wrap">
+                      {(selectedCampaign.status === 'pending' || selectedCampaign.status === 'paused') && (
+                        <button
+                          onClick={() => openEditModal(selectedCampaign)}
+                          className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-medium hover:shadow-lg hover:shadow-cyan-500/50 transition-all flex items-center gap-2"
+                        >
+                          <span>✏️</span>
+                          <span>Edit</span>
+                        </button>
+                      )}
+
                       {selectedCampaign.status === 'pending' && (
                         <button
                           onClick={() => startCampaign(selectedCampaign.id)}
@@ -1162,7 +1337,7 @@ export default function Airdropper() {
                     <span>📋</span>
                     <span>Activity Logs ({logs.length})</span>
                   </h3>
-                  <div className="max-h-64 overflow-y-auto space-y-2">
+                  <div className={`space-y-2 ${logs.length > 5 ? 'max-h-96 overflow-y-auto' : ''}`}>
                     {logs.map(log => (
                       <div key={log.id} className={`rounded-xl p-3 border ${
                         log.log_type === 'success' ? 'bg-green-500/10 border-green-500/30' :
@@ -1451,6 +1626,252 @@ export default function Airdropper() {
                   </button>
                   <button
                     onClick={() => setShowCreateModal(false)}
+                    className="px-6 py-3 bg-purple-950/50 rounded-xl font-medium hover:bg-purple-900/50 transition-all border border-purple-500/30"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && editingCampaign && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-gradient-to-br from-purple-900/95 to-purple-800/95 border border-purple-500/50 rounded-2xl max-w-3xl w-full my-8 shadow-2xl shadow-purple-500/20">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold">Edit Campaign</h2>
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingCampaign(null);
+                  }}
+                  className="text-slate-400 hover:text-white text-2xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-5 max-h-[70vh] overflow-y-auto pr-2">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-slate-300">Campaign Name</label>
+                  <input
+                    type="text"
+                    value={editingCampaign.name}
+                    onChange={(e) => setEditingCampaign({ ...editingCampaign, name: e.target.value })}
+                    className="w-full px-4 py-3 bg-purple-950/50 border border-purple-500/30 rounded-xl focus:outline-none focus:border-purple-400 text-white placeholder-purple-300/50"
+                    placeholder="My Token Airdrop"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-slate-300">Interval Between Recipients (seconds)</label>
+                  <input
+                    type="number"
+                    min="5"
+                    value={editingCampaign.intervalSeconds}
+                    onChange={(e) => setEditingCampaign({ ...editingCampaign, intervalSeconds: e.target.value })}
+                    className="w-full px-4 py-3 bg-purple-950/50 border border-purple-500/30 rounded-xl focus:outline-none focus:border-purple-400 text-white"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <label className="block text-sm font-medium text-slate-300">Tokens to Airdrop</label>
+                    <button
+                      onClick={() => setEditingCampaign({
+                        ...editingCampaign,
+                        tokens: [...editingCampaign.tokens, {
+                          currency_code: '',
+                          issuer_address: '',
+                          distribution_method: 'fixed',
+                          amount: '',
+                          min_amount: '',
+                          max_amount: '',
+                          balance_percent: '',
+                          source_token_currency: '',
+                          source_token_issuer: ''
+                        }]
+                      })}
+                      className="px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-xl text-sm hover:bg-purple-500/30 transition-all text-purple-300"
+                    >
+                      + Add Token
+                    </button>
+                  </div>
+                  <div className="space-y-4">
+                    {editingCampaign.tokens.map((token, index) => (
+                      <div key={index} className="bg-purple-950/40 rounded-xl p-4 space-y-3 border border-purple-500/30">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium text-white">Token {index + 1}</span>
+                          {editingCampaign.tokens.length > 1 && (
+                            <button
+                              onClick={() => {
+                                const newTokens = editingCampaign.tokens.filter((_, i) => i !== index);
+                                setEditingCampaign({ ...editingCampaign, tokens: newTokens });
+                              }}
+                              className="text-red-400 hover:text-red-300 text-sm font-medium"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            value={token.currency_code}
+                            onChange={(e) => {
+                              const newTokens = [...editingCampaign.tokens];
+                              newTokens[index].currency_code = e.target.value;
+                              setEditingCampaign({ ...editingCampaign, tokens: newTokens });
+                            }}
+                            className="px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
+                            placeholder="Currency Code"
+                          />
+                          <input
+                            type="text"
+                            value={token.issuer_address}
+                            onChange={(e) => {
+                              const newTokens = [...editingCampaign.tokens];
+                              newTokens[index].issuer_address = e.target.value;
+                              setEditingCampaign({ ...editingCampaign, tokens: newTokens });
+                            }}
+                            className="px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
+                            placeholder="Issuer Address"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-slate-400 mb-1">Distribution Method</label>
+                          <select
+                            value={token.distribution_method}
+                            onChange={(e) => {
+                              const newTokens = [...editingCampaign.tokens];
+                              newTokens[index].distribution_method = e.target.value;
+                              setEditingCampaign({ ...editingCampaign, tokens: newTokens });
+                            }}
+                            className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm"
+                          >
+                            {DISTRIBUTION_METHODS.map(method => (
+                              <option key={method.id} value={method.id}>{method.icon} {method.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {token.distribution_method === 'fixed' && (
+                          <input
+                            type="number"
+                            value={token.amount}
+                            onChange={(e) => {
+                              const newTokens = [...editingCampaign.tokens];
+                              newTokens[index].amount = e.target.value;
+                              setEditingCampaign({ ...editingCampaign, tokens: newTokens });
+                            }}
+                            className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
+                            placeholder="Amount per recipient"
+                            step="0.000001"
+                          />
+                        )}
+
+                        {(token.distribution_method === 'wallet_balance_percent' || token.distribution_method === 'xrp_balance_percent') && (
+                          <div>
+                            <label className="block text-xs text-slate-400 mb-1">Percentage (%)</label>
+                            <input
+                              type="number"
+                              value={token.balance_percent}
+                              onChange={(e) => {
+                                const newTokens = [...editingCampaign.tokens];
+                                newTokens[index].balance_percent = e.target.value;
+                                setEditingCampaign({ ...editingCampaign, tokens: newTokens });
+                              }}
+                              className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
+                              placeholder="e.g., 10 for 10%"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                            />
+                          </div>
+                        )}
+
+                        {token.distribution_method === 'random_range' && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs text-slate-400 mb-1">Min Amount</label>
+                              <input
+                                type="number"
+                                value={token.min_amount}
+                                onChange={(e) => {
+                                  const newTokens = [...editingCampaign.tokens];
+                                  newTokens[index].min_amount = e.target.value;
+                                  setEditingCampaign({ ...editingCampaign, tokens: newTokens });
+                                }}
+                                className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
+                                placeholder="Min"
+                                step="0.000001"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-400 mb-1">Max Amount</label>
+                              <input
+                                type="number"
+                                value={token.max_amount}
+                                onChange={(e) => {
+                                  const newTokens = [...editingCampaign.tokens];
+                                  newTokens[index].max_amount = e.target.value;
+                                  setEditingCampaign({ ...editingCampaign, tokens: newTokens });
+                                }}
+                                className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
+                                placeholder="Max"
+                                step="0.000001"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-slate-300">Recipients (Pending Only)</label>
+                  <textarea
+                    value={editingCampaign.recipientsList}
+                    onChange={(e) => setEditingCampaign({ ...editingCampaign, recipientsList: e.target.value })}
+                    className="w-full px-4 py-3 bg-purple-950/50 border border-purple-500/30 rounded-xl focus:outline-none focus:border-purple-400 h-32 font-mono text-sm text-white placeholder-purple-300/50"
+                    placeholder="rAddress1&#10;rAddress2&#10;rAddress3"
+                  />
+                  <div className="text-sm text-slate-400 mt-2">
+                    {editingCampaign.recipientsList.split('\n').filter(addr => addr.trim()).length} recipients
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-br from-orange-500/10 to-red-500/5 border border-orange-500/30 rounded-xl p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-sm font-medium text-orange-300">Fee Estimate</div>
+                    <div className="text-3xl font-bold text-white">
+                      {(editingCampaign.recipientsList.split('\n').filter(addr => addr.trim()).length *
+                        editingCampaign.tokens.filter(t => t.currency_code && t.issuer_address).length * 0.01).toFixed(2)} XRP
+                    </div>
+                  </div>
+                  <div className="text-xs text-orange-400">
+                    {editingCampaign.recipientsList.split('\n').filter(addr => addr.trim()).length} recipients × {editingCampaign.tokens.filter(t => t.currency_code && t.issuer_address).length} tokens × 0.01 XRP per transaction
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={updateCampaign}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/50 transition-all"
+                  >
+                    Update Campaign
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setEditingCampaign(null);
+                    }}
                     className="px-6 py-3 bg-purple-950/50 rounded-xl font-medium hover:bg-purple-900/50 transition-all border border-purple-500/30"
                   >
                     Cancel
