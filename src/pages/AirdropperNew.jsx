@@ -47,6 +47,8 @@ export default function Airdropper() {
   });
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [fetchingHolders, setFetchingHolders] = useState(false);
+  const [fetchHoldersForToken, setFetchHoldersForToken] = useState(null);
   const [analytics, setAnalytics] = useState({
     totalCampaigns: 0,
     activeCampaigns: 0,
@@ -220,6 +222,69 @@ export default function Airdropper() {
     newTokens[index].currency_code = selectedToken.currency_code;
     newTokens[index].issuer_address = selectedToken.issuer_address;
     setNewCampaign({ ...newCampaign, tokens: newTokens });
+  };
+
+  const fetchTokenHolders = async (currencyCode, issuerAddress) => {
+    if (!currencyCode || !issuerAddress) {
+      toast.error('Please select or enter a token first');
+      return;
+    }
+
+    setFetchingHolders(true);
+    try {
+      const client = new xrpl.Client('wss://xrplcluster.com');
+      await client.connect();
+
+      const holders = new Set();
+      let marker = undefined;
+      let iterations = 0;
+      const maxIterations = 50;
+
+      toast.loading('Fetching token holders from XRPL...', { id: 'fetch-holders' });
+
+      while (iterations < maxIterations) {
+        const response = await client.request({
+          command: 'account_lines',
+          account: issuerAddress,
+          limit: 400,
+          marker: marker
+        });
+
+        if (response.result && response.result.lines) {
+          response.result.lines.forEach(line => {
+            if (line.account && line.balance && parseFloat(line.balance) > 0) {
+              holders.add(line.account);
+            }
+          });
+        }
+
+        marker = response.result.marker;
+        if (!marker) break;
+        iterations++;
+      }
+
+      await client.disconnect();
+
+      if (holders.size === 0) {
+        toast.error('No holders found for this token', { id: 'fetch-holders' });
+        setFetchingHolders(false);
+        return;
+      }
+
+      const holdersList = Array.from(holders).join('\n');
+      const existingRecipients = newCampaign.recipientsList.trim();
+      const updatedRecipients = existingRecipients
+        ? existingRecipients + '\n' + holdersList
+        : holdersList;
+
+      setNewCampaign({ ...newCampaign, recipientsList: updatedRecipients });
+      toast.success(`Added ${holders.size} token holders!`, { id: 'fetch-holders' });
+    } catch (error) {
+      console.error('Error fetching token holders:', error);
+      toast.error('Failed to fetch token holders', { id: 'fetch-holders' });
+    } finally {
+      setFetchingHolders(false);
+    }
   };
 
   const createCampaign = async () => {
@@ -679,22 +744,106 @@ export default function Airdropper() {
                             step="0.000001"
                           />
                         )}
+
+                        {(token.distribution_method === 'wallet_balance_percent' || token.distribution_method === 'xrp_balance_percent') && (
+                          <div>
+                            <label className="block text-xs text-slate-400 mb-1">Percentage (%)</label>
+                            <input
+                              type="number"
+                              value={token.balance_percent}
+                              onChange={(e) => updateToken(index, 'balance_percent', e.target.value)}
+                              className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
+                              placeholder="e.g., 10 for 10%"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                            />
+                          </div>
+                        )}
+
+                        {token.distribution_method === 'random_range' && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs text-slate-400 mb-1">Min Amount</label>
+                              <input
+                                type="number"
+                                value={token.min_amount}
+                                onChange={(e) => updateToken(index, 'min_amount', e.target.value)}
+                                className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
+                                placeholder="Min"
+                                step="0.000001"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-400 mb-1">Max Amount</label>
+                              <input
+                                type="number"
+                                value={token.max_amount}
+                                onChange={(e) => updateToken(index, 'max_amount', e.target.value)}
+                                className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
+                                placeholder="Max"
+                                step="0.000001"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {token.distribution_method === 'token_balance_ratio' && (
+                          <div>
+                            <label className="block text-xs text-slate-400 mb-1">Source Token (for balance ratio)</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                value={token.source_token_currency}
+                                onChange={(e) => updateToken(index, 'source_token_currency', e.target.value)}
+                                className="px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
+                                placeholder="Currency"
+                              />
+                              <input
+                                type="text"
+                                value={token.source_token_issuer}
+                                onChange={(e) => updateToken(index, 'source_token_issuer', e.target.value)}
+                                className="px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
+                                placeholder="Issuer"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-slate-300">Recipients (one per line or import CSV)</label>
-                  <label className="w-full px-4 py-3 bg-purple-950/50 border border-purple-500/30 rounded-xl cursor-pointer hover:bg-purple-950/70 transition-all text-center block mb-2 text-purple-300">
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={handleCSVUpload}
-                      className="hidden"
-                    />
-                    📁 Import CSV
-                  </label>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-slate-300">Recipients</label>
+                    {newCampaign.tokens.length > 0 && newCampaign.tokens[0].currency_code && newCampaign.tokens[0].issuer_address && (
+                      <button
+                        onClick={() => fetchTokenHolders(newCampaign.tokens[0].currency_code, newCampaign.tokens[0].issuer_address)}
+                        disabled={fetchingHolders}
+                        className="px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg text-xs font-medium hover:shadow-lg hover:shadow-green-500/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {fetchingHolders ? '⏳ Fetching...' : '🔍 Fetch Token Holders'}
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <label className="px-4 py-3 bg-purple-950/50 border border-purple-500/30 rounded-xl cursor-pointer hover:bg-purple-950/70 transition-all text-center text-purple-300 text-sm">
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={handleCSVUpload}
+                        className="hidden"
+                      />
+                      📁 Import CSV
+                    </label>
+                    <button
+                      onClick={() => setNewCampaign({ ...newCampaign, recipientsList: '' })}
+                      className="px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-xl hover:bg-red-500/20 transition-all text-red-300 text-sm"
+                    >
+                      🗑️ Clear All
+                    </button>
+                  </div>
                   <textarea
                     value={newCampaign.recipientsList}
                     onChange={(e) => setNewCampaign({ ...newCampaign, recipientsList: e.target.value })}
