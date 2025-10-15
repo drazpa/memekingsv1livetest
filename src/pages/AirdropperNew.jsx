@@ -352,8 +352,8 @@ export default function Airdropper() {
 
   if (!connectedWallet) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-6 flex items-center justify-center">
-        <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 max-w-md text-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white p-6 flex items-center justify-center">
+        <div className="bg-purple-900/20 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-8 max-w-md text-center">
           <div className="text-6xl mb-4">✈️</div>
           <h2 className="text-2xl font-bold mb-4">Connect Your Wallet</h2>
           <p className="text-slate-400">Please connect a wallet to use the Airdropper</p>
@@ -363,7 +363,7 @@ export default function Airdropper() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -374,7 +374,7 @@ export default function Airdropper() {
           </div>
           <button
             onClick={() => setShowInfoModal(true)}
-            className="px-4 py-2 bg-blue-500/10 border border-blue-500/30 rounded-xl hover:bg-blue-500/20 transition-all flex items-center gap-2"
+            className="px-4 py-2 bg-purple-500/10 border border-purple-500/30 rounded-xl hover:bg-purple-500/20 transition-all flex items-center gap-2"
           >
             <span>ℹ️</span>
             <span>How It Works</span>
@@ -382,7 +382,7 @@ export default function Airdropper() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6">
+          <div className="bg-gradient-to-br from-purple-900/30 to-purple-800/20 backdrop-blur-xl border border-purple-500/20 rounded-2xl p-6">
             <div className="text-sm text-slate-400 mb-2">Total Campaigns</div>
             <div className="text-3xl font-bold text-white mb-1">{analytics.totalCampaigns}</div>
             <div className="text-xs text-slate-500">All time</div>
@@ -417,7 +417,7 @@ export default function Airdropper() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1 space-y-4">
             {campaigns.length === 0 ? (
-              <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-12 text-center">
+              <div className="bg-purple-900/20 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-12 text-center">
                 <div className="text-5xl mb-4">📭</div>
                 <p className="text-slate-400">No campaigns yet</p>
                 <p className="text-sm text-slate-500 mt-2">Create your first airdrop campaign</p>
@@ -430,7 +430,7 @@ export default function Airdropper() {
                   className={`backdrop-blur-xl border rounded-2xl p-5 cursor-pointer transition-all ${
                     selectedCampaign?.id === campaign.id
                       ? 'bg-gradient-to-br from-purple-500/20 to-blue-500/10 border-purple-500/50 shadow-lg shadow-purple-500/20'
-                      : 'bg-slate-800/50 border-slate-700/50 hover:border-slate-600'
+                      : 'bg-purple-900/20 border-purple-500/30 hover:border-purple-500/50'
                   }`}
                 >
                   <div className="flex justify-between items-start mb-3">
@@ -469,7 +469,7 @@ export default function Airdropper() {
               <>
                 <AirdropAnalytics campaign={selectedCampaign} transactions={transactions} recipients={recipients} />
 
-                <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6">
+                <div className="bg-purple-900/20 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-6">
                   <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <span>🪙</span>
                     <span>Tokens ({tokens.length})</span>
@@ -479,7 +479,7 @@ export default function Airdropper() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {tokens.map(token => (
-                        <div key={token.id} className="bg-slate-700/30 rounded-xl p-4 border border-slate-600/30">
+                        <div key={token.id} className="bg-purple-950/40 rounded-xl p-4 border border-purple-500/30">
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex-1">
                               <div className="font-bold text-white">{token.currency_code}</div>
@@ -499,7 +499,7 @@ export default function Airdropper() {
                   )}
                 </div>
 
-                <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6">
+                <div className="bg-purple-900/20 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-6">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-bold flex items-center gap-2">
                       <span>📊</span>
@@ -511,7 +511,7 @@ export default function Airdropper() {
                       const recipient = recipients.find(r => r.id === tx.recipient_id);
                       const token = tokens.find(t => t.id === tx.token_id);
                       return (
-                        <div key={tx.id} className="bg-slate-700/30 rounded-xl p-3 border border-slate-600/30">
+                        <div key={tx.id} className="bg-purple-950/40 rounded-xl p-3 border border-purple-500/30">
                           <div className="flex justify-between items-start gap-3">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
@@ -547,7 +547,7 @@ export default function Airdropper() {
                 </div>
               </>
             ) : (
-              <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-20 text-center">
+              <div className="bg-purple-900/20 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-20 text-center">
                 <div className="text-6xl mb-4">👈</div>
                 <p className="text-slate-400 text-lg">Select a campaign to view details</p>
                 <p className="text-sm text-slate-500 mt-2">Choose from the list on the left</p>
@@ -559,7 +559,7 @@ export default function Airdropper() {
 
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl max-w-3xl w-full my-8">
+          <div className="bg-gradient-to-br from-purple-900/95 to-purple-800/95 border border-purple-500/50 rounded-2xl max-w-3xl w-full my-8 shadow-2xl shadow-purple-500/20">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold">Create Airdrop Campaign</h2>
@@ -578,7 +578,7 @@ export default function Airdropper() {
                     type="text"
                     value={newCampaign.name}
                     onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl focus:outline-none focus:border-purple-500 text-white placeholder-slate-500"
+                    className="w-full px-4 py-3 bg-purple-950/50 border border-purple-500/30 rounded-xl focus:outline-none focus:border-purple-400 text-white placeholder-purple-300/50"
                     placeholder="My Token Airdrop"
                   />
                 </div>
@@ -590,7 +590,7 @@ export default function Airdropper() {
                     min="5"
                     value={newCampaign.intervalSeconds}
                     onChange={(e) => setNewCampaign({ ...newCampaign, intervalSeconds: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl focus:outline-none focus:border-purple-500 text-white"
+                    className="w-full px-4 py-3 bg-purple-950/50 border border-purple-500/30 rounded-xl focus:outline-none focus:border-purple-400 text-white"
                   />
                 </div>
 
@@ -606,7 +606,7 @@ export default function Airdropper() {
                   </div>
                   <div className="space-y-4">
                     {newCampaign.tokens.map((token, index) => (
-                      <div key={index} className="bg-slate-700/30 rounded-xl p-4 space-y-3 border border-slate-600/30">
+                      <div key={index} className="bg-purple-950/40 rounded-xl p-4 space-y-3 border border-purple-500/30">
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-medium text-white">Token {index + 1}</span>
                           {newCampaign.tokens.length > 1 && (
@@ -627,7 +627,7 @@ export default function Airdropper() {
                                 const selected = availableTokens.find(t => t.value === e.target.value);
                                 if (selected) selectTokenFromDropdown(index, selected);
                               }}
-                              className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500 text-white text-sm"
+                              className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm"
                             >
                               <option value="">Choose a token...</option>
                               {availableTokens.map(token => (
@@ -644,14 +644,14 @@ export default function Airdropper() {
                             type="text"
                             value={token.currency_code}
                             onChange={(e) => updateToken(index, 'currency_code', e.target.value)}
-                            className="px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500 text-white text-sm placeholder-slate-500"
+                            className="px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
                             placeholder="Currency Code"
                           />
                           <input
                             type="text"
                             value={token.issuer_address}
                             onChange={(e) => updateToken(index, 'issuer_address', e.target.value)}
-                            className="px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500 text-white text-sm placeholder-slate-500"
+                            className="px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
                             placeholder="Issuer Address"
                           />
                         </div>
@@ -661,7 +661,7 @@ export default function Airdropper() {
                           <select
                             value={token.distribution_method}
                             onChange={(e) => updateToken(index, 'distribution_method', e.target.value)}
-                            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500 text-white text-sm"
+                            className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm"
                           >
                             {DISTRIBUTION_METHODS.map(method => (
                               <option key={method.id} value={method.id}>{method.icon} {method.name}</option>
@@ -674,7 +674,7 @@ export default function Airdropper() {
                             type="number"
                             value={token.amount}
                             onChange={(e) => updateToken(index, 'amount', e.target.value)}
-                            className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500 text-white text-sm placeholder-slate-500"
+                            className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm placeholder-purple-300/50"
                             placeholder="Amount per recipient"
                             step="0.000001"
                           />
@@ -686,7 +686,7 @@ export default function Airdropper() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2 text-slate-300">Recipients (one per line or import CSV)</label>
-                  <label className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl cursor-pointer hover:bg-slate-700 transition-all text-center block mb-2 text-purple-300">
+                  <label className="w-full px-4 py-3 bg-purple-950/50 border border-purple-500/30 rounded-xl cursor-pointer hover:bg-purple-950/70 transition-all text-center block mb-2 text-purple-300">
                     <input
                       type="file"
                       accept=".csv"
@@ -698,7 +698,7 @@ export default function Airdropper() {
                   <textarea
                     value={newCampaign.recipientsList}
                     onChange={(e) => setNewCampaign({ ...newCampaign, recipientsList: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl focus:outline-none focus:border-purple-500 h-32 font-mono text-sm text-white placeholder-slate-500"
+                    className="w-full px-4 py-3 bg-purple-950/50 border border-purple-500/30 rounded-xl focus:outline-none focus:border-purple-400 h-32 font-mono text-sm text-white placeholder-purple-300/50"
                     placeholder="rAddress1&#10;rAddress2&#10;rAddress3"
                   />
                   <div className="text-sm text-slate-400 mt-2">
@@ -725,7 +725,7 @@ export default function Airdropper() {
                   </button>
                   <button
                     onClick={() => setShowCreateModal(false)}
-                    className="px-6 py-3 bg-slate-700/50 rounded-xl font-medium hover:bg-slate-700 transition-all border border-slate-600"
+                    className="px-6 py-3 bg-purple-950/50 rounded-xl font-medium hover:bg-purple-900/50 transition-all border border-purple-500/30"
                   >
                     Cancel
                   </button>
