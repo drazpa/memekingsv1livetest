@@ -77,19 +77,33 @@ export default function FeaturedSpotModal({ isOpen, onClose, token, walletSeed, 
         hours: actualHours,
         walletSeed,
         walletAddress,
-        xrpAmount: totalCost
+        xrpAmount: totalCost,
+        receiverAddress: token.receiver_address
       });
 
       toast.dismiss(loadingToast);
-      toast.success(
-        <div>
-          <div className="font-bold">Featured spot purchased!</div>
-          <div className="text-sm">
-            {token.token_name} is now in spot #{selectedSpot} for {actualHours} hour{actualHours > 1 ? 's' : ''}
-          </div>
-        </div>,
-        { duration: 5000 }
-      );
+
+      if (result.wasFree) {
+        toast.success(
+          <div>
+            <div className="font-bold">Featured spot activated!</div>
+            <div className="text-sm">
+              {token.token_name} is now in spot #{selectedSpot} for {actualHours} hour{actualHours > 1 ? 's' : ''} (FREE for admin/receiver)
+            </div>
+          </div>,
+          { duration: 5000 }
+        );
+      } else {
+        toast.success(
+          <div>
+            <div className="font-bold">Featured spot purchased!</div>
+            <div className="text-sm">
+              {token.token_name} is now in spot #{selectedSpot} for {actualHours} hour{actualHours > 1 ? 's' : ''}
+            </div>
+          </div>,
+          { duration: 5000 }
+        );
+      }
 
       onClose();
     } catch (error) {

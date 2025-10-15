@@ -1221,7 +1221,7 @@ export default function Dashboard() {
   const userTokens = tokens.filter(t => t.issuer_address !== ISSUER_ADDRESS);
 
   const topTokens = [...tokens]
-    .filter(t => t.is_featured === true && t.amm_pool_created)
+    .filter(t => t.is_featured === true)
     .sort((a, b) => (a.featured_order || 999) - (b.featured_order || 999))
     .slice(0, 3);
 

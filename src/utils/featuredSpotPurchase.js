@@ -38,40 +38,52 @@ export const purchaseFeaturedSpot = async ({
   hours,
   walletSeed,
   walletAddress,
-  xrpAmount
+  xrpAmount,
+  receiverAddress
 }) => {
   try {
     const finalXrpAmount = xrpAmount || (hours * XRP_PER_HOUR);
 
-    const client = await getClient();
-    const wallet = xrpl.Wallet.fromSeed(walletSeed);
+    const isAdminOrReceiver = walletAddress === FEATURED_SPOT_WALLET ||
+                             (receiverAddress && walletAddress === receiverAddress);
 
-    const payment = {
-      TransactionType: 'Payment',
-      Account: wallet.address,
-      Amount: xrpl.xrpToDrops(finalXrpAmount),
-      Destination: FEATURED_SPOT_WALLET,
-      Memos: [
-        {
-          Memo: {
-            MemoType: Buffer.from('featured_spot', 'utf8').toString('hex').toUpperCase(),
-            MemoData: Buffer.from(JSON.stringify({
-              tokenId,
-              spotPosition,
-              hours,
-              deal: xrpAmount ? 'day_buyout' : 'standard'
-            }), 'utf8').toString('hex').toUpperCase()
+    let txHash = null;
+
+    if (!isAdminOrReceiver) {
+      const client = await getClient();
+      const wallet = xrpl.Wallet.fromSeed(walletSeed);
+
+      const payment = {
+        TransactionType: 'Payment',
+        Account: wallet.address,
+        Amount: xrpl.xrpToDrops(finalXrpAmount),
+        Destination: FEATURED_SPOT_WALLET,
+        Memos: [
+          {
+            Memo: {
+              MemoType: Buffer.from('featured_spot', 'utf8').toString('hex').toUpperCase(),
+              MemoData: Buffer.from(JSON.stringify({
+                tokenId,
+                spotPosition,
+                hours,
+                deal: xrpAmount ? 'day_buyout' : 'standard'
+              }), 'utf8').toString('hex').toUpperCase()
+            }
           }
-        }
-      ]
-    };
+        ]
+      };
 
-    const prepared = await client.autofill(payment);
-    const signed = wallet.sign(prepared);
-    const result = await client.submitAndWait(signed.tx_blob);
+      const prepared = await client.autofill(payment);
+      const signed = wallet.sign(prepared);
+      const result = await client.submitAndWait(signed.tx_blob);
 
-    if (result.result.meta.TransactionResult !== 'tesSUCCESS') {
-      throw new Error(`Transaction failed: ${result.result.meta.TransactionResult}`);
+      if (result.result.meta.TransactionResult !== 'tesSUCCESS') {
+        throw new Error(`Transaction failed: ${result.result.meta.TransactionResult}`);
+      }
+
+      txHash = result.result.hash;
+    } else {
+      txHash = 'FREE_ADMIN_RECEIVER';
     }
 
     const startedAt = new Date();
@@ -84,8 +96,8 @@ export const purchaseFeaturedSpot = async ({
         wallet_address: walletAddress,
         spot_position: spotPosition,
         hours_purchased: hours,
-        xrp_amount: finalXrpAmount,
-        tx_hash: result.result.hash,
+        xrp_amount: isAdminOrReceiver ? 0 : finalXrpAmount,
+        tx_hash: txHash,
         started_at: startedAt.toISOString(),
         expires_at: expiresAt.toISOString(),
         is_active: true
@@ -98,7 +110,8 @@ export const purchaseFeaturedSpot = async ({
     return {
       success: true,
       purchase: data,
-      txHash: result.result.hash
+      txHash: txHash,
+      wasFree: isAdminOrReceiver
     };
   } catch (error) {
     console.error('Error purchasing featured spot:', error);

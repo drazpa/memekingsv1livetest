@@ -17,6 +17,9 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
     xrpAmount: '',
     tradingFee: 0
   });
+  const [progressStep, setProgressStep] = useState('');
+  const [showProgress, setShowProgress] = useState(false);
+  const [progressSteps, setProgressSteps] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -89,14 +92,32 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
     }
 
     setLoading(true);
+    setShowProgress(true);
+    const steps = [];
+
     try {
+      setProgressStep('Initializing wallet...');
+      steps.push({ text: 'Initialize wallet', status: 'in_progress' });
+      setProgressSteps([...steps]);
+
       const xrplWallet = XrplWallet.fromSeed(wallet.seed);
       const client = await getClient();
 
       const token = formData.selectedToken;
       const currencyHex = token.currency_hex || encodeCurrencyCode(token.currency_code);
 
-      if (token.receiver_address && token.receiver_address !== wallet.address) {
+      steps[0].status = 'completed';
+      setProgressSteps([...steps]);
+
+      const ISSUER_ADDRESS = 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6';
+      const isAdminOrReceiver = wallet.address === ISSUER_ADDRESS ||
+                               (token.receiver_address && wallet.address === token.receiver_address);
+
+      if (token.receiver_address && token.receiver_address !== wallet.address && !isAdminOrReceiver) {
+        setProgressStep(`Paying ${AMM_CREATION_FEE} XRP creation fee...`);
+        steps.push({ text: `Pay ${AMM_CREATION_FEE} XRP creation fee`, status: 'in_progress' });
+        setProgressSteps([...steps]);
+
         const feePayment = {
           TransactionType: 'Payment',
           Account: xrplWallet.address,
@@ -116,8 +137,17 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
           throw new Error('Fee payment failed');
         }
 
+        steps[steps.length - 1].status = 'completed';
+        setProgressSteps([...steps]);
         toast.success(`${AMM_CREATION_FEE} XRP fee paid to token receiver`);
+      } else if (isAdminOrReceiver) {
+        steps.push({ text: 'Skip fee (admin/receiver wallet)', status: 'completed' });
+        setProgressSteps([...steps]);
       }
+
+      setProgressStep('Creating AMM pool on XRPL...');
+      steps.push({ text: 'Create AMM pool on XRPL', status: 'in_progress' });
+      setProgressSteps([...steps]);
 
       const amount = {
         currency: currencyHex,
@@ -143,6 +173,13 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
         throw new Error(`Transaction failed: ${result.result.meta.TransactionResult}`);
       }
 
+      steps[steps.length - 1].status = 'completed';
+      setProgressSteps([...steps]);
+
+      setProgressStep('Updating database...');
+      steps.push({ text: 'Update token status in database', status: 'in_progress' });
+      setProgressSteps([...steps]);
+
       await supabase
         .from('meme_tokens')
         .update({
@@ -154,11 +191,42 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
         })
         .eq('id', token.id);
 
+      steps[steps.length - 1].status = 'completed';
+      setProgressSteps([...steps]);
+
+      setProgressStep('Adding to pool tracking...');
+      steps.push({ text: 'Add to pool tracking', status: 'in_progress' });
+      setProgressSteps([...steps]);
+
+      await supabase
+        .from('user_pools')
+        .insert({
+          user_address: wallet.address,
+          token_id: token.id,
+          token_amount: parseFloat(formData.tokenAmount),
+          xrp_amount: parseFloat(formData.xrpAmount),
+          created_at: new Date().toISOString()
+        });
+
+      steps[steps.length - 1].status = 'completed';
+      setProgressSteps([...steps]);
+
+      setProgressStep('Complete!');
       toast.success('AMM Pool created successfully!');
-      onClose();
-      window.location.reload();
+
+      setTimeout(() => {
+        onClose();
+        window.location.reload();
+      }, 1500);
     } catch (error) {
       console.error('Error creating AMM pool:', error);
+
+      const steps = progressSteps.map((s, i) =>
+        i === progressSteps.length - 1 && s.status === 'in_progress'
+          ? { ...s, status: 'error' }
+          : s
+      );
+      setProgressSteps(steps);
 
       let errorMessage = 'Failed to create AMM pool';
       if (error.message?.includes('tecNO_AUTH')) {
@@ -173,6 +241,7 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
         errorMessage = error.message;
       }
 
+      setProgressStep(`Error: ${errorMessage}`);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -225,7 +294,7 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
                 <li>• Provide initial liquidity (Token + XRP)</li>
                 <li>• The pool will be created on the XRPL blockchain</li>
                 <li>• You'll receive LP tokens representing your share</li>
-                <li>• Fee: {AMM_CREATION_FEE} XRP (FREE if you're the token receiver)</li>
+                <li>• Fee: {AMM_CREATION_FEE} XRP (FREE for admin issuer and token receiver wallets)</li>
               </ul>
             </div>
 
@@ -375,12 +444,12 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
                 </div>
               )}
 
-              {(!formData.selectedToken?.receiver_address || formData.selectedToken.receiver_address === wallet?.address) && (
+              {(!formData.selectedToken?.receiver_address || formData.selectedToken.receiver_address === wallet?.address || wallet?.address === 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6') && (
                 <div className="glass rounded-lg p-4 bg-green-500/10 border-green-500/30">
                   <div className="text-green-400 text-sm mb-1">AMM Creation Fee</div>
                   <div className="text-green-200 font-semibold">FREE</div>
                   <div className="text-green-300 text-xs mt-1">
-                    No fee for token receiver wallet
+                    No fee for admin issuer and token receiver wallets
                   </div>
                 </div>
               )}
@@ -423,6 +492,52 @@ export default function CreateAMMPoolModal({ isOpen, onClose, wallet }) {
             </button>
           )}
         </div>
+
+        {showProgress && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60]">
+            <div className="glass rounded-xl p-6 max-w-md w-full mx-4 border border-purple-500/30">
+              <h3 className="text-xl font-bold text-white mb-4">Creating AMM Pool</h3>
+
+              <div className="space-y-3">
+                {progressSteps.map((step, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    {step.status === 'completed' && (
+                      <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                    {step.status === 'in_progress' && (
+                      <div className="w-6 h-6 rounded-full border-2 border-purple-500 border-t-transparent animate-spin flex-shrink-0" />
+                    )}
+                    {step.status === 'error' && (
+                      <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                    )}
+                    <span className={`text-sm ${
+                      step.status === 'completed' ? 'text-green-300' :
+                      step.status === 'in_progress' ? 'text-purple-300 font-semibold' :
+                      step.status === 'error' ? 'text-red-300' :
+                      'text-gray-400'
+                    }`}>
+                      {step.text}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {progressStep && (
+                <div className="mt-4 pt-4 border-t border-purple-500/20">
+                  <p className="text-purple-300 text-sm">{progressStep}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
