@@ -2355,7 +2355,15 @@ export default function Memes() {
                   <div className="space-y-3">
                     <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-3">
                       <p className="text-yellow-300 text-xs font-medium">⚠️ Important Requirements</p>
-                      <p className="text-yellow-300/80 text-xs mt-1">You need TWO activated wallets (20 XRP reserve each) before proceeding. Ensure you have enough XRP for transaction fees and liquidity pool creation.</p>
+                      <p className="text-yellow-300/80 text-xs mt-1 mb-2">You need TWO activated wallets (2 XRP reserve each) before proceeding. Ensure you have enough XRP for transaction fees and liquidity pool creation.</p>
+                      <button
+                        onClick={() => {
+                          window.dispatchEvent(new CustomEvent('navigateToPage', { detail: 'wallets' }));
+                        }}
+                        className="text-purple-300 hover:text-purple-200 underline text-xs font-medium"
+                      >
+                        → Go to Wallets page to generate wallets
+                      </button>
                     </div>
                     <div>
                       <label className="block text-purple-300 mb-2 text-sm">Issuer Wallet</label>

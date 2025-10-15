@@ -1747,6 +1747,17 @@ export default function Trade({ preselectedToken = null }) {
         setCurrentTradeStep(3);
         await fetchTokenBalance();
 
+        // Refresh market data and chart after successful trade
+        setTimeout(async () => {
+          try {
+            await fetchMarketData(true);
+            await loadChartData();
+            console.log('✅ Market data and chart refreshed after trade');
+          } catch (error) {
+            console.error('Error refreshing market data:', error);
+          }
+        }, 1000);
+
         setTimeout(() => {
           setShowTradeProgress(false);
           setAmount('');
