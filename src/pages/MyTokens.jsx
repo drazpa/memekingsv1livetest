@@ -806,9 +806,18 @@ export default function MyTokens() {
                 <tbody className="divide-y divide-purple-500/20">
                   {holdings
                     .filter(holding => {
-                      if (!showLPTokens && holding.isLPToken) return false;
-                      if (!showRegularTokens && !holding.isLPToken) return false;
-                      if (tokenFilterTab === 'user' && connectedWallet && holding.token.issuer_address !== connectedWallet.address) return false;
+                      const isUserToken = connectedWallet && holding.token.issuer_address === connectedWallet.address;
+                      const isLPToken = holding.isLPToken;
+                      const isRegularToken = !isLPToken && !isUserToken;
+
+                      if (tokenFilterTab === 'all') {
+                        if (isLPToken && !showLPTokens) return false;
+                        if (isRegularToken && !showRegularTokens) return false;
+                        if (isUserToken && !showUserTokens) return false;
+                      } else if (tokenFilterTab === 'user') {
+                        if (!isUserToken) return false;
+                      }
+
                       if (!searchQuery) return true;
                       const search = searchQuery.toLowerCase();
                       return holding.token.token_name.toLowerCase().includes(search) ||

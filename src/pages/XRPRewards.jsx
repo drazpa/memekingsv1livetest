@@ -16,6 +16,13 @@ export default function XRPRewards() {
     pending: 0,
     lifetimeEarnings: 0
   });
+  const [globalStats, setGlobalStats] = useState({
+    totalXRPPaid: 0,
+    totalXRPClaimed: 0,
+    totalUSDPaid: 0,
+    totalUSDClaimed: 0
+  });
+  const [xrpPrice, setXrpPrice] = useState(2.50);
   const [loading, setLoading] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [claimProgress, setClaimProgress] = useState(null);
@@ -35,6 +42,11 @@ export default function XRPRewards() {
       window.removeEventListener('walletConnected', handleWalletChange);
       window.removeEventListener('walletDisconnected', handleWalletChange);
     };
+  }, []);
+
+  useEffect(() => {
+    fetchXRPPrice();
+    loadGlobalStats();
   }, []);
 
   useEffect(() => {
@@ -79,6 +91,40 @@ export default function XRPRewards() {
       setConnectedWallet(wallet);
     } else {
       setConnectedWallet(null);
+    }
+  };
+
+  const fetchXRPPrice = async () => {
+    try {
+      const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd');
+      const data = await response.json();
+      if (data.ripple?.usd) {
+        setXrpPrice(data.ripple.usd);
+      }
+    } catch (error) {
+      console.error('Failed to fetch XRP price:', error);
+    }
+  };
+
+  const loadGlobalStats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('xrp_rewards')
+        .select('amount, status');
+
+      if (error) throw error;
+
+      const totalXRPPaid = data?.reduce((sum, r) => sum + parseFloat(r.amount), 0) || 0;
+      const totalXRPClaimed = data?.filter(r => r.status === 'claimed').reduce((sum, r) => sum + parseFloat(r.amount), 0) || 0;
+
+      setGlobalStats({
+        totalXRPPaid,
+        totalXRPClaimed,
+        totalUSDPaid: totalXRPPaid * xrpPrice,
+        totalUSDClaimed: totalXRPClaimed * xrpPrice
+      });
+    } catch (error) {
+      console.error('Error loading global stats:', error);
     }
   };
 
@@ -372,6 +418,36 @@ export default function XRPRewards() {
           </button>
         )}
       </div>
+
+      <div className="glass rounded-lg p-6 mb-6">
+        <h3 className="text-xl font-bold text-purple-200 mb-4">🌍 Global Rewards Statistics</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-purple-900/20 rounded-lg p-4">
+            <div className="text-purple-400 text-sm mb-2">Total XRP Distributed</div>
+            <div className="text-2xl font-bold text-purple-200">{globalStats.totalXRPPaid.toFixed(2)} XRP</div>
+            <div className="text-green-400 text-sm mt-1">${globalStats.totalUSDPaid.toFixed(2)} USD</div>
+          </div>
+          <div className="bg-green-900/20 rounded-lg p-4">
+            <div className="text-green-400 text-sm mb-2">Total XRP Claimed</div>
+            <div className="text-2xl font-bold text-green-400">{globalStats.totalXRPClaimed.toFixed(2)} XRP</div>
+            <div className="text-green-300 text-sm mt-1">${globalStats.totalUSDClaimed.toFixed(2)} USD</div>
+          </div>
+          <div className="bg-yellow-900/20 rounded-lg p-4">
+            <div className="text-yellow-400 text-sm mb-2">Unclaimed XRP</div>
+            <div className="text-2xl font-bold text-yellow-400">{(globalStats.totalXRPPaid - globalStats.totalXRPClaimed).toFixed(2)} XRP</div>
+            <div className="text-yellow-300 text-sm mt-1">${((globalStats.totalXRPPaid - globalStats.totalXRPClaimed) * xrpPrice).toFixed(2)} USD</div>
+          </div>
+          <div className="bg-blue-900/20 rounded-lg p-4">
+            <div className="text-blue-400 text-sm mb-2">Claim Rate</div>
+            <div className="text-2xl font-bold text-blue-400">
+              {globalStats.totalXRPPaid > 0 ? ((globalStats.totalXRPClaimed / globalStats.totalXRPPaid) * 100).toFixed(1) : 0}%
+            </div>
+            <div className="text-blue-300 text-sm mt-1">Of total rewards</div>
+          </div>
+        </div>
+      </div>
+
+      <h3 className="text-xl font-bold text-purple-200 mb-4">💰 Your Rewards</h3>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass rounded-lg p-6">

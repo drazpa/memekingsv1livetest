@@ -596,7 +596,7 @@ export default function Pools() {
                   </button>
 
                   <a
-                    href={`https://xmagnetic.org/dex/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
+                    href={`https://xmagnetic.org/amm/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3"
@@ -744,7 +744,7 @@ export default function Pools() {
                 </button>
 
                 <a
-                  href={`https://xmagnetic.org/dex/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
+                  href={`https://xmagnetic.org/amm/${token.currency_code}+${token.issuer_address}_XRP+XRP?network=mainnet`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-full px-4 py-3 text-left hover:bg-purple-600/30 transition-colors flex items-center gap-3"
