@@ -124,6 +124,7 @@ export default function Sidebar({ currentPage, onNavigate }) {
     { id: 'vault', label: 'Vault', icon: '🏦' },
     { id: 'mytokens', label: 'My Tokens', icon: '💎' },
     { id: 'xrprewards', label: 'XRP Rewards', icon: '💰' },
+    { id: 'airdropper', label: 'Airdropper', icon: '✈️' },
     { id: 'analytics', label: 'Analytics', icon: '📈' },
     { id: 'aichat', label: 'AI Chat', icon: '💬' },
     { id: 'about', label: 'About', icon: 'ℹ️' },
