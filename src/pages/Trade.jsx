@@ -98,6 +98,7 @@ export default function Trade({ preselectedToken = null }) {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [depositMode, setDepositMode] = useState('both');
   const [showMiniAIChat, setShowMiniAIChat] = useState(false);
+  const [lastPriceUpdate, setLastPriceUpdate] = useState(null);
   const priceChartContainerRef = useRef(null);
   const volumeChartContainerRef = useRef(null);
   const priceChartInstanceRef = useRef(null);
@@ -411,7 +412,7 @@ export default function Trade({ preselectedToken = null }) {
 
     priceUpdateIntervalRef.current = setInterval(() => {
       updateRealTimePrice();
-    }, 20000);
+    }, 5000);
   };
 
   const stopRealTimeUpdates = () => {
@@ -421,15 +422,34 @@ export default function Trade({ preselectedToken = null }) {
     }
   };
 
-  const updateRealTimePrice = () => {
+  const updateRealTimePrice = async () => {
     if (!selectedToken || !priceSeriesRef.current || chartDataRef.current.length === 0) return;
 
-    const basePrice = calculatePrice(selectedToken);
-    const lastCandle = chartDataRef.current[chartDataRef.current.length - 1];
-    const now = Math.floor(Date.now() / 1000);
+    try {
+      const { requestWithRetry } = await import('../utils/xrplClient');
 
-    const variance = (Math.random() - 0.5) * 0.02;
-    const newPrice = basePrice * (1 + variance);
+      const ammInfoResponse = await requestWithRetry({
+        command: 'amm_info',
+        asset: { currency: 'XRP' },
+        asset2: {
+          currency: selectedToken.currency_code,
+          issuer: selectedToken.issuer_address
+        },
+        ledger_index: 'validated'
+      });
+
+      if (!ammInfoResponse.result.amm) return;
+
+      const amm = ammInfoResponse.result.amm;
+      const xrpAmount = parseFloat(amm.amount) / 1000000;
+      const tokenAmount = parseFloat(amm.amount2.value);
+      const newPrice = xrpAmount / tokenAmount;
+
+      setLivePrice(newPrice);
+      setLastPriceUpdate(Date.now());
+
+      const lastCandle = chartDataRef.current[chartDataRef.current.length - 1];
+      const now = Math.floor(Date.now() / 1000);
 
     if (now - lastCandle.time >= 60) {
       const newCandle = {
@@ -474,6 +494,9 @@ export default function Trade({ preselectedToken = null }) {
       } catch (error) {
         console.error('Error updating chart:', error);
       }
+    }
+    } catch (error) {
+      console.error('Error fetching real-time price:', error);
     }
   };
 
@@ -2077,13 +2100,16 @@ export default function Trade({ preselectedToken = null }) {
                 <div className="flex items-center gap-3">
                   <TokenIcon token={selectedToken} size="3xl" />
                   <div>
-                    <h3 className="text-base font-bold text-purple-200">{selectedToken.token_name}/XRP</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-bold text-purple-200">{selectedToken.token_name}/XRP</h3>
+                      <span className="flex items-center gap-1 text-xs text-green-400" title={lastPriceUpdate ? `Last updated: ${new Date(lastPriceUpdate).toLocaleTimeString()}` : 'Loading...'}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                        Live
+                      </span>
+                    </div>
                     <div className="flex items-center gap-2">
                       <div className="text-base sm:text-lg font-bold text-purple-200 font-mono">
-                        {chartDataRef.current.length > 0
-                          ? (chartDataRef.current[chartDataRef.current.length - 1].close || chartDataRef.current[chartDataRef.current.length - 1].value || currentPrice).toFixed(8)
-                          : currentPrice.toFixed(8)
-                        } XRP
+                        {livePrice > 0 ? livePrice.toFixed(8) : currentPrice.toFixed(8)} XRP
                       </div>
                       <span className={`text-xs font-medium px-1.5 py-0.5 rounded whitespace-nowrap ${
                         parseFloat(change24h) >= 0
