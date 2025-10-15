@@ -6,269 +6,226 @@ import { Client } from 'xrpl';
 import { XRPScanLink } from '../components/XRPScanLink';
 
 export default function KingsList() {
-  const [kings, setKings] = useState([]);
+  const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState({});
+  const [fetching, setFetching] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    loadKings();
+    loadAllTokens();
   }, []);
 
-  const loadKings = async () => {
+  const loadAllTokens = async () => {
     setLoading(true);
     try {
+      // Load all tokens
       const { data: tokensData, error: tokensError } = await supabase
         .from('meme_tokens')
         .select('*')
-        .eq('amm_pool_created', true)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (tokensError) throw tokensError;
+
+      // Load cached holder data for all tokens
+      const { data: holdersData } = await supabase
+        .from('token_holders')
+        .select('*')
+        .eq('rank', 1);
+
+      // Map holders to tokens
+      const tokensWithHolders = (tokensData || []).map(token => {
+        const holder = holdersData?.find(h => h.token_id === token.id);
+        return {
+          ...token,
+          topHolder: holder || null
+        };
+      });
+
+      setTokens(tokensWithHolders);
+    } catch (error) {
+      console.error('Error loading tokens:', error);
+      toast.error('Failed to load tokens');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchTopHolder = async (tokenId) => {
+    setFetching(prev => ({ ...prev, [tokenId]: true }));
+
+    try {
+      const token = tokens.find(t => t.id === tokenId);
+      if (!token) return;
 
       const client = new Client('wss://xrplcluster.com');
       await client.connect();
 
       try {
-        // Process all tokens in parallel for speed
-        const kingsPromises = (tokensData || []).map(async (token) => {
-          try {
-            // Fetch holder data and price data in parallel
-            const [holderResponse, ammPriceResponse] = await Promise.all([
-              // Get trustlines
-              client.request({
-                command: 'account_lines',
-                account: token.issuer_address,
-                peer: undefined,
-                ledger_index: 'validated'
-              }),
-              // Get AMM price if available
-              token.amm_account_id ? client.request({
-                command: 'amm_info',
-                asset: {
-                  currency: token.currency_code,
-                  issuer: token.issuer_address
-                },
-                asset2: {
-                  currency: 'XRP'
-                },
-                ledger_index: 'validated'
-              }).catch(() => null) : Promise.resolve(null)
-            ]);
+        // Fetch holder data and price data in parallel
+        const [holderResponse, ammPriceResponse] = await Promise.all([
+          client.request({
+            command: 'account_lines',
+            account: token.issuer_address,
+            peer: undefined,
+            ledger_index: 'validated'
+          }),
+          token.amm_account_id ? client.request({
+            command: 'amm_info',
+            asset: {
+              currency: token.currency_code,
+              issuer: token.issuer_address
+            },
+            asset2: {
+              currency: 'XRP'
+            },
+            ledger_index: 'validated'
+          }).catch(() => null) : Promise.resolve(null)
+        ]);
 
-            const trustlines = holderResponse.result.lines || [];
+        const trustlines = holderResponse.result.lines || [];
 
-            if (trustlines.length === 0) return null;
+        if (trustlines.length === 0) {
+          toast.error('No holders found for this token');
+          return;
+        }
 
-            // Sort by balance descending to get top holder
-            trustlines.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
+        // Sort by balance descending
+        trustlines.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
 
-            const topLine = trustlines[0];
-            const balance = parseFloat(topLine.balance);
+        const topLine = trustlines[0];
+        const balance = parseFloat(topLine.balance);
 
-            if (balance <= 0) return null;
+        if (balance <= 0) {
+          toast.error('No positive balances found');
+          return;
+        }
 
-            // Calculate total supply from all trustlines
-            const totalSupply = trustlines.reduce((sum, line) => {
-              const bal = parseFloat(line.balance);
-              return sum + (bal > 0 ? bal : 0);
-            }, 0);
+        // Calculate total supply
+        const totalSupply = trustlines.reduce((sum, line) => {
+          const bal = parseFloat(line.balance);
+          return sum + (bal > 0 ? bal : 0);
+        }, 0);
 
-            const percentage = totalSupply > 0 ? (balance / totalSupply) * 100 : 0;
-            const receiverWallet = token.receiver_address;
-            const isDeveloperWallet = topLine.account === receiverWallet;
+        const percentage = totalSupply > 0 ? (balance / totalSupply) * 100 : 0;
+        const isDeveloperWallet = topLine.account === token.receiver_address;
 
-            // Calculate real-time price from AMM
-            let price = 0;
-            if (ammPriceResponse?.result?.amm) {
-              const amm = ammPriceResponse.result.amm;
-              const amount = amm.amount;
-              const amount2 = amm.amount2;
+        // Calculate price from AMM
+        let price = 0;
+        if (ammPriceResponse?.result?.amm) {
+          const amm = ammPriceResponse.result.amm;
+          const amount = amm.amount;
+          const amount2 = amm.amount2;
 
-              let xrpPool, tokenPool;
-              if (typeof amount === 'string') {
-                xrpPool = parseFloat(amount) / 1000000;
-                tokenPool = parseFloat(amount2.value);
-              } else {
-                xrpPool = parseFloat(amount2) / 1000000;
-                tokenPool = parseFloat(amount.value);
-              }
+          let xrpPool, tokenPool;
+          if (typeof amount === 'string') {
+            xrpPool = parseFloat(amount) / 1000000;
+            tokenPool = parseFloat(amount2.value);
+          } else {
+            xrpPool = parseFloat(amount2) / 1000000;
+            tokenPool = parseFloat(amount.value);
+          }
 
-              if (tokenPool > 0) {
-                price = xrpPool / tokenPool;
-              }
-            } else {
-              // Fallback to cached price
-              price = parseFloat(token.current_price) || 0;
-            }
+          if (tokenPool > 0) {
+            price = xrpPool / tokenPool;
+          }
+        } else {
+          price = parseFloat(token.current_price) || 0;
+        }
 
-            const xrpValue = balance * price;
+        const xrpValue = balance * price;
 
-            // Create holder object
-            const holder = {
-              holder_address: topLine.account,
-              balance: balance,
-              percentage: percentage,
-              is_developer_wallet: isDeveloperWallet,
-              rank: 1
-            };
+        // Delete old holders for this token
+        await supabase
+          .from('token_holders')
+          .delete()
+          .eq('token_id', token.id);
 
-            // Cache holder data asynchronously (don't wait)
-            supabase
-              .from('token_holders')
-              .upsert({
-                token_id: token.id,
+        // Save all holders
+        const holdersToInsert = trustlines.map((line, index) => {
+          const bal = parseFloat(line.balance);
+          if (bal <= 0) return null;
+          return {
+            token_id: token.id,
+            holder_address: line.account,
+            balance: bal,
+            percentage: totalSupply > 0 ? (bal / totalSupply) * 100 : 0,
+            is_developer_wallet: line.account === token.receiver_address,
+            rank: index + 1,
+            last_updated: new Date().toISOString()
+          };
+        }).filter(h => h !== null);
+
+        if (holdersToInsert.length > 0) {
+          await supabase
+            .from('token_holders')
+            .insert(holdersToInsert);
+        }
+
+        // Update token price
+        if (price > 0) {
+          await supabase
+            .from('meme_tokens')
+            .update({
+              current_price: price,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', token.id);
+        }
+
+        // Update local state
+        setTokens(prev => prev.map(t => {
+          if (t.id === tokenId) {
+            return {
+              ...t,
+              current_price: price,
+              topHolder: {
                 holder_address: topLine.account,
                 balance: balance,
                 percentage: percentage,
                 is_developer_wallet: isDeveloperWallet,
                 rank: 1,
                 last_updated: new Date().toISOString()
-              }, {
-                onConflict: 'token_id,holder_address'
-              })
-              .then(() => {
-                // Update token price cache asynchronously
-                if (price > 0) {
-                  return supabase
-                    .from('meme_tokens')
-                    .update({
-                      current_price: price,
-                      updated_at: new Date().toISOString()
-                    })
-                    .eq('id', token.id);
-                }
-              })
-              .catch(err => console.error(`Error caching data for ${token.token_name}:`, err));
-
-            return {
-              token: {
-                ...token,
-                current_price: price,
-                total_supply: totalSupply
-              },
-              holder,
-              xrpValue
+              }
             };
-
-          } catch (tokenError) {
-            console.error(`Error loading holder for token ${token.token_name}:`, tokenError);
-            return null;
           }
-        });
+          return t;
+        }));
 
-        // Wait for all tokens to process
-        const results = await Promise.all(kingsPromises);
-
-        // Filter out null results
-        const kingsData = results.filter(result => result !== null);
-
-        setKings(kingsData);
+        toast.success(`Found king for ${token.token_name}!`);
       } finally {
         await client.disconnect();
       }
     } catch (error) {
-      console.error('Error loading kings:', error);
-      toast.error('Failed to load kings list');
+      console.error('Error fetching top holder:', error);
+      toast.error('Failed to fetch top holder');
     } finally {
-      setLoading(false);
+      setFetching(prev => ({ ...prev, [tokenId]: false }));
     }
   };
 
-  const refreshTokenHolders = async (tokenId) => {
-    setRefreshing(prev => ({ ...prev, [tokenId]: true }));
-
-    try {
-      const king = kings.find(k => k.token.id === tokenId);
-      if (!king) return;
-
-      const token = king.token;
-      const receiverWallet = token.receiver_address;
-
-      const client = new Client('wss://xrplcluster.com');
-      await client.connect();
-
-      try {
-        const response = await client.request({
-          command: 'account_lines',
-          account: token.issuer_address,
-          peer: undefined,
-          ledger_index: 'validated'
-        });
-
-        const trustlines = response.result.lines || [];
-
-        // Calculate real total supply from trustlines
-        const totalSupply = trustlines.reduce((sum, line) => {
-          const bal = parseFloat(line.balance);
-          return sum + (bal > 0 ? bal : 0);
-        }, 0);
-
-        const holdersToInsert = [];
-
-        trustlines.sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance));
-
-        trustlines.forEach((line, index) => {
-          const balance = parseFloat(line.balance);
-          if (balance > 0) {
-            const percentage = totalSupply > 0 ? (balance / totalSupply) * 100 : 0;
-
-            holdersToInsert.push({
-              token_id: token.id,
-              holder_address: line.account,
-              balance: balance,
-              percentage: percentage,
-              is_developer_wallet: line.account === receiverWallet,
-              rank: index + 1,
-              last_updated: new Date().toISOString()
-            });
-          }
-        });
-
-        await supabase
-          .from('token_holders')
-          .delete()
-          .eq('token_id', token.id);
-
-        if (holdersToInsert.length > 0) {
-          const { error: insertError } = await supabase
-            .from('token_holders')
-            .insert(holdersToInsert);
-
-          if (insertError) throw insertError;
-        }
-
-        await loadKings();
-        toast.success(`Updated holders for ${token.token_name || token.name}`);
-      } finally {
-        await client.disconnect();
-      }
-    } catch (error) {
-      console.error('Error refreshing holders:', error);
-      toast.error('Failed to refresh holders');
-    } finally {
-      setRefreshing(prev => ({ ...prev, [tokenId]: false }));
-    }
-  };
-
-  const refreshAllHolders = async () => {
+  const fetchAllTopHolders = async () => {
     setLoading(true);
-    for (const king of kings) {
-      await refreshTokenHolders(king.token.id);
+    for (const token of tokens) {
+      await fetchTopHolder(token.id);
     }
-    toast.success('All token holders updated!');
+    setLoading(false);
+    toast.success('All top holders updated!');
   };
 
-  const filteredKings = kings.filter(king => {
+  const filteredTokens = tokens.filter(token => {
     if (!searchQuery) return true;
-    const token = king.token;
-    const tokenName = token.token_name || token.name || '';
-    const tokenSymbol = token.currency_code || token.symbol || '';
+    const tokenName = token.token_name || '';
+    const tokenSymbol = token.currency_code || '';
     return tokenName.toLowerCase().includes(searchQuery.toLowerCase()) ||
            tokenSymbol.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  const totalXrpValue = filteredKings.reduce((sum, king) => sum + king.xrpValue, 0);
+  const tokensWithKings = filteredTokens.filter(t => t.topHolder !== null);
+  const totalXrpValue = tokensWithKings.reduce((sum, token) => {
+    const balance = parseFloat(token.topHolder?.balance || 0);
+    const price = parseFloat(token.current_price || 0);
+    return sum + (balance * price);
+  }, 0);
 
   return (
     <div className="space-y-6">
@@ -279,7 +236,7 @@ export default function KingsList() {
         </div>
 
         <button
-          onClick={refreshAllHolders}
+          onClick={fetchAllTopHolders}
           disabled={loading}
           className="bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-3 rounded-lg hover:from-green-500 hover:to-green-400 disabled:opacity-50 shadow-lg shadow-green-500/20 transition-all duration-300 flex items-center gap-2"
         >
@@ -289,14 +246,14 @@ export default function KingsList() {
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              Refreshing...
+              Updating All...
             </>
           ) : (
             <>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              Refresh All
+              Fetch All Kings
             </>
           )}
         </button>
@@ -305,22 +262,18 @@ export default function KingsList() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="glass rounded-lg p-4">
           <div className="text-gray-400 text-sm mb-1">Total Tokens</div>
-          <div className="text-2xl font-bold text-white">{filteredKings.length}</div>
+          <div className="text-2xl font-bold text-white">{filteredTokens.length}</div>
+        </div>
+
+        <div className="glass rounded-lg p-4">
+          <div className="text-gray-400 text-sm mb-1">Kings Found</div>
+          <div className="text-2xl font-bold text-yellow-400">{tokensWithKings.length}</div>
         </div>
 
         <div className="glass rounded-lg p-4">
           <div className="text-gray-400 text-sm mb-1">Total XRP Value</div>
           <div className="text-2xl font-bold text-green-400">
             {totalXrpValue.toLocaleString(undefined, { maximumFractionDigits: 2 })} XRP
-          </div>
-        </div>
-
-        <div className="glass rounded-lg p-4">
-          <div className="text-gray-400 text-sm mb-1">Avg XRP Value</div>
-          <div className="text-2xl font-bold text-blue-400">
-            {filteredKings.length > 0
-              ? (totalXrpValue / filteredKings.length).toLocaleString(undefined, { maximumFractionDigits: 2 })
-              : '0'} XRP
           </div>
         </div>
       </div>
@@ -335,25 +288,19 @@ export default function KingsList() {
         />
       </div>
 
-      {loading && filteredKings.length === 0 ? (
+      {loading && filteredTokens.length === 0 ? (
         <div className="glass rounded-lg p-12 text-center">
           <svg className="animate-spin h-12 w-12 mx-auto text-green-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <p className="text-gray-400">Loading kings...</p>
+          <p className="text-gray-400">Loading tokens...</p>
         </div>
-      ) : filteredKings.length === 0 ? (
+      ) : filteredTokens.length === 0 ? (
         <div className="glass rounded-lg p-12 text-center">
           <div className="text-6xl mb-4">👑</div>
-          <h3 className="text-xl font-bold text-white mb-2">No Kings Found</h3>
-          <p className="text-gray-400 mb-6">No token holders data available yet.</p>
-          <button
-            onClick={refreshAllHolders}
-            className="bg-gradient-to-r from-green-600 to-green-500 text-white px-6 py-3 rounded-lg hover:from-green-500 hover:to-green-400 shadow-lg shadow-green-500/20 transition-all duration-300"
-          >
-            Fetch Holder Data
-          </button>
+          <h3 className="text-xl font-bold text-white mb-2">No Tokens Found</h3>
+          <p className="text-gray-400">No tokens match your search.</p>
         </div>
       ) : (
         <div className="glass rounded-lg overflow-hidden">
@@ -361,89 +308,106 @@ export default function KingsList() {
             <table className="w-full">
               <thead className="bg-gray-800/50 border-b border-gray-700">
                 <tr>
-                  <th className="text-left px-6 py-4 text-gray-400 font-medium text-sm">Rank</th>
                   <th className="text-left px-6 py-4 text-gray-400 font-medium text-sm">Token</th>
                   <th className="text-left px-6 py-4 text-gray-400 font-medium text-sm">King Address</th>
                   <th className="text-right px-6 py-4 text-gray-400 font-medium text-sm">Balance</th>
                   <th className="text-right px-6 py-4 text-gray-400 font-medium text-sm">% Supply</th>
                   <th className="text-right px-6 py-4 text-gray-400 font-medium text-sm">XRP Value</th>
-                  <th className="text-center px-6 py-4 text-gray-400 font-medium text-sm">Actions</th>
+                  <th className="text-center px-6 py-4 text-gray-400 font-medium text-sm">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-700/50">
-                {filteredKings.map((king, index) => (
-                  <tr key={king.token.id} className="hover:bg-gray-800/30 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white text-sm font-bold rounded-full w-10 h-10 flex items-center justify-center shadow-lg">
-                        #{index + 1}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <TokenIcon token={king.token} size="md" />
-                        <div>
-                          <div className="text-white font-bold">{king.token.token_name || king.token.name}</div>
-                          <div className="text-gray-400 text-sm">{king.token.currency_code || king.token.symbol}</div>
+                {filteredTokens.map((token) => {
+                  const holder = token.topHolder;
+                  const balance = holder ? parseFloat(holder.balance) : 0;
+                  const price = parseFloat(token.current_price) || 0;
+                  const xrpValue = balance * price;
+
+                  return (
+                    <tr key={token.id} className="hover:bg-gray-800/30 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <TokenIcon token={token} size="md" />
+                          <div>
+                            <div className="text-white font-bold">{token.token_name}</div>
+                            <div className="text-gray-400 text-sm">{token.currency_code}</div>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      {king.holder.is_developer_wallet ? (
-                        <div className="inline-flex px-3 py-1 bg-gradient-to-r from-purple-600 to-purple-500 rounded-full text-white text-xs font-medium">
-                          MEMEKINGS Dev
-                        </div>
-                      ) : (
-                        <XRPScanLink
-                          type="address"
-                          value={king.holder.holder_address}
-                          network="mainnet"
-                          className="text-green-400 hover:text-green-300 text-sm font-mono"
-                        />
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="text-white font-bold">
-                        {parseFloat(king.holder.balance).toLocaleString(undefined, {
-                          maximumFractionDigits: 2
-                        })}
-                      </div>
-                      <div className="text-gray-500 text-xs">{king.token.currency_code || king.token.symbol}</div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="text-green-400 font-bold">
-                        {parseFloat(king.holder.percentage).toFixed(2)}%
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="text-green-400 font-bold">
-                        {king.xrpValue.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2
-                        })}
-                      </div>
-                      <div className="text-gray-500 text-xs">XRP</div>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      <button
-                        onClick={() => refreshTokenHolders(king.token.id)}
-                        disabled={refreshing[king.token.id]}
-                        className="text-green-400 hover:text-green-300 disabled:opacity-50 inline-flex items-center gap-1 text-sm"
-                        title="Refresh holder data"
-                      >
-                        {refreshing[king.token.id] ? (
-                          <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
+                      </td>
+                      <td className="px-6 py-4">
+                        {holder ? (
+                          holder.is_developer_wallet ? (
+                            <div className="inline-flex px-3 py-1 bg-gradient-to-r from-purple-600 to-purple-500 rounded-full text-white text-xs font-medium">
+                              MEMEKINGS Dev
+                            </div>
+                          ) : (
+                            <XRPScanLink
+                              type="address"
+                              value={holder.holder_address}
+                              network="mainnet"
+                              className="text-green-400 hover:text-green-300 text-sm font-mono"
+                            />
+                          )
                         ) : (
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
+                          <span className="text-gray-500 text-sm">-</span>
                         )}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {holder ? (
+                          <>
+                            <div className="text-white font-bold">
+                              {balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                            </div>
+                            <div className="text-gray-500 text-xs">{token.currency_code}</div>
+                          </>
+                        ) : (
+                          <span className="text-gray-500 text-sm">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {holder ? (
+                          <div className="text-green-400 font-bold">
+                            {parseFloat(holder.percentage).toFixed(2)}%
+                          </div>
+                        ) : (
+                          <span className="text-gray-500 text-sm">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {holder && xrpValue > 0 ? (
+                          <>
+                            <div className="text-green-400 font-bold">
+                              {xrpValue.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2
+                              })}
+                            </div>
+                            <div className="text-gray-500 text-xs">XRP</div>
+                          </>
+                        ) : (
+                          <span className="text-gray-500 text-sm">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button
+                          onClick={() => fetchTopHolder(token.id)}
+                          disabled={fetching[token.id]}
+                          className="text-yellow-400 hover:text-yellow-300 disabled:opacity-50 inline-flex items-center gap-1 text-sm transition-colors"
+                          title={holder ? "Refresh top holder" : "Fetch top holder"}
+                        >
+                          {fetching[token.id] ? (
+                            <svg className="animate-spin h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          ) : (
+                            <span className="text-2xl">👑</span>
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
