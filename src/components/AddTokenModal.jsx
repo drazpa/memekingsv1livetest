@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { supabase } from '../utils/supabase';
 import { Wallet as XrplWallet } from 'xrpl';
 import { getClient, submitWithRetry } from '../utils/xrplClient';
+import { encodeCurrencyCode } from '../utils/currencyUtils';
 
 const LISTING_FEE = 1;
 const FEATURED_FEE_OPTIONS = [
@@ -141,12 +142,14 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
         throw new Error('Payment transaction failed');
       }
 
+      const currencyHex = encodeCurrencyCode(formData.currencyCode);
+
       const { data: tokenData, error: tokenError } = await supabase
         .from('meme_tokens')
         .insert({
           token_name: formData.tokenName,
           currency_code: formData.currencyCode.toUpperCase(),
-          currency_hex: Buffer.from(formData.currencyCode.toUpperCase()).toString('hex').toUpperCase().padEnd(40, '0'),
+          currency_hex: currencyHex,
           issuer_address: formData.issuerAddress,
           receiver_address: wallet.address,
           supply: parseFloat(formData.supply),
@@ -269,6 +272,16 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
                 maxLength={10}
                 className="w-full px-4 py-3 bg-purple-900/20 border border-purple-500/30 rounded-lg text-white placeholder-purple-500"
               />
+              {formData.currencyCode && formData.currencyCode.length >= 3 && (
+                <div className="mt-2 p-2 bg-purple-900/30 border border-purple-500/20 rounded text-xs">
+                  <p className="text-purple-300">
+                    {formData.currencyCode.length === 3
+                      ? `Standard code: ${formData.currencyCode.toUpperCase()}`
+                      : `Hex encoded: ${encodeCurrencyCode(formData.currencyCode)}`
+                    }
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
@@ -364,6 +377,19 @@ export default function AddTokenModal({ isOpen, onClose, wallet }) {
         {step === 3 && (
           <div className="space-y-4">
             <h3 className="text-white font-semibold">AMM Pool Information</h3>
+
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+              <h4 className="text-blue-300 font-semibold mb-2 flex items-center gap-2">
+                <span>ℹ️</span>
+                Receiver Wallet Configuration
+              </h4>
+              <p className="text-blue-200 text-sm mb-2">
+                Your connected wallet address will be set as the receiver for this token listing:
+              </p>
+              <p className="text-blue-100 text-xs font-mono bg-blue-900/30 p-2 rounded break-all">
+                {wallet?.address || 'No wallet connected'}
+              </p>
+            </div>
 
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
               <p className="text-yellow-200 text-sm">

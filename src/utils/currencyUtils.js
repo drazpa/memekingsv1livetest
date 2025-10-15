@@ -192,3 +192,38 @@ export function formatBalance(balance, decimals = 6) {
   if (!balance) return '0.00';
   return parseFloat(balance).toFixed(decimals);
 }
+
+export function encodeCurrencyCode(currencyCode) {
+  if (!currencyCode || typeof currencyCode !== 'string') {
+    throw new Error('Invalid currency code');
+  }
+
+  const code = currencyCode.toUpperCase().trim();
+
+  if (code.length < 3 || code.length > 20) {
+    throw new Error('Currency code must be between 3 and 20 characters');
+  }
+
+  if (code === 'XRP') {
+    return null;
+  }
+
+  if (code.length === 3 && /^[A-Z0-9]{3}$/.test(code)) {
+    return code;
+  }
+
+  const hex = Buffer.from(code, 'utf8').toString('hex').toUpperCase();
+  return hex.padEnd(40, '0');
+}
+
+export function decodeCurrencyCode(currencyHex) {
+  if (!currencyHex || typeof currencyHex !== 'string') {
+    return 'Unknown';
+  }
+
+  if (currencyHex.length === 3) {
+    return currencyHex;
+  }
+
+  return hexToString(currencyHex);
+}
