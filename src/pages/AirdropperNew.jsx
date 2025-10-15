@@ -23,6 +23,7 @@ export default function Airdropper() {
   const [transactions, setTransactions] = useState([]);
   const [logs, setLogs] = useState([]);
   const [availableTokens, setAvailableTokens] = useState([]);
+  const [allTokens, setAllTokens] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -69,6 +70,7 @@ export default function Airdropper() {
       loadCampaigns();
       loadAnalytics();
       loadAvailableTokens();
+      loadAllTokens();
     }
   }, [connectedWallet]);
 
@@ -113,6 +115,29 @@ export default function Airdropper() {
   const loadAvailableTokens = async () => {
     const tokens = await loadUserTokens(connectedWallet.address);
     setAvailableTokens(tokens.map(formatTokenOption));
+  };
+
+  const loadAllTokens = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tokens')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (error) throw error;
+
+      const formattedTokens = (data || []).map(token => ({
+        value: `${token.currency_code}:${token.issuer_address}`,
+        label: `${token.currency_code} (${token.issuer_address.slice(0, 8)}...)`,
+        currency_code: token.currency_code,
+        issuer_address: token.issuer_address
+      }));
+
+      setAllTokens(formattedTokens);
+    } catch (error) {
+      console.error('Error loading all tokens:', error);
+    }
   };
 
   const loadCampaigns = async () => {
@@ -1436,18 +1461,18 @@ export default function Airdropper() {
                           )}
                         </div>
 
-                        {availableTokens.length > 0 && (
+                        {allTokens.length > 0 && (
                           <div>
-                            <label className="block text-xs text-slate-400 mb-1">Select from your tokens</label>
+                            <label className="block text-xs text-slate-400 mb-1">Select from all tokens</label>
                             <select
                               onChange={(e) => {
-                                const selected = availableTokens.find(t => t.value === e.target.value);
+                                const selected = allTokens.find(t => t.value === e.target.value);
                                 if (selected) selectTokenFromDropdown(index, selected);
                               }}
                               className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm"
                             >
                               <option value="">Choose a token...</option>
-                              {availableTokens.map(token => (
+                              {allTokens.map(token => (
                                 <option key={token.value} value={token.value}>
                                   {token.label}
                                 </option>
@@ -1717,6 +1742,31 @@ export default function Airdropper() {
                             </button>
                           )}
                         </div>
+
+                        {allTokens.length > 0 && (
+                          <div>
+                            <label className="block text-xs text-slate-400 mb-1">Select from all tokens</label>
+                            <select
+                              onChange={(e) => {
+                                const selected = allTokens.find(t => t.value === e.target.value);
+                                if (selected) {
+                                  const newTokens = [...editingCampaign.tokens];
+                                  newTokens[index].currency_code = selected.currency_code;
+                                  newTokens[index].issuer_address = selected.issuer_address;
+                                  setEditingCampaign({ ...editingCampaign, tokens: newTokens });
+                                }
+                              }}
+                              className="w-full px-3 py-2 bg-purple-950/50 border border-purple-500/30 rounded-lg focus:outline-none focus:border-purple-400 text-white text-sm"
+                            >
+                              <option value="">Choose a token...</option>
+                              {allTokens.map(token => (
+                                <option key={token.value} value={token.value}>
+                                  {token.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-2">
                           <input
