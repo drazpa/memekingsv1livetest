@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import * as xrpl from 'xrpl';
+import { getClient } from './xrplClient';
 
 const FEATURED_SPOT_WALLET = 'rKxBBMmY969Ph1y63ddVfYyN7xmxwDfVq6';
 const XRP_PER_HOUR = 1;
@@ -41,9 +42,7 @@ export const purchaseFeaturedSpot = async ({
   try {
     const finalXrpAmount = xrpAmount || (hours * XRP_PER_HOUR);
 
-    const client = new xrpl.Client('wss://s.altnet.rippletest.net:51233');
-    await client.connect();
-
+    const client = await getClient();
     const wallet = xrpl.Wallet.fromSeed(walletSeed);
 
     const payment = {
@@ -58,7 +57,8 @@ export const purchaseFeaturedSpot = async ({
             MemoData: Buffer.from(JSON.stringify({
               tokenId,
               spotPosition,
-              hours
+              hours,
+              deal: xrpAmount ? 'day_buyout' : 'standard'
             }), 'utf8').toString('hex').toUpperCase()
           }
         }
@@ -72,8 +72,6 @@ export const purchaseFeaturedSpot = async ({
     if (result.result.meta.TransactionResult !== 'tesSUCCESS') {
       throw new Error(`Transaction failed: ${result.result.meta.TransactionResult}`);
     }
-
-    await client.disconnect();
 
     const startedAt = new Date();
     const expiresAt = new Date(startedAt.getTime() + hours * 60 * 60 * 1000);
