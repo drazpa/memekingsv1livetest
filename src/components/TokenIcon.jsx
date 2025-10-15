@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo, useMemo } from 'react';
 import { imageCacheManager, extractIpfsHash as extractHash, normalizeImageUrl } from '../utils/imageCache';
 
 const IPFS_GATEWAYS = [
@@ -9,7 +9,8 @@ const IPFS_GATEWAYS = [
 ];
 
 function TokenIcon({ token, size = 'md', className = '' }) {
-  const cacheKey = `token-img-${token.id}`;
+  const cacheKey = useMemo(() => `token-img-${token.id}`, [token.id]);
+  const stableImageUrl = useMemo(() => token.image_url, [token.image_url]);
 
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -17,6 +18,7 @@ function TokenIcon({ token, size = 'md', className = '' }) {
   const [retryCount, setRetryCount] = useState(0);
   const imageUrlRef = useRef(null);
   const [currentUrl, setCurrentUrl] = useState(null);
+  const mountedRef = useRef(true);
 
   const sizeClasses = {
     sm: 'w-8 h-8 min-w-[2rem] min-h-[2rem] text-sm',
@@ -30,43 +32,61 @@ function TokenIcon({ token, size = 'md', className = '' }) {
   const sizeClass = sizeClasses[size] || sizeClasses.md;
 
   useEffect(() => {
-    if (!token.image_url) {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!stableImageUrl) {
       setImageError(true);
+      return;
+    }
+
+    if (imageUrlRef.current === stableImageUrl && imageLoaded) {
       return;
     }
 
     const loadImage = async () => {
       const cached = await imageCacheManager.get(cacheKey);
-      if (cached) {
+      if (cached && mountedRef.current) {
         setCurrentUrl(cached);
         setImageLoaded(true);
         setImageError(false);
+        imageUrlRef.current = stableImageUrl;
         return;
       }
 
-      if (imageUrlRef.current !== token.image_url) {
-        setImageError(false);
-        setImageLoaded(false);
-        setCurrentGatewayIndex(0);
-        setRetryCount(0);
-        imageUrlRef.current = token.image_url;
+      if (imageUrlRef.current !== stableImageUrl) {
+        if (mountedRef.current) {
+          setImageError(false);
+          setImageLoaded(false);
+          setCurrentGatewayIndex(0);
+          setRetryCount(0);
+        }
+        imageUrlRef.current = stableImageUrl;
 
-        let imageUrl = normalizeImageUrl(token.image_url);
+        let imageUrl = normalizeImageUrl(stableImageUrl);
 
         if (imageUrl.includes('gateway.pinata.cloud') || imageUrl.includes('ipfs.io') || imageUrl.includes('cloudflare-ipfs.com') || imageUrl.includes('dweb.link')) {
-          setCurrentUrl(imageUrl);
+          if (mountedRef.current) {
+            setCurrentUrl(imageUrl);
+          }
         } else {
-          const ipfsHash = extractHash(token.image_url);
+          const ipfsHash = extractHash(stableImageUrl);
           if (ipfsHash) {
             imageUrl = `${IPFS_GATEWAYS[0]}${ipfsHash}`;
           }
-          setCurrentUrl(imageUrl);
+          if (mountedRef.current) {
+            setCurrentUrl(imageUrl);
+          }
         }
       }
     };
 
     loadImage();
-  }, [token.image_url, token.id, cacheKey]);
+  }, [stableImageUrl, cacheKey, imageLoaded]);
 
   const handleImageError = () => {
     console.error('Image load error for token:', token.token_name, 'URL:', currentUrl, 'Gateway:', currentGatewayIndex, 'Retry:', retryCount);
@@ -107,8 +127,11 @@ function TokenIcon({ token, size = 'md', className = '' }) {
             alt={token.token_name}
             className={`w-full h-full object-cover transition-opacity duration-200 ${!imageLoaded ? 'opacity-0' : 'opacity-100'}`}
             onLoad={async () => {
+              if (!mountedRef.current) return;
               await imageCacheManager.set(cacheKey, currentUrl);
-              setImageLoaded(true);
+              if (mountedRef.current) {
+                setImageLoaded(true);
+              }
             }}
             onError={handleImageError}
             loading="lazy"

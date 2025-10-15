@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import { supabase } from '../utils/supabase';
 import toast from 'react-hot-toast';
 import TokenIcon from '../components/TokenIcon';
@@ -185,9 +185,23 @@ export default function Vault() {
       localStorage.setItem('vault_tokens_cache', JSON.stringify(tokenList));
       localStorage.setItem('vault_tokens_cache_time', Date.now().toString());
       console.log('💾 Cached admin tokens list for Vault');
+
+      // Preload images in background
+      preloadTokenImages(tokenList);
     } catch (error) {
       console.error('Error loading tokens from DB:', error);
     }
+  };
+
+  const preloadTokenImages = (tokenList) => {
+    tokenList.forEach((token, index) => {
+      if (token.image_url) {
+        setTimeout(() => {
+          const img = new Image();
+          img.src = token.image_url;
+        }, index * 100);
+      }
+    });
   };
 
   const loadTokenBalances = async () => {
@@ -623,7 +637,7 @@ export default function Vault() {
     }
   };
 
-  const TokenCard = ({ token, isListView = false }) => {
+  const TokenCard = memo(({ token, isListView = false }) => {
     const balance = tokenBalances[token.id] || 0;
     const earning = earnings[token.id];
     const pending = calculatePendingEarnings(token.id);
@@ -858,7 +872,10 @@ export default function Vault() {
         </div>
       </div>
     );
-  };
+  }, (prevProps, nextProps) => {
+    return prevProps.token.id === nextProps.token.id &&
+           prevProps.isListView === nextProps.isListView;
+  });
 
   if (!connectedWallet) {
     return (
@@ -877,21 +894,30 @@ export default function Vault() {
     );
   }
 
-  const tokensWithBalance = tokens.filter(t => parseFloat(tokenBalances[t.id] || 0) > 0);
+  const tokensWithBalance = useMemo(() =>
+    tokens.filter(t => parseFloat(tokenBalances[t.id] || 0) > 0),
+    [tokens, tokenBalances]
+  );
 
-  const filteredTokens = tokensWithBalance.filter(token => {
-    const matchesSearch = token.token_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         token.currency_code.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
+  const filteredTokens = useMemo(() =>
+    tokensWithBalance.filter(token => {
+      const matchesSearch = token.token_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           token.currency_code.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesSearch;
+    }),
+    [tokensWithBalance, searchQuery]
+  );
 
-  const sortedTokens = [...filteredTokens].sort((a, b) => {
-    const aFav = favorites.includes(a.id);
-    const bFav = favorites.includes(b.id);
-    if (aFav && !bFav) return -1;
-    if (!aFav && bFav) return 1;
-    return 0;
-  });
+  const sortedTokens = useMemo(() =>
+    [...filteredTokens].sort((a, b) => {
+      const aFav = favorites.includes(a.id);
+      const bFav = favorites.includes(b.id);
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return 0;
+    }),
+    [filteredTokens, favorites]
+  );
 
   return (
     <div className="space-y-6">
