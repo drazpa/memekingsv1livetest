@@ -201,32 +201,6 @@ export default function Setup() {
     }
   };
 
-  const clearAllData = async () => {
-    const confirmed = confirm(
-      'WARNING: This will delete ALL tokens, wallets, and activity logs!\n\nThis action cannot be undone. Are you sure?'
-    );
-
-    if (!confirmed) return;
-
-    const doubleConfirm = confirm('Are you ABSOLUTELY sure? This will delete everything!');
-    if (!doubleConfirm) return;
-
-    try {
-      await Promise.all([
-        supabase.from('meme_tokens').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-        supabase.from('wallets').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
-        supabase.from('activity_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      ]);
-
-      localStorage.clear();
-      toast.success('All data cleared!');
-      loadData();
-    } catch (error) {
-      console.error('Error clearing data:', error);
-      toast.error('Failed to clear data');
-    }
-  };
-
   const issuerWallet = wallets.find(w => w.id === selectedIssuer);
   const receiverWallet = wallets.find(w => w.id === selectedReceiver);
 
@@ -397,24 +371,6 @@ export default function Setup() {
           <p className="text-purple-400 text-sm">
             Import previously exported data. This will add to your existing data without deleting anything.
           </p>
-        </div>
-      </div>
-
-      <div className="glass rounded-lg p-6 border-2 border-red-500/30">
-        <h3 className="text-xl font-bold text-red-400 mb-4">Danger Zone</h3>
-        <div className="space-y-4">
-          <div className="bg-red-500/10 rounded-lg p-4">
-            <h4 className="text-red-300 font-bold mb-2">Clear All Data</h4>
-            <p className="text-red-200/80 text-sm mb-3">
-              This will permanently delete all tokens, wallets, and settings. This action cannot be undone!
-            </p>
-            <button
-              onClick={clearAllData}
-              className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium"
-            >
-              🗑️ Clear All Data
-            </button>
-          </div>
         </div>
       </div>
 
